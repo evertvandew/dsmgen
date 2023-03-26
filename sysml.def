@@ -1,0 +1,224 @@
+
+
+Entity note {
+    required attribute description: string
+}
+
+entity constraint {
+    required attribute description: string
+}
+
+relationship Anchor {
+    source: note, constraint
+    target: entity
+    attribute name: string
+}
+
+
+###############################################################################
+# Structural Diagrams
+
+#######################################
+# (internal) Block Definition diagram
+
+block Block {
+    recursion allowed
+    attribute name: string
+    attribute description: string
+    ports: list of (BlockPort or FlowPort)
+}
+
+
+port FullPort {
+    attribute name: string
+    attribute provides: list of (entity or string)
+    attribute requires: list of (entity or string)
+}
+
+port FlowPort {
+    attribute name: string
+    attribute inputs: list of (entity or string)
+    attribute outputs: list of (entity or string)
+}
+
+relationship BlockReference {
+    stereotypes: None, Association, Aggregration, Composition
+    source: Block
+    target: Block
+    multiplicity: any to any
+    association: Block
+}
+
+relationship BlockGeneralization {
+    source: Block
+    target: Block
+}
+
+relationship FullPortConnection {
+    attribute name: string
+    source: FullPort
+    target: FullPort
+}
+relationship FlowPortConnection {
+    attribute name: string
+    source: FlowPort
+    target: FlowPort
+}
+
+diagram BlockDefinitionDiagram {
+    entities: Block, note
+}
+
+#######################################
+# Package Diagram
+
+entity Package {
+    recursion allowed
+    required attribute name: string
+    attribute description: string
+}
+
+entity SubSystem inherits from Package {}
+
+relationship PackageRelationship {
+    stereotypes: Merge, Import
+}
+
+diagram PackageDiagram {
+    entities Package, note, constraint
+}
+
+
+###############################################################################
+# Behavioural Diagrams
+
+#######################################
+# For Use Cases
+
+enum usecase_stereotypes {
+    Includes, Extends, Generalizes
+}
+
+block usecase {
+    required attribute name: string
+    attribute description: string
+}
+
+block actor {
+    required attribute name: string    
+}
+
+relationship UseCaseCommunication {
+    attribute stereotype: one of usecase_stereotypes
+    source of type usecase or actor
+    target of type usecase or actor
+}
+
+
+diagram UseCaseDiagram {
+    entities: actor, usecase, note
+}
+
+
+#######################################
+# For the Activity Diagram
+
+block Action {
+    required attribute name: string
+    attribute description: string
+}
+
+block ForkJoin {
+    attribute type: enum{Fork, Join}
+}
+block Decision {
+    attribute condition: string
+    connections: {
+        incoming: 1,
+        outgoing: 2: (true, false),
+    }
+}
+block StartStopAction {
+    attribute type: enum{Start, Stop}
+}
+
+block CompositeActivity inherits Action {
+    attribute child: ActivityDiagram
+}
+block LoopActivity inherits CompositeActivity {
+    attribute initialisation: string
+    attribute condition: string
+}
+block ConditionalActivity inherits Action {
+    attribute condition: string
+    attribute then: ActivityDiagram
+    attribute else: ActivityDiagram
+}
+block SequentialActivity inherits Action {
+    attribute children: list of ActivityDiagram
+}
+
+relationship ActivityFlow {
+    connects (Object, Action, ForkJoin, StartStop, Decision)  to (Object, Action, ForkJoin, StartStop, Decision)
+    attribute associated_object: Object
+}
+
+diagram ActivityDiagram {
+    entities: Object, Action, ForkJoin, StartStop, Decision
+    relationships: ActivityFlow
+}
+
+
+#######################################
+# Sequence Diagram
+
+
+
+
+
+diagram SequenceDiagram {}
+
+#######################################
+diagram StateMachineDiagram {}
+
+
+# System Diagrams
+
+diagram ParametricDiagram {}
+
+
+#######################################
+# Requirements Diagram
+
+block Requirement {
+    required attribute name: string
+    attribute description: string
+    required attribute id: string autoincremented "REQ{count}"
+}
+block TestCase {
+    required attribute name: string
+    attribute description: string
+    required attribute id: string autoincremented "TEST{count}"
+}
+relationship RequirementTree {
+    stereotypes Derive, Contains, Depends
+    source: Requirement
+    target: Requirement
+}
+relationship Satisfy {
+    source: UseCase, Requirement
+    target: Requirement
+}
+relationship Verifies {
+    source: TestCase
+    target: Requirement
+}
+
+diagram RequirementDiagram {
+    entities: Requirement, UseCase, TestCase
+}
+
+
+###############################################################################
+# Tracability
+

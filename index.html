@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="brython.js"></script>
+<script type="text/javascript" src="brython_stdlib.js"></script>
+</head>
+
+<body onload="brython(1)">
+<div class="example" id="ex8">
+    <button id="button8">draw in a canvas</button>
+    <svg id="canvas" width="100%" height="50%"
+        style="border-color:#000;border-style:solid;border-width:1px;margin-left:5em;"></svg>
+
+    <script type="text/python" id="script8" src="diagrams.py"></script>
+
+    <p>
+    <pre class="python"></pre>
+    <p>
+
+    <span class="comment">
+    We start by importing the module <code class="module">math</code>, the same as in the Python standard distribution.
+    <p><a href="https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API" target="_blank">Canvas</a> is an API for drawing geometric forms in the page. The examples on the MDN pages are written in Javascript but can be easily translated for Brython.
+    </span>
+</div>
+</body>
+
+</html>
