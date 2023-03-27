@@ -24,6 +24,9 @@ class Shape:
     width: float
     name: str
 
+    def isResizable(self):
+        return True
+
     def getPos(self):
         return Point(x=int(self.shape['x']), y=int(self.shape['y']))
     def setPos(self, new):
@@ -32,6 +35,8 @@ class Shape:
             s(self)
     def getSize(self):
         return Point(x=int(self.shape['width']), y=int(self.shape['height']))
+    def setSize(self, new):
+        self.shape['width'], self.shape['height'] = new.x, new.y
 
     def subscribe(self, role, f):
         self.subscribers[role] = f
@@ -151,19 +156,83 @@ def getMousePos(ev):
     CTM = ev.target.getScreenCTM()
     return Point(x=int((ev.clientX - CTM.e)/CTM.a), y=int((ev.clientY-CTM.f)/CTM.d))
 
-ResizeStates = enum.IntEnum('ResizeStates', 'NONE DECORATED MOVING RESIZING')
+def moveSingleHandle(decorators, shape, orientation):
+    d = decorators[orientation]
+    x, y, width, height = [int(shape[k]) for k in ['x', 'y', 'width', 'height']]
+    d['cx'], d['cy'] = locations[orientation](x, y, width, height)
+
+def moveHandles(decorators, shape, orientation):
+    # Determine which markers to move
+    for o in to_update[orientation]:
+        moveSingleHandle(decorators, shape, o)
+
+def moveAll(shape, decorators):
+    for o in Orientations:
+        moveSingleHandle(decorators, shape, o)
+
+
+class ResizeStates:
+    States = enum.IntEnum("States", "NONE DECORATED MOVING RESIZING")
+
+    def __init__(self):
+        super(self).__init__(self)
+        self.state = self.States.NONE
+
+    def mouseDownShape(self, diagram, widget, ev):
+        if self.state != self.States.NONE and diagram.selection != widget:
+            diagram.unselect(diagram.selection)
+        if not diagram.selection:
+            diagram.select(widget)
+        self.state = self.States.MOVING
+        self.dragstart = getMousePos(ev)
+        self.initial_pos = widget.getPos()
+        ev.stopPropagation()
+        ev.preventDefault()
+
+    def mouseDownBackground(self, diagram, ev):
+        console.log("mouse down background")
+        if diagram.selection and ev.target == diagram.selection.shape:
+            self.state = self.States.MOVING
+            return
+        if ev.target == diagram.canvas:
+            if self.state == self.States.DECORATED:
+                diagram.unselect(diagram.selection)
+        self.state = self.States.NONE
+        return
+        self.dragstart = getMousePos(ev)
+        if diagram.selection:
+            self.initial_pos = diagram.selection.getPos()
+            self.initial_size = diagram.selection.getSize()
+
+
+    def onMouseUp(self, diagram, ev):
+        if self.state == self.States.RESIZING:
+            diagram.dragEnd(ev)
+            self.state = self.States.DECORATED
+        if self.state == self.States.MOVING:
+            self.state = self.States.DECORATED
+
+    def onMouseMove(self, diagram, ev):
+        if self.state in [self.States.NONE, self.States.DECORATED]:
+            return
+        delta = getMousePos(ev) - self.dragstart
+        if self.state == self.States.RESIZING:
+            diagram.onDrag(self.initial_pos, self.initial_size, delta)
+        if self.state == self.States.MOVING:
+            diagram.selection.setPos(self.initial_pos + delta)
+
+    def startResize(self, widget, orientation, ev):
+        self.dragstart = getMousePos(ev)
+        self.state = self.States.RESIZING
+        self.initial_pos = widget.getPos()
+        self.initial_size = widget.getSize()
+
 
 class Diagram:
     resize_role = 'resize_decorator'
     def __init__(self):
-        self.children = []
-        self.decorators = {}
-        self.dragstart = None
-        self.dragged_handle = None
         self.selection = None
-        self.initial_pos = None
-        self.initial_size = None
-        self.resizestate = ResizeStates.NONE
+        self.resizestate = ResizeStates()
 
     def bind(self, canvas):
         self.canvas = canvas
@@ -178,41 +247,19 @@ class Diagram:
         pass
 
     def mouseDownChild(self, widget, ev):
-        if self.resizestate != ResizeStates.NONE and self.selection != widget:
-            self.unselect(self.selection)
-        if not self.selection:
-            self.select(widget)
-        self.resizestate = ResizeStates.MOVING
-        self.dragstart = getMousePos(ev)
-        self.initial_pos = widget.getPos()
-        ev.stopPropagation()
-        ev.preventDefault()
+        self.resizestate.mouseDownShape(self, widget, ev)
 
     def onClick(self, ev):
         pass
 
     def onMouseDown(self, ev):
-        if self.selection and ev.target == self.selection.shape:
-            self.resizestate = ResizeStates.MOVING
-        if ev.target == self.canvas:
-            if self.resizestate == ResizeStates.DECORATED:
-                self.unselect(self.selection)
-        self.dragstart = getMousePos(ev)
-        if self.selection:
-            self.initial_pos = self.selection.getPos()
+        self.resizestate.mouseDownBackground(self, ev)
 
     def onMouseUp(self, ev):
-        if self.resizestate == ResizeStates.RESIZING:
-            self.dragEnd(ev)
-            self.resizestate = ResizeStates.DECORATED
-        if self.resizestate == ResizeStates.MOVING:
-            self.resizestate = ResizeStates.DECORATED
+        self.resizestate.onMouseUp(self, ev)
 
     def onMouseMove(self, ev):
-        if self.resizestate == ResizeStates.RESIZING:
-            self.onDrag(ev)
-        if self.resizestate == ResizeStates.MOVING:
-            self.selection.setPos(self.initial_pos + getMousePos(ev) - self.dragstart)
+        self.resizestate.onMouseMove(self, ev)
 
     def drop(self, block):
         block.create(self, None)
@@ -227,47 +274,19 @@ class Diagram:
     def onDrop(self):
         pass
 
-
-    def moveSingleHandle(self, orientation):
-        d = self.decorators[orientation]
-        x, y, width, height = [int(self.selection.shape[k]) for k in ['x', 'y', 'width', 'height']]
-        d['cx'], d['cy'] = locations[orientation](x, y, width, height)
-
-    def moveHandles(self, orientation):
-        # Determine which markers to move
-        for o in to_update[orientation]:
-            self.moveSingleHandle(o)
-
-    def moveAll(self, w):
-        if w == self.selection:
-            if not self.decorators:
-                # We should have been unsubscribed
-                self.clearResizeDecorator()
-            for o in Orientations:
-                self.moveSingleHandle(o)
-
-    def onDrag(self, ev):
-        if not self.dragstart:
-            return
+    def onDrag(self, origin, original_size, delta):
         dx, dy, sx, sy, mx, my = orientation_details[self.dragged_handle]
         d = self.decorators[self.dragged_handle]
-        shape = self.selection.shape
-        cood = getMousePos(ev)
-        d['cx'], d['cy'] = cood.x if mx else self.dragstart.x, cood.y if my else self.dragstart.y
-        delta = Point(x=cood.x - self.dragstart.x, y=cood.y - self.dragstart.y)
+        shape = self.selection
+        movement = Point(x=delta.x * dx, y=delta.y * dy)
         # alert(f"{delta}, {dx}, {dy}, {sx}, {sy}")
-        shape['x'] = self.initial_pos.x + dx * delta.x
-        shape['y'] = self.initial_pos.y + dy * delta.y
-        shape['width'] = self.initial_size.x + sx * delta.x
-        shape['height'] = self.initial_size.y + sy * delta.y
+        shape.setPos(origin + movement)
+        resizement = Point(x=original_size.x + sx * delta.x, y=original_size.y + sy * delta.y)
+        shape.setSize(resizement)
 
-        self.moveHandles(self.dragged_handle)
+        moveHandles(self.decorators, shape.shape, self.dragged_handle)
 
     def dragEnd(self, ev):
-        self.dragstart = None
-        x, y, width, height = [int(self.selection.shape[k]) for k in ['x', 'y', 'width', 'height']]
-        self.initial_pos = self.selection.getPos()
-        self.initial_size = self.selection.getSize()
         ev.stopPropagation()
         ev.preventDefault()
 
@@ -278,20 +297,13 @@ class Diagram:
         if self.selection:
             self.selection.unsubscribe(self.resize_role)
         self.selection = None
-        self.resizestate = ResizeStates.NONE
 
     def select(self, widget):
-        if self.resizestate != ResizeStates.NONE:
-            return
-
         self.selection = widget
         shape = widget.shape
 
         self.decorators = {k: svg.circle(r=5, stroke_width=0, fill="#29B6F2") for k in Orientations}
         x, y, width, height = [int(shape[k]) for k in ['x', 'y', 'width', 'height']]
-
-        self.initial_pos = Point(x=x, y=y)
-        self.initial_size = Point(x=width, y=height)
 
         for k, d in self.decorators.items():
             d['cx'], d['cy'] = locations[k](x, y, width, height)
@@ -299,10 +311,7 @@ class Diagram:
         def bind_decorator(d, orientation):
             def dragStart(ev):
                 self.dragged_handle = orientation
-                self.dragstart = getMousePos(ev)
-                self.resizestate = ResizeStates.RESIZING
-                self.initial_pos = widget.getPos()
-                self.initial_size = widget.getSize()
+                self.resizestate.startResize(widget, orientation, ev)
                 ev.stopPropagation()
 
             d.bind('mousedown', dragStart)
@@ -311,8 +320,7 @@ class Diagram:
             self.canvas <= d
             bind_decorator(d, orientation)
 
-        widget.subscribe(self.resize_role, self.moveAll)
-        self.resizestate = ResizeStates.DECORATED
+        widget.subscribe(self.resize_role, lambda w: moveAll(w.shape, self.decorators))
 
 
 
