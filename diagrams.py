@@ -11,6 +11,7 @@ from typing import Union, Any, List, Self
 from dataclasses import dataclass, field
 from weakref import ref
 import enum
+import math
 
 
 ###############################################################################
@@ -79,6 +80,21 @@ class Shape:
     def destroy(self):
         pass
 
+    def getCenter(self):
+        return self.getPos() + self.getSize()/2
+    def getIntersection(self, b):
+        halfsize = self.getSize()/2
+        a = self.getCenter()
+        delta = b - a
+        if abs(delta.x) > 1:
+            rc = delta.y / delta.x
+            i_left = Point(math.copysign(halfsize.x, delta.x), math.copysign(rc*halfsize.x, delta.y))
+            if abs(i_left.y) < halfsize.y:
+                return i_left + a
+        rc = delta.x / delta.y
+        i_top = Point(math.copysign(rc*halfsize.y, delta.x), math.copysign(halfsize.y, delta.y))
+        return i_top + a
+
 @dataclass
 class CP:
     x: float
@@ -98,11 +114,20 @@ class CP:
 class Point:
     x: float
     y: float
+    def __str__(self):
+        return f"({self.x}, {self.y})"
 
     def __add__(self, other):
         return Point(self.x + other.x, self.y + other.y)
     def __sub__(self, other):
         return Point(self.x - other.x, self.y - other.y)
+    def __truediv__(self, scalar):
+        return Point(self.x/scalar, self.y/scalar)
+    def __mul__(self, scalar):
+        return Point(self.x*scalar, self.y*scalar)
+
+    def __len__(self):
+        return math.sqrt(self.x*self.x + self.y*self.y)
 
 @dataclass
 class Relationship:
@@ -118,6 +143,31 @@ class Relationship:
 
     def getMenu(self):
         pass
+
+    def reroute(self, all_blocks):
+        # Determine the centers of both blocks
+        c_a = self.start.getCenter()
+        c_b = self.finish.getCenter()
+
+        # Get the points where the line intersects both blocks
+        i_a = self.start.getIntersection(c_b)
+        i_b = self.finish.getIntersection(c_a)
+
+        # Store the waypoints
+        self.waypoints = [i_a, i_b]
+        # Move the line
+        self.path['d'] = f"M {i_a.x} {i_a.y} L {i_b.x} {i_b.y}"
+
+
+    def route(self, canvas, all_blocks):
+        """ The default routing is center-to-center. """
+        self.canvas = canvas
+        # Create the line
+        self.path = svg.path(d="", stroke="black", stroke_width="2", marker_end="url(#endarrow)",
+                             marker_start="url(#startarrow)")
+        self.reroute(all_blocks)
+        self.canvas <= self.path
+        console.log("Added connection")
 
 
 Orientations = enum.IntEnum("Orientations", "TL TOP TR RIGHT BR BOTTOM BL LEFT")
@@ -220,6 +270,7 @@ class ResizeStates:
             diagram.onDrag(self.initial_pos, self.initial_size, delta)
         if self.state == self.States.MOVING:
             diagram.selection.setPos(self.initial_pos + delta)
+            diagram.rerouteConnections(diagram.selection)
 
     def startResize(self, widget, orientation, ev):
         self.dragstart = getMousePos(ev)
@@ -233,6 +284,22 @@ class Diagram:
     def __init__(self):
         self.selection = None
         self.resizestate = ResizeStates()
+        self.children = []
+        self.connections = []
+
+    def drop(self, block):
+        block.create(self, None)
+        self.children.append(block)
+
+    def connect(self, a, b, cls):
+        connection = cls(start=a, finish=b, waypoints=[])
+        self.connections.append(connection)
+        connection.route(self.canvas, self.children)
+
+    def rerouteConnections(self, widget):
+        for c in self.connections:
+            if c.start == widget or c.finish == widget:
+                c.reroute(self.children)
 
     def bind(self, canvas):
         self.canvas = canvas
@@ -261,10 +328,6 @@ class Diagram:
     def onMouseMove(self, ev):
         self.resizestate.onMouseMove(self, ev)
 
-    def drop(self, block):
-        block.create(self, None)
-        #self.children.append(block)
-
     def onHover(self):
         pass
 
@@ -285,6 +348,7 @@ class Diagram:
         shape.setSize(resizement)
 
         moveHandles(self.decorators, shape.shape, self.dragged_handle)
+        self.rerouteConnections(shape)
 
     def dragEnd(self, ev):
         ev.stopPropagation()
@@ -381,6 +445,10 @@ def test():
     diagram = BlockDefinitionDiagram()
     diagrams.append(diagram)
     diagram.bind(canvas)
-    diagram.drop(Block(x=100, y=40, width=200, height=20, name='MyBlock'))
+    b1 = Block(x=100, y=40, width=100, height=40, name='MyBlock1')
+    b2 = Block(x=300, y=40, width=100, height=40, name='MyBlock2')
+    diagram.drop(b1)
+    diagram.drop(b2)
+    diagram.connect(b1, b2, Relationship)
 
 test()
