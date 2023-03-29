@@ -17,6 +17,8 @@ import math
 ###############################################################################
 ## Primitive shapes
 
+resize_role = 'resize_decorator'
+
 @dataclass
 class Shape:
     x: float
@@ -116,7 +118,6 @@ class Point:
     y: float
     def __str__(self):
         return f"({self.x}, {self.y})"
-
     def __add__(self, other):
         return Point(self.x + other.x, self.y + other.y)
     def __sub__(self, other):
@@ -125,9 +126,10 @@ class Point:
         return Point(self.x/scalar, self.y/scalar)
     def __mul__(self, scalar):
         return Point(self.x*scalar, self.y*scalar)
-
     def __len__(self):
         return math.sqrt(self.x*self.x + self.y*self.y)
+    def dot(self, other):
+        return self.x*other.x + self.y*other.y
 
 @dataclass
 class Relationship:
@@ -144,30 +146,59 @@ class Relationship:
     def getMenu(self):
         pass
 
+    def onMouseDown(self, ev):
+        self.diagram.mouseDownConnection(self, ev)
+
+    def insertWaypoint(self, pos):
+        # Find the spot to insert the waypoint.
+        # We insert it where the distance to the line between the two adjacent points is smallest
+        allpoints = [self.terminations[0]] + self.waypoints + [self.terminations[1]]
+        adjacents = zip(allpoints[:-1], allpoints[1:])
+        distances = []
+        for a, b in adjacents:
+            v = b - a
+            vmin = a - b
+            n = Point(x=v.y, y=-v.x)
+            d1 = pos - a
+            d2 = pos - b
+            # Check if the point is "behind" the segment
+            # These we give infinite distance
+            if v.dot(d1) < 0 or vmin.dot(d2) < 0:
+                distances.append(math.inf)
+            else:
+                distances.append(abs(n.dot(d1)))
+        # Find the smallest distance
+        minimum = min(distances)
+        index = distances.index(minimum)
+        self.waypoints.insert(index, pos)
+        return index
+
     def reroute(self, all_blocks):
         # Determine the centers of both blocks
         c_a = self.start.getCenter()
         c_b = self.finish.getCenter()
 
         # Get the points where the line intersects both blocks
-        i_a = self.start.getIntersection(c_b)
-        i_b = self.finish.getIntersection(c_a)
+        i_a = self.start.getIntersection(c_b if not self.waypoints else self.waypoints[0])
+        i_b = self.finish.getIntersection(c_a if not self.waypoints else self.waypoints[-1])
 
-        # Store the waypoints
-        self.waypoints = [i_a, i_b]
         # Move the line
-        self.path['d'] = f"M {i_a.x} {i_a.y} L {i_b.x} {i_b.y}"
+        waypoints = ''.join(f'L {p.x} {p.y} ' for p in self.waypoints)
+        self.path['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
+
+        # Store the actual intersection points
+        self.terminations = (i_a, i_b)
 
 
-    def route(self, canvas, all_blocks):
+    def route(self, diagram, all_blocks):
         """ The default routing is center-to-center. """
-        self.canvas = canvas
+        self.diagram = diagram
         # Create the line
         self.path = svg.path(d="", stroke="black", stroke_width="2", marker_end="url(#endarrow)",
-                             marker_start="url(#startarrow)")
+                             marker_start="url(#startarrow)", fill="none")
         self.reroute(all_blocks)
-        self.canvas <= self.path
-        console.log("Added connection")
+        self.path.bind('mousedown', self.onMouseDown)
+        self.diagram.canvas <= self.path
 
 
 Orientations = enum.IntEnum("Orientations", "TL TOP TR RIGHT BR BOTTOM BL LEFT")
@@ -224,42 +255,49 @@ def moveAll(shape, decorators):
 class ResizeStates:
     States = enum.IntEnum("States", "NONE DECORATED MOVING RESIZING")
 
-    def __init__(self):
+    def __init__(self, diagram):
         super(self).__init__(self)
         self.state = self.States.NONE
+        self.diagram = diagram
+        self.widget = None
+        self.decorators = []
 
     def mouseDownShape(self, diagram, widget, ev):
-        if self.state != self.States.NONE and diagram.selection != widget:
-            diagram.unselect(diagram.selection)
-        if not diagram.selection:
-            diagram.select(widget)
+        if self.state != self.States.NONE and self.widget != widget:
+            self.unselect(self.widget)
+        if self.state == self.States.NONE:
+            self.select(widget)
         self.state = self.States.MOVING
         self.dragstart = getMousePos(ev)
         self.initial_pos = widget.getPos()
         ev.stopPropagation()
         ev.preventDefault()
 
+    def mouseDownConnection(self, diagram, widget, ev):
+        # We need to change the state machine
+        if self.state != self.States.NONE:
+            self.unselect(self.widget)
+        fsm = RerouteStates(self.diagram)
+        self.diagram.changeFSM(fsm)
+        fsm.mouseDownConnection(diagram, widget, ev)
+
     def mouseDownBackground(self, diagram, ev):
-        console.log("mouse down background")
-        if diagram.selection and ev.target == diagram.selection.shape:
+        if self.widget and ev.target == self.widget.shape:
             self.state = self.States.MOVING
             return
         if ev.target == diagram.canvas:
             if self.state == self.States.DECORATED:
-                diagram.unselect(diagram.selection)
+                self.unselect(diagram.selection)
         self.state = self.States.NONE
         return
         self.dragstart = getMousePos(ev)
-        if diagram.selection:
+        if self.widget:
             self.initial_pos = diagram.selection.getPos()
             self.initial_size = diagram.selection.getSize()
 
 
     def onMouseUp(self, diagram, ev):
-        if self.state == self.States.RESIZING:
-            diagram.dragEnd(ev)
-            self.state = self.States.DECORATED
-        if self.state == self.States.MOVING:
+        if self.state in [self.States.MOVING, self.States.RESIZING]:
             self.state = self.States.DECORATED
 
     def onMouseMove(self, diagram, ev):
@@ -267,10 +305,10 @@ class ResizeStates:
             return
         delta = getMousePos(ev) - self.dragstart
         if self.state == self.States.RESIZING:
-            diagram.onDrag(self.initial_pos, self.initial_size, delta)
+            self.onDrag(self.initial_pos, self.initial_size, delta)
         if self.state == self.States.MOVING:
-            diagram.selection.setPos(self.initial_pos + delta)
-            diagram.rerouteConnections(diagram.selection)
+            self.widget.setPos(self.initial_pos + delta)
+            diagram.rerouteConnections(self.widget)
 
     def startResize(self, widget, orientation, ev):
         self.dragstart = getMousePos(ev)
@@ -278,14 +316,147 @@ class ResizeStates:
         self.initial_pos = widget.getPos()
         self.initial_size = widget.getSize()
 
+    def unselect(self, widget):
+        for dec in self.decorators.values():
+            dec.remove()
+        self.decorators = {}
+        if self.widget:
+            self.widget.unsubscribe(resize_role)
+        self.widget = None
+        self.state = self.States.NONE
+
+    def select(self, widget):
+        self.widget = widget
+        shape = widget.shape
+
+        self.decorators = {k: svg.circle(r=5, stroke_width=0, fill="#29B6F2") for k in Orientations}
+        x, y, width, height = [int(shape[k]) for k in ['x', 'y', 'width', 'height']]
+
+        for k, d in self.decorators.items():
+            d['cx'], d['cy'] = locations[k](x, y, width, height)
+
+        def bind_decorator(d, orientation):
+            def dragStart(ev):
+                self.dragged_handle = orientation
+                self.startResize(widget, orientation, ev)
+                ev.stopPropagation()
+
+            d.bind('mousedown', dragStart)
+
+        for orientation, d in self.decorators.items():
+            self.diagram.canvas <= d
+            bind_decorator(d, orientation)
+
+        widget.subscribe(resize_role, lambda w: moveAll(w.shape, self.decorators))
+
+    def onDrag(self, origin, original_size, delta):
+        dx, dy, sx, sy, mx, my = orientation_details[self.dragged_handle]
+        d = self.decorators[self.dragged_handle]
+        shape = self.widget
+        movement = Point(x=delta.x * dx, y=delta.y * dy)
+        # alert(f"{delta}, {dx}, {dy}, {sx}, {sy}")
+        shape.setPos(origin + movement)
+        resizement = Point(x=original_size.x + sx * delta.x, y=original_size.y + sy * delta.y)
+        shape.setSize(resizement)
+
+        moveHandles(self.decorators, shape.shape, self.dragged_handle)
+        self.diagram.rerouteConnections(shape)
+
+
+
+class RerouteStates:
+    States = enum.IntEnum('States', 'NONE DECORATED POTENTIAL_DRAG DRAGGING')
+    def __init__(self, diagram):
+        super(self).__init__(self)
+        self.state = self.States.NONE
+        self.diagram = diagram
+        self.decorators = []
+
+    def mouseDownShape(self, diagram, widget, ev):
+        # We need to change the state machine
+        if self.state != self.States.NONE:
+            self.clear_decorations()
+        fsm = ResizeStates(self.diagram)
+        self.diagram.changeFSM(fsm)
+        fsm.mouseDownShape(diagram, widget, ev)
+
+    def mouseDownConnection(self, diagram, widget, ev):
+        self.widget = widget
+        if not self.decorators:
+            self.decorate()
+        self.state = self.States.POTENTIAL_DRAG
+        self.dragstart = getMousePos(ev)
+        ev.stopPropagation()
+        ev.preventDefault()
+
+    def mouseDownBackground(self, diagram, ev):
+        if diagram.selection and ev.target == diagram.selection.shape:
+            self.state = self.States.MOVING
+            return
+        if ev.target == diagram.canvas:
+            if self.state == self.States.DECORATED:
+                self.clear_decorations()
+        self.state = self.States.NONE
+        return
+        self.dragstart = getMousePos(ev)
+        if diagram.selection:
+            self.initial_pos = diagram.selection.getPos()
+            self.initial_size = diagram.selection.getSize()
+
+    def mouseDownHandle(self, index, ev):
+        self.dragged_index = index
+        self.state = self.States.DRAGGING
+        self.dragstart = getMousePos(ev)
+        self.initial_pos = self.widget.waypoints[index]
+        ev.stopPropagation()
+        ev.preventDefault()
+
+    def onMouseUp(self, diagram, ev):
+        if self.state in [self.States.POTENTIAL_DRAG, self.States.DRAGGING]:
+            self.state = self.States.DECORATED
+
+    def onMouseMove(self, diagram, ev):
+        if self.state in [self.States.NONE, self.States.DECORATED]:
+            return
+        delta = getMousePos(ev) - self.dragstart
+        if self.state == self.States.POTENTIAL_DRAG:
+            if len(delta) > 10:
+                pos = getMousePos(ev)
+                self.dragged_index = self.widget.insertWaypoint(pos)
+                self.initial_pos = self.dragstart = self.widget.waypoints[self.dragged_index]
+                self.clear_decorations()
+                self.decorate()
+                self.state = self.States.DRAGGING
+        if self.state == self.States.DRAGGING:
+            new_pos = self.initial_pos + delta
+            handle = self.decorators[self.dragged_index]
+            handle['cx'], handle['cy'] = new_pos.x, new_pos.y
+            self.widget.waypoints[self.dragged_index] = new_pos
+            diagram.rerouteConnections(self.widget)
+
+    def clear_decorations(self):
+        for d in self.decorators:
+            d.remove()
+        self.decorators = []
+
+    def decorate(self):
+        self.decorators = [svg.circle(cx=p.x, cy=p.y, r=5, stroke_width=0, fill="#29B6F2") for p in self.widget.waypoints]
+        def bind(i, d):
+            d.bind('mousedown', lambda ev: self.mouseDownHandle(i, ev))
+        for i, d in enumerate(self.decorators):
+            self.diagram.canvas <= d
+            # Python shares variables inside a for loop by reference
+            # So to avoid binding to the same handle x times, we need to call a function to make permanent copies.
+            bind(i, d)
+
 
 class Diagram:
-    resize_role = 'resize_decorator'
     def __init__(self):
         self.selection = None
-        self.resizestate = ResizeStates()
+        self.mouse_events_fsm = None
         self.children = []
         self.connections = []
+        self.decorators = []
 
     def drop(self, block):
         block.create(self, None)
@@ -294,12 +465,18 @@ class Diagram:
     def connect(self, a, b, cls):
         connection = cls(start=a, finish=b, waypoints=[])
         self.connections.append(connection)
-        connection.route(self.canvas, self.children)
+        connection.route(self, self.children)
+
+    def changeFSM(self, fsm):
+        self.mouse_events_fsm = fsm
 
     def rerouteConnections(self, widget):
-        for c in self.connections:
-            if c.start == widget or c.finish == widget:
-                c.reroute(self.children)
+        if isinstance(widget, Relationship):
+            widget.reroute(self.children)
+        else:
+            for c in self.connections:
+                if c.start == widget or c.finish == widget:
+                    c.reroute(self.children)
 
     def bind(self, canvas):
         self.canvas = canvas
@@ -314,19 +491,26 @@ class Diagram:
         pass
 
     def mouseDownChild(self, widget, ev):
-        self.resizestate.mouseDownShape(self, widget, ev)
+        if not self.mouse_events_fsm:
+            self.mouse_events_fsm = ResizeStates(self)
+        self.mouse_events_fsm.mouseDownShape(self, widget, ev)
+
+    def mouseDownConnection(self, connection, ev):
+        if not self.mouse_events_fsm:
+            self.mouse_events_fsm = RerouteStates(self)
+        self.mouse_events_fsm.mouseDownConnection(self, connection, ev)
 
     def onClick(self, ev):
         pass
 
     def onMouseDown(self, ev):
-        self.resizestate.mouseDownBackground(self, ev)
+        self.mouse_events_fsm and self.mouse_events_fsm.mouseDownBackground(self, ev)
 
     def onMouseUp(self, ev):
-        self.resizestate.onMouseUp(self, ev)
+        self.mouse_events_fsm and self.mouse_events_fsm.onMouseUp(self, ev)
 
     def onMouseMove(self, ev):
-        self.resizestate.onMouseMove(self, ev)
+        self.mouse_events_fsm and self.mouse_events_fsm.onMouseMove(self, ev)
 
     def onHover(self):
         pass
@@ -336,56 +520,6 @@ class Diagram:
 
     def onDrop(self):
         pass
-
-    def onDrag(self, origin, original_size, delta):
-        dx, dy, sx, sy, mx, my = orientation_details[self.dragged_handle]
-        d = self.decorators[self.dragged_handle]
-        shape = self.selection
-        movement = Point(x=delta.x * dx, y=delta.y * dy)
-        # alert(f"{delta}, {dx}, {dy}, {sx}, {sy}")
-        shape.setPos(origin + movement)
-        resizement = Point(x=original_size.x + sx * delta.x, y=original_size.y + sy * delta.y)
-        shape.setSize(resizement)
-
-        moveHandles(self.decorators, shape.shape, self.dragged_handle)
-        self.rerouteConnections(shape)
-
-    def dragEnd(self, ev):
-        ev.stopPropagation()
-        ev.preventDefault()
-
-    def unselect(self, widget):
-        for dec in self.decorators.values():
-            dec.remove()
-        self.decorators = {}
-        if self.selection:
-            self.selection.unsubscribe(self.resize_role)
-        self.selection = None
-
-    def select(self, widget):
-        self.selection = widget
-        shape = widget.shape
-
-        self.decorators = {k: svg.circle(r=5, stroke_width=0, fill="#29B6F2") for k in Orientations}
-        x, y, width, height = [int(shape[k]) for k in ['x', 'y', 'width', 'height']]
-
-        for k, d in self.decorators.items():
-            d['cx'], d['cy'] = locations[k](x, y, width, height)
-
-        def bind_decorator(d, orientation):
-            def dragStart(ev):
-                self.dragged_handle = orientation
-                self.resizestate.startResize(widget, orientation, ev)
-                ev.stopPropagation()
-
-            d.bind('mousedown', dragStart)
-
-        for orientation, d in self.decorators.items():
-            self.canvas <= d
-            bind_decorator(d, orientation)
-
-        widget.subscribe(self.resize_role, lambda w: moveAll(w.shape, self.decorators))
-
 
 
 
@@ -450,5 +584,6 @@ def test():
     diagram.drop(b1)
     diagram.drop(b2)
     diagram.connect(b1, b2, Relationship)
+    diagram.connections[0].insertWaypoint(Point(x=250, y=60))
 
 test()
