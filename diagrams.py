@@ -185,6 +185,7 @@ class Relationship:
         # Move the line
         waypoints = ''.join(f'L {p.x} {p.y} ' for p in self.waypoints)
         self.path['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
+        self.selector['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
 
         # Store the actual intersection points
         self.terminations = (i_a, i_b)
@@ -196,8 +197,12 @@ class Relationship:
         # Create the line
         self.path = svg.path(d="", stroke="black", stroke_width="2", marker_end="url(#endarrow)",
                              marker_start="url(#startarrow)", fill="none")
+        # Above the visible path, there is an invisible one used to give a wider selection region.
+        self.selector = svg.path(d="", stroke="gray", stroke_width="10", fill="none", opacity="0.0")
         self.reroute(all_blocks)
         self.path.bind('mousedown', self.onMouseDown)
+        self.selector.bind('mousedown', self.onMouseDown)
+        self.diagram.canvas <= self.selector
         self.diagram.canvas <= self.path
 
 
@@ -310,6 +315,9 @@ class ResizeStates:
             self.widget.setPos(self.initial_pos + delta)
             diagram.rerouteConnections(self.widget)
 
+    def onKeyDown(self, diagram, ev):
+        pass
+
     def startResize(self, widget, orientation, ev):
         self.dragstart = getMousePos(ev)
         self.state = self.States.RESIZING
@@ -371,6 +379,7 @@ class RerouteStates:
         self.state = self.States.NONE
         self.diagram = diagram
         self.decorators = []
+        self.dragged_index = None
 
     def mouseDownShape(self, diagram, widget, ev):
         # We need to change the state machine
@@ -386,6 +395,7 @@ class RerouteStates:
             self.decorate()
         self.state = self.States.POTENTIAL_DRAG
         self.dragstart = getMousePos(ev)
+        self.dragged_index = None
         ev.stopPropagation()
         ev.preventDefault()
 
@@ -434,6 +444,16 @@ class RerouteStates:
             self.widget.waypoints[self.dragged_index] = new_pos
             diagram.rerouteConnections(self.widget)
 
+    def onKeyDown(self, diagram, ev):
+        if ev.key == 'Delete':
+            console.log("Deleting")
+            if self.state != self.States.NONE and self.dragged_index is not None:
+                console.log("Removing waypoint")
+                self.widget.waypoints.pop(self.dragged_index)
+                self.clear_decorations()
+                self.decorate()
+                diagram.rerouteConnections(self.widget)
+
     def clear_decorations(self):
         for d in self.decorators:
             d.remove()
@@ -480,12 +500,11 @@ class Diagram:
 
     def bind(self, canvas):
         self.canvas = canvas
-        #canvas.bind('click', lambda ev: alert("CLICK2"))
-        #canvas.bind('mousedown', self.onMouseDown)
         canvas.bind('click', self.onClick)
         canvas.bind('mouseup', self.onMouseUp)
         canvas.bind('mousemove', self.onMouseMove)
         canvas.bind('mousedown', self.onMouseDown)
+        document.bind('keydown', self.onKeyDown)
 
     def clickChild(self, widget, ev):
         pass
@@ -511,6 +530,10 @@ class Diagram:
 
     def onMouseMove(self, ev):
         self.mouse_events_fsm and self.mouse_events_fsm.onMouseMove(self, ev)
+
+    def onKeyDown(self, ev):
+        console.log("KeyDown")
+        self.mouse_events_fsm and self.mouse_events_fsm.onKeyDown(self, ev)
 
     def onHover(self):
         pass
