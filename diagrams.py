@@ -5,7 +5,13 @@ try:
 except:
     document = {}
     alert = None
-    svg = {}
+    class svg:
+        pass
+    svg_elements = ['line', 'circle', 'path', 'rect']
+    functions = {k: (lambda self, **kargs: kwargs) for k in svg_elements}
+    svg.__dict__.update(functions)
+
+
 
 from typing import Union, Any, List, Self
 from dataclasses import dataclass, field
@@ -31,15 +37,20 @@ class Shape:
         return True
 
     def getPos(self):
-        return Point(x=int(self.shape['x']), y=int(self.shape['y']))
+        return Point(x=self.x, y=self.y)
     def setPos(self, new):
-        self.shape['x'], self.shape['y'] = new.x, new.y
+        self.x, self.y = new.astuple()
+        self.updateShape(self.shape)
         for s in self.subscribers.values():
             s(self)
     def getSize(self):
-        return Point(x=int(self.shape['width']), y=int(self.shape['height']))
+        return Point(x=self.width, y=self.height)
     def setSize(self, new):
-        self.shape['width'], self.shape['height'] = new.x, new.y
+        self.width, self.height = new.astuple()
+        self.updateShape(self.shape)
+    def updateShape(self, shape):
+        shape['width'], shape['height'] = self.width, self.height
+        shape['x'], shape['y'] = self.x, self.y
 
     def subscribe(self, role, f):
         self.subscribers[role] = f
@@ -67,17 +78,18 @@ class Shape:
         if ev.buttons == 0:
             self.onHover(ev)
 
+    def getShape(self, diagram):
+        return svg.rect(x=self.x,y=self.y, width=self.width, height=self.height, stroke_width="2",stroke="black",fill="white")
     def create(self, diagram, parent):
         self.diagram = ref(diagram)
 
         canvas = diagram.canvas
-        r = svg.rect(x=self.x,y=self.y, width=self.width, height=self.height, stroke_width="2",stroke="black",fill="white")
         self.subscribers = {}
-        self.shape = r
-        canvas <=  r
+        self.shape = self.getShape(diagram)
+        canvas <=  self.shape
 
-        r.bind('click', self.onClick)
-        r.bind('mousedown', self.onMouseDown)
+        self.shape.bind('click', self.onClick)
+        self.shape.bind('mousedown', self.onMouseDown)
 
     def destroy(self):
         pass
@@ -130,6 +142,104 @@ class Point:
         return math.sqrt(self.x*self.x + self.y*self.y)
     def dot(self, other):
         return self.x*other.x + self.y*other.y
+    def astuple(self):
+        return (int(self.x), int(self.y))
+
+
+
+def routeCenterToCenter(shape, all_blocks):
+    # Determine the centers of both blocks
+    c_a = shape.start.getCenter()
+    c_b = shape.finish.getCenter()
+
+    # Get the points where the line intersects both blocks
+    i_a = shape.start.getIntersection(c_b if not shape.waypoints else shape.waypoints[0])
+    i_b = shape.finish.getIntersection(c_a if not shape.waypoints else shape.waypoints[-1])
+
+    # Move the line
+    waypoints = ''.join(f'L {p.x} {p.y} ' for p in shape.waypoints)
+    shape.path['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
+    shape.selector['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
+
+    # Store the actual intersection points
+    shape.terminations = (i_a, i_b)
+
+
+Directions = enum.IntEnum('Directions', "TOP LEFT BOTTOM RIGHT")
+
+def routeSquare(shape, all_blocks):
+    current_range = (shape.start.getPos(), shape.start.getPos() + shape.start.getSize())
+    current_center = (current_range[0] + current_range[1])/2
+    for wp in shape.waypoints:
+        next_range = (wp, wp)
+    next_range = (shape.finish.getPos(), shape.finish.getPos() + shape.finish.getSize())
+    next_center = (next_range[0] + next_range[1])/2
+
+    v = next_center - current_center
+    if abs(v.y) > abs(v.x):
+        if v.y > 0:
+            quadrant = Directions.TOP
+            start = Point(current_center.x, current_range[1].y)
+            end = Point(next_center.x, next_range[0].y)
+        else:
+            quadrant = Directions.BOTTOM
+            start = Point(current_center.x, current_range[0].y)
+            end = Point(next_center.x, next_range[1].y)
+    elif v.x > 0:
+        quadrant = Directions.RIGHT
+        start = Point(current_range[1].x, current_center.y)
+        end = Point(next_range[0].x, next_center.y)
+    else:
+        quadrant = Directions.LEFT
+        start = Point(current_range[0].x, current_center.y)
+        end = Point(next_range[1].x, next_center.y)
+
+    middle = (start + end) / 2
+    if quadrant in [Directions.TOP, Directions.BOTTOM]:
+            p1 = Point(current_center.x, middle.y)
+            p2 = Point(next_center.x, middle.y)
+    else:
+            p1 = Point(middle.x, current_center.y)
+            p2 = Point(middle.x, next_center.y)
+
+    points = [p1, p2, end]
+    waypoints = ''.join(f'L {p.x} {p.y} ' for p in points)
+    shape.path['d'] = f"M {start.x} {start.y} {waypoints}"
+    shape.selector['d'] = f"M {start.x} {start.y} {waypoints}"
+    shape.terminations = (start, end)
+
+    console.log(f"Quadrant: {quadrant}, {start} {points} {end}")
+
+    return
+
+    outside = []
+    outside.append(next_range[1].x < current_range[0].x)
+    outside.append(next_range[0].x > current_range[1].x)
+    outside.append(next_range[1].y < current_range[0].y)
+    outside.append(next_range[0].y > current_range[1].y)
+
+
+    nr_outside = len([o for o in outside if o])
+    console.log(f'Nr outside: {nr_outside}')
+    if nr_outside <= 2:
+        # Overlapping objects. Don't draw this line.
+        pass
+    elif nr_outside == 3:
+        # Determine which side is inside
+        i = outside.index(False)
+        # zig-zag to the next bit.
+        if i+1 == indices.LEFT:
+            start = Point(current_range[1].x, (current_range[1].y+current_range[0].y)/2)
+            end = Point(next_range[0].x, (next_range[1].y + next_range[0].y) / 2)
+            middle = (start + end) / 2
+            points = [start, Point(middle.x, start.y), Point(middle.x, end.y), end]
+
+            waypoints = ''.join(f'L {p.x} {p.y} ' for p in points[1:])
+            shape.path['d'] = f"M {points[0].x} {points[0].y} {waypoints}"
+            shape.selector['d'] = f"M {points[0].x} {points[0].y} {waypoints}"
+            self.terminations = (start, end)
+
+
 
 @dataclass
 class Relationship:
@@ -174,22 +284,8 @@ class Relationship:
         return index
 
     def reroute(self, all_blocks):
-        # Determine the centers of both blocks
-        c_a = self.start.getCenter()
-        c_b = self.finish.getCenter()
-
-        # Get the points where the line intersects both blocks
-        i_a = self.start.getIntersection(c_b if not self.waypoints else self.waypoints[0])
-        i_b = self.finish.getIntersection(c_a if not self.waypoints else self.waypoints[-1])
-
-        # Move the line
-        waypoints = ''.join(f'L {p.x} {p.y} ' for p in self.waypoints)
-        self.path['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
-        self.selector['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
-
-        # Store the actual intersection points
-        self.terminations = (i_a, i_b)
-
+        router = getattr(self, 'router', routeCenterToCenter)
+        router(self, all_blocks)
 
     def route(self, diagram, all_blocks):
         """ The default routing is center-to-center. """
@@ -257,7 +353,28 @@ def moveAll(shape, decorators):
         moveSingleHandle(decorators, shape, o)
 
 
-class ResizeStates:
+
+class BehaviourFSM:
+    def mouseDownShape(self, diagram, widget, ev):
+        pass
+    def mouseDownConnection(self, diagram, widget, ev):
+        pass
+    def mouseDownPort(self, diagram, widget, ev):
+        pass
+    def mouseDownBackground(self, diagram, ev):
+        pass
+    def onMouseUp(self, diagram, ev):
+        pass
+    def onMouseMove(self, diagram, ev):
+        pass
+    def onKeyDown(self, diagram, ev):
+        pass
+    def delete(self, diagram):
+        """ Called when the FSM is about to be deleted"""
+        pass
+
+
+class ResizeStates(BehaviourFSM):
     States = enum.IntEnum("States", "NONE DECORATED MOVING RESIZING")
 
     def __init__(self, diagram):
@@ -315,8 +432,10 @@ class ResizeStates:
             self.widget.setPos(self.initial_pos + delta)
             diagram.rerouteConnections(self.widget)
 
-    def onKeyDown(self, diagram, ev):
-        pass
+    def delete(self, diagram):
+        """ Called when the FSM is about to be deleted"""
+        if self.state != self.States.NONE:
+            self.unselect(self.widget)
 
     def startResize(self, widget, orientation, ev):
         self.dragstart = getMousePos(ev)
@@ -372,7 +491,7 @@ class ResizeStates:
 
 
 
-class RerouteStates:
+class RerouteStates(BehaviourFSM):
     States = enum.IntEnum('States', 'NONE DECORATED POTENTIAL_DRAG DRAGGING')
     def __init__(self, diagram):
         super(self).__init__(self)
@@ -446,13 +565,15 @@ class RerouteStates:
 
     def onKeyDown(self, diagram, ev):
         if ev.key == 'Delete':
-            console.log("Deleting")
             if self.state != self.States.NONE and self.dragged_index is not None:
-                console.log("Removing waypoint")
                 self.widget.waypoints.pop(self.dragged_index)
                 self.clear_decorations()
                 self.decorate()
                 diagram.rerouteConnections(self.widget)
+
+    def delete(self, diagram):
+        if self.state != self.States.NONE:
+            self.clear_decorations()
 
     def clear_decorations(self):
         for d in self.decorators:
@@ -470,6 +591,51 @@ class RerouteStates:
             bind(i, d)
 
 
+class ConnectionEditor(BehaviourFSM):
+    States = enum.IntEnum('States', 'NONE A_SELECTED RECONNECTING')
+    ConnectionRoles = enum.IntEnum('ConnectionRoles', 'START FINISH')
+    def __init__(self, connectionFactory):
+        self.connectionFactory = connectionFactory
+        self.state = self.States.NONE
+        self.a_party = None
+        self.connection = None
+        self.b_connection_role = None
+        self.path = None
+    def mouseDownShape(self, diagram, widget, ev):
+        if self.state in [self.States.A_SELECTED, self.States.RECONNECTING]:
+            if diagram.allowsConnection(self.a_party, widget):
+                if self.state == self.States.A_SELECTED:
+                    diagram.connect(self.a_party, widget, self.connectionFactory)
+                elif self.state == self.States.RECONNECTING:
+                    match self.b_connection_role:
+                        case self.ConnectionRoles.START:
+                            self.connection.start = widget
+                        case self.ConnectionRoles.FINISH:
+                            self.connection.start = widget
+                    diagram.reroute(self.connection)
+
+                self.path.remove()
+                self.state = self.States.NONE
+        elif self.state == self.States.NONE:
+            self.state = self.States.A_SELECTED
+            self.a_party = widget
+            # Create a temporary path to follow the mouse
+            x, y = (widget.getPos() + widget.getSize()/2).astuple()
+            self.path = svg.line(x1=x, y1=y, x2=x, y2=y, stroke_width=2, stroke="gray")
+            diagram.canvas <= self.path
+    def onMouseMove(self, diagram, ev):
+        if self.state == self.States.NONE:
+            return
+        pos = getMousePos(ev)
+        # Let the temporary line follow the mouse.
+        # But ensure it doesn't hide the B-shape
+        v = pos - self.a_party.getPos()
+        delta = (v/len(v)) * 2
+        self.path['x2'], self.path['y2'] = (pos - delta).astuple()
+    def delete(self, diagram):
+        if self.state != self.States.NONE:
+            self.path.remove()
+
 class Diagram:
     def __init__(self):
         self.selection = None
@@ -482,12 +648,17 @@ class Diagram:
         block.create(self, None)
         self.children.append(block)
 
+    def allowsConnection(self, a, b):
+        return True
+
     def connect(self, a, b, cls):
         connection = cls(start=a, finish=b, waypoints=[])
         self.connections.append(connection)
         connection.route(self, self.children)
 
     def changeFSM(self, fsm):
+        if self.mouse_events_fsm is not None:
+            self.mouse_events_fsm.delete(self)
         self.mouse_events_fsm = fsm
 
     def rerouteConnections(self, widget):
@@ -532,7 +703,6 @@ class Diagram:
         self.mouse_events_fsm and self.mouse_events_fsm.onMouseMove(self, ev)
 
     def onKeyDown(self, ev):
-        console.log("KeyDown")
         self.mouse_events_fsm and self.mouse_events_fsm.onKeyDown(self, ev)
 
     def onHover(self):
@@ -551,6 +721,15 @@ class Diagram:
 @dataclass
 class Note(Shape):
     description: str
+    fold_size = 10
+    def getPoints(self):
+        x, y, w, h = self.x, self.y, self.width, self.height
+        f = self.fold_size
+        return ' '.join(f'{x+a},{y+b}' for a, b in [(0,0), (w-f,0), (w,f), (w-f,f), (w-f,0), (w,f), (w,h), (0,h)])
+    def getShape(self):
+        return svg.polygon(points=self.getPoints(), fill="yellow", stroke="black")
+    def updateShape(self, shape):
+        shape['points'] = self.getPoints()
 
 @dataclass
 class Constraint(Note):
@@ -607,6 +786,9 @@ def test():
     diagram.drop(b1)
     diagram.drop(b2)
     diagram.connect(b1, b2, Relationship)
-    diagram.connections[0].insertWaypoint(Point(x=250, y=60))
+    diagram.connections[0].router = routeSquare
+
+    document['NormalEditBtn'].bind('click', lambda ev: diagram.changeFSM(None))
+    document['EditConnectionsBtn'].bind('click', lambda ev: diagram.changeFSM(ConnectionEditor(Relationship)))
 
 test()
