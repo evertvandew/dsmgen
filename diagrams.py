@@ -1,7 +1,7 @@
 
 
 try:
-    from browser import document, alert, svg, console
+    from browser import document, alert, svg, console, window
 except:
     document = {}
     alert = None
@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from weakref import ref
 import enum
 import math
+from math import inf
 
 
 ###############################################################################
@@ -138,114 +139,325 @@ class Point:
         return Point(self.x/scalar, self.y/scalar)
     def __mul__(self, scalar):
         return Point(self.x*scalar, self.y*scalar)
+    def __rmul__(self, scalar):
+        return Point(self.x * scalar, self.y * scalar)
     def __len__(self):
         return math.sqrt(self.x*self.x + self.y*self.y)
     def dot(self, other):
         return self.x*other.x + self.y*other.y
     def astuple(self):
         return (int(self.x), int(self.y))
+    def transpose(self):
+        return Point(x=self.y, y=-self.x)
 
 
+class RoutingMethod(enum.IntEnum):
+    CenterTCenter = 1
+    Squared = 2
 
-def routeCenterToCenter(shape, all_blocks):
-    # Determine the centers of both blocks
-    c_a = shape.start.getCenter()
-    c_b = shape.finish.getCenter()
+class RoutingStragegy:
+    def decorate(self, connection, canvas):
+        raise NotImplementedError
+    def route(self, shape, all_blocks):
+        raise NotImplementedError
 
-    # Get the points where the line intersects both blocks
-    i_a = shape.start.getIntersection(c_b if not shape.waypoints else shape.waypoints[0])
-    i_b = shape.finish.getIntersection(c_a if not shape.waypoints else shape.waypoints[-1])
+class RouteCenterToCenter(RoutingStragegy):
+    def __init__(self):
+        self.decorators = []
+        self.widget = None
+        self.drag_start = None
 
-    # Move the line
-    waypoints = ''.join(f'L {p.x} {p.y} ' for p in shape.waypoints)
-    shape.path['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
-    shape.selector['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
+    def createWaypointByDrag(self, ev, connection, canvas):
+        pos = getMousePos(ev)
+        self.dragged_index = self.widget.insertWaypoint(pos)
+        self.initial_pos = self.drag_start = self.widget.waypoints[self.dragged_index]
+        self.clear_decorations()
+        self.decorate(connection, canvas)
 
-    # Store the actual intersection points
-    shape.terminations = (i_a, i_b)
+    def dragHandle(self, ev):
+        console.log(f"Dragging handle: {self.dragged_index}")
+        delta = getMousePos(ev) - self.drag_start
+        new_pos = self.initial_pos + delta
+        handle = self.decorators[self.dragged_index]
+        handle['cx'], handle['cy'] = new_pos.x, new_pos.y
+        self.widget.waypoints[self.dragged_index] = new_pos
 
+    def mouseDownHandle(self, decorator_id, ev):
+        console.log("Handle was clicked on")
+        self.dragged_index = decorator_id
+        self.drag_start = getMousePos(ev)
+        self.initial_pos = self.widget.waypoints[decorator_id]
+        current = ev.target
+        current.dispatchEvent(window.CustomEvent.new("handle_drag_start", {"bubbles":True, "detail": {'router': self}}))
+        ev.stopPropagation()
+        ev.preventDefault()
+
+    def deleteWaypoint(self):
+        if self.dragged_index is not None and self.dragged_index < len(self.widget.waypoints):
+            self.widget.waypoints.pop(self.dragged_index)
+            self.clear_decorations()
+            self.decorate(self.widget, self.widget.canvas)
+
+    def decorate(self, connection, canvas):
+        self.widget = connection
+        self.decorators = [svg.circle(cx=p.x, cy=p.y, r=5, stroke_width=0, fill="#29B6F2") for p in self.widget.waypoints]
+        def bind(i, d):
+            d.bind('mousedown', lambda ev: self.mouseDownHandle(i, ev))
+        for i, d in enumerate(self.decorators):
+            canvas <= d
+            # Python shares variables inside a for loop by reference
+            # So to avoid binding to the same handle x times, we need to call a function to make permanent copies.
+            bind(i, d)
+
+    def clear_decorations(self):
+        for d in self.decorators:
+            d.remove()
+        self.decorators = []
+
+    def route(self, shape, all_blocks):
+        # Determine the centers of both blocks
+        c_a = shape.start.getCenter()
+        c_b = shape.finish.getCenter()
+
+        # Get the points where the line intersects both blocks
+        i_a = shape.start.getIntersection(c_b if not shape.waypoints else shape.waypoints[0])
+        i_b = shape.finish.getIntersection(c_a if not shape.waypoints else shape.waypoints[-1])
+
+        # Move the line
+        waypoints = ''.join(f'L {p.x} {p.y} ' for p in shape.waypoints)
+        shape.path['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
+        shape.selector['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
+
+        # Store the actual intersection points
+        shape.terminations = (i_a, i_b)
+
+
+class XP(enum.IntEnum):
+    LEFT = 1
+    OVERLAP = 2
+    RIGHT = 3
+class YP(enum.IntEnum):
+    BELOW = 1
+    OVERLAP = 2
+    ABOVE = 3
 
 Directions = enum.IntEnum('Directions', "TOP LEFT BOTTOM RIGHT")
 
-def routeSquare(shape, all_blocks):
-    current_range = (shape.start.getPos(), shape.start.getPos() + shape.start.getSize())
-    current_center = (current_range[0] + current_range[1])/2
-    for wp in shape.waypoints:
-        next_range = (wp, wp)
-    next_range = (shape.finish.getPos(), shape.finish.getPos() + shape.finish.getSize())
-    next_center = (next_range[0] + next_range[1])/2
+def routeSquare(start_block, finish_block, waypoints):
+    def extend_wp(w):
+        # Each wp will have one co-ordinate at infinity.
+        if abs(w.x) == inf:
+            return (Point(x=-inf, y=w.y), Point(x=inf, y=w.y))
+        return (Point(x=w.x, y=-inf), Point(x=w.x, y=inf))
 
-    v = next_center - current_center
-    if abs(v.y) > abs(v.x):
-        if v.y > 0:
-            quadrant = Directions.TOP
-            start = Point(current_center.x, current_range[1].y)
-            end = Point(next_center.x, next_range[0].y)
+    ranges = [(start_block[0], start_block[0] + start_block[1])]
+    ranges.extend([extend_wp(wp) for wp in waypoints])
+    ranges.append((finish_block[0], finish_block[0] + finish_block[1]))
+    centers = [(r[0]+r[1])/2 for r in ranges]
+
+    points = []
+
+    for i, j in zip(range(len(ranges)-1), range(1, len(ranges))):
+
+        current_range, next_range = ranges[i], ranges[j]
+        current_center, next_center = centers[i], centers[j]
+
+        # Check if there can be a direct line between the ranges
+        xpos = XP.LEFT if next_range[1].x < current_range[0].x else (
+            XP.RIGHT if next_range[0].x > current_range[1].x else XP.OVERLAP
+        )
+        ypos = YP.BELOW if next_range[1].y < current_range[0].y else (
+            YP.ABOVE if next_range[0].y > current_range[1].y else YP.OVERLAP
+        )
+
+        # Detect a waypoint that runs through the start of finish object
+        handled = False
+        if i==0:
+            if next_range[0].x == -inf and (current_range[0].y <= next_center.y <= current_range[1].y):
+                # peek ahead to see which side of the object we need to be
+                if centers[j+1].x < current_center.x:
+                    points.append(Point(x=current_range[0].x, y=next_center.y))
+                else:
+                    points.append(Point(x=current_range[1].x, y=next_center.y))
+                handled = True
+            elif next_range[0].y == -inf and (current_range[0].x <= next_center.x <= current_range[1].x):
+                # peek ahead to see which side of the object we need to be
+                if centers[j + 1].y < current_center.y:
+                    points.append(Point(x=next_center.x, y=current_range[0].y))
+                else:
+                    points.append(Point(x=next_center.x, y=current_range[1].y))
+                handled = True
+        if j == len(ranges)-1:
+            if current_range[0].x == -inf and (next_range[0].y <= current_center.y <= next_range[1].y):
+                # Look behind to see which side of the object we need to be
+                if centers[i-1].x < next_center.x:
+                    points.append(Point(x=next_range[0].x, y=current_center.y))
+                else:
+                    points.append(Point(x=next_range[1].x, y=current_center.y))
+                handled = True
+            elif current_range[0].y == -inf and (next_range[0].x <= current_center.x <= next_range[1].x):
+                # look behind to see which side of the object we need to be
+                if centers[i- 1].y < next_center.y:
+                    points.append(Point(x=current_center.x, y=next_range[0].y))
+                else:
+                    points.append(Point(x=current_center.x, y=next_range[1].y))
+                handled = True
+
+        #Detect situations where there is overlap between objects or waypoints
+        if handled:
+            pass
+        elif ypos == YP.OVERLAP:
+            if current_center.x < next_center.x:
+                x1 = current_range[1].x
+                x2 = next_range[0].x
+            else:
+                x1 = current_range[0].x
+                x2 = next_range[1].x
+
+            # If the whole block is overlapped, draw the line from the center of the smallest
+            if current_range[0].y < next_range[0].y:
+                if current_range[1].y > next_range[1].y:
+                    y = next_center.y
+                else:
+                    y = (current_range[1].y + next_range[0].y) / 2
+            else:
+                if current_range[1].y > next_range[1].y:
+                    y = (next_range[1].y + current_range[0].y) / 2
+                else:
+                    y = current_center.y
+
+            points.append(Point(x=x1, y=y))
+            points.append(Point(x=x2, y=y))
+        elif xpos == XP.OVERLAP:
+            # A vertical line
+            if current_center.y < next_center.y:
+                y1 = current_range[1].y
+                y2 = next_range[0].y
+            else:
+                y1 = current_range[0].y
+                y2 = next_range[1].y
+
+            # If the whole block is overlapped, draw the line from the center of the smallest
+            if current_range[0].x < next_range[0].x:
+                if current_range[1].x > next_range[1].x:
+                    x = next_center.x
+                else:
+                    x = (current_range[1].x + next_range[0].x) / 2
+            else:
+                if current_range[1].x > next_range[1].x:
+                    x = (next_range[1].x + current_range[0].x) / 2
+                else:
+                    x = current_center.x
+
+
+            points.append(Point(x=x, y=y1))
+            points.append(Point(x=x, y=y2))
         else:
-            quadrant = Directions.BOTTOM
-            start = Point(current_center.x, current_range[0].y)
-            end = Point(next_center.x, next_range[1].y)
-    elif v.x > 0:
-        quadrant = Directions.RIGHT
-        start = Point(current_range[1].x, current_center.y)
-        end = Point(next_range[0].x, next_center.y)
-    else:
-        quadrant = Directions.LEFT
-        start = Point(current_range[0].x, current_center.y)
-        end = Point(next_range[1].x, next_center.y)
+            # No overlap: draw a line in three parts.
 
-    middle = (start + end) / 2
-    if quadrant in [Directions.TOP, Directions.BOTTOM]:
-            p1 = Point(current_center.x, middle.y)
-            p2 = Point(next_center.x, middle.y)
-    else:
-            p1 = Point(middle.x, current_center.y)
-            p2 = Point(middle.x, next_center.y)
+            v = next_center - current_center
+            if abs(v.y) > abs(v.x):
+                if v.y > 0:
+                    quadrant = Directions.TOP
+                    start = Point(current_center.x, current_range[1].y)
+                    end = Point(next_center.x, next_range[0].y)
+                else:
+                    quadrant = Directions.BOTTOM
+                    start = Point(current_center.x, current_range[0].y)
+                    end = Point(next_center.x, next_range[1].y)
+            elif v.x > 0:
+                quadrant = Directions.RIGHT
+                start = Point(current_range[1].x, current_center.y)
+                end = Point(next_range[0].x, next_center.y)
+            else:
+                quadrant = Directions.LEFT
+                start = Point(current_range[0].x, current_center.y)
+                end = Point(next_range[1].x, next_center.y)
 
-    points = [p1, p2, end]
-    waypoints = ''.join(f'L {p.x} {p.y} ' for p in points)
-    shape.path['d'] = f"M {start.x} {start.y} {waypoints}"
-    shape.selector['d'] = f"M {start.x} {start.y} {waypoints}"
-    shape.terminations = (start, end)
-
-    console.log(f"Quadrant: {quadrant}, {start} {points} {end}")
-
-    return
-
-    outside = []
-    outside.append(next_range[1].x < current_range[0].x)
-    outside.append(next_range[0].x > current_range[1].x)
-    outside.append(next_range[1].y < current_range[0].y)
-    outside.append(next_range[0].y > current_range[1].y)
-
-
-    nr_outside = len([o for o in outside if o])
-    console.log(f'Nr outside: {nr_outside}')
-    if nr_outside <= 2:
-        # Overlapping objects. Don't draw this line.
-        pass
-    elif nr_outside == 3:
-        # Determine which side is inside
-        i = outside.index(False)
-        # zig-zag to the next bit.
-        if i+1 == indices.LEFT:
-            start = Point(current_range[1].x, (current_range[1].y+current_range[0].y)/2)
-            end = Point(next_range[0].x, (next_range[1].y + next_range[0].y) / 2)
             middle = (start + end) / 2
-            points = [start, Point(middle.x, start.y), Point(middle.x, end.y), end]
+            if quadrant in [Directions.TOP, Directions.BOTTOM]:
+                    p1 = Point(current_center.x, middle.y)
+                    p2 = Point(next_center.x, middle.y)
+            else:
+                    p1 = Point(middle.x, current_center.y)
+                    p2 = Point(middle.x, next_center.y)
 
-            waypoints = ''.join(f'L {p.x} {p.y} ' for p in points[1:])
-            shape.path['d'] = f"M {points[0].x} {points[0].y} {waypoints}"
-            shape.selector['d'] = f"M {points[0].x} {points[0].y} {waypoints}"
-            self.terminations = (start, end)
+            points.extend([start, p1, p2, end])
+
+    return points
+
+class RouteSquare(RoutingStragegy):
+    def __init__(self):
+        self.decorators = []
+        self.dragged_index = None
+    def mouseDownHandle(self, decorator_id, ev):
+        console.log("Handle was clicked on")
+        self.dragged_index = decorator_id
+        self.drag_start = getMousePos(ev)
+        current = ev.target
+        current.dispatchEvent(window.CustomEvent.new("handle_drag_start", {"bubbles":True, "detail": {'router': self}}))
+        ev.stopPropagation()
+        ev.preventDefault()
+    def createWaypointByDrag(self, ev, connection, canvas):
+        # WIth this router, new line segments are created differenly.
+        pass
+    def dragHandle(self, ev):
+        pass
+    def deleteWaypoint(self):
+        pass
+
+    def decorate(self, connection, canvas):
+        def bind(i, d):
+            d.bind('mousedown', lambda ev: self.mouseDownHandle(i, ev))
+        # Show a little stripe next to each line-piece
+        self.decorators = []
+        self.initial_pos = {}
+        self.widget = connection
+        self.handle_orientation = []
+        for p1, p2 in zip(self.widget.points[:-1], self.widget.points[1:]):
+            v = (p2 - p1)
+            vn = v / len(v)
+            c = (p1 + p2) / 2
+            n = vn.transpose()
+            self.handle_orientation.append('X' if abs(n.x) > abs(n.y) else 'Y')
+            p1 = c + 10 * n - 20 * vn
+            p2 = c + 10 * n + 20 * vn
+            decorator = svg.line(x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, stroke_width=6, stroke="#29B6F2")
+            bind(len(self.decorators), decorator)
+            self.initial_pos[len(self.decorators)] = c
+            canvas <= decorator
+            self.decorators.append(decorator)
+
+    def clear_decorations(self):
+        for d in self.decorators:
+            d.remove()
+        self.decorators = []
+
+    def route(self, shape, all_blocks):
+        current_range = (shape.start.getPos(), shape.start.getPos() + shape.start.getSize())
+        shape.points = routeSquare((shape.start.getPos(), shape.start.getSize()),
+                                   (shape.finish.getPos(), shape.finish.getSize()),
+                                   shape.waypoints)
+
+        waypoints = ''.join(f'L {p.x} {p.y} ' for p in shape.points[1:])
+        start, end = shape.points[0], shape.points[-1]
+        shape.path['d'] = f"M {start.x} {start.y} {waypoints}"
+        shape.selector['d'] = f"M {start.x} {start.y} {waypoints}"
+        shape.terminations = (start, end)
 
 
+router_classes = {RoutingMethod.CenterTCenter: RouteCenterToCenter, RoutingMethod.Squared: RouteSquare}
 
 @dataclass
 class Relationship:
     start: Point
     finish: Point
     waypoints: List[Point]
+    routing_method: RoutingMethod
+
+    @property
+    def canvas(self):
+        return self.diagram.canvas
 
     def onHover(self):
         pass
@@ -284,8 +496,9 @@ class Relationship:
         return index
 
     def reroute(self, all_blocks):
-        router = getattr(self, 'router', routeCenterToCenter)
-        router(self, all_blocks)
+        router = getattr(self, 'router', None) or router_classes[self.routing_method]()
+        router.route(self, all_blocks)
+        self.router = router
 
     def route(self, diagram, all_blocks):
         """ The default routing is center-to-center. """
@@ -532,11 +745,9 @@ class RerouteStates(BehaviourFSM):
             self.initial_pos = diagram.selection.getPos()
             self.initial_size = diagram.selection.getSize()
 
-    def mouseDownHandle(self, index, ev):
-        self.dragged_index = index
+    def handleDragStart(self, index, ev):
+        console.log("Handle Drag Start")
         self.state = self.States.DRAGGING
-        self.dragstart = getMousePos(ev)
-        self.initial_pos = self.widget.waypoints[index]
         ev.stopPropagation()
         ev.preventDefault()
 
@@ -547,48 +758,30 @@ class RerouteStates(BehaviourFSM):
     def onMouseMove(self, diagram, ev):
         if self.state in [self.States.NONE, self.States.DECORATED]:
             return
-        delta = getMousePos(ev) - self.dragstart
         if self.state == self.States.POTENTIAL_DRAG:
+            delta = getMousePos(ev) - self.dragstart
             if len(delta) > 10:
-                pos = getMousePos(ev)
-                self.dragged_index = self.widget.insertWaypoint(pos)
-                self.initial_pos = self.dragstart = self.widget.waypoints[self.dragged_index]
-                self.clear_decorations()
-                self.decorate()
+                self.widget.router.createWaypointByDrag(ev, self.widget, self.diagram.canvas)
                 self.state = self.States.DRAGGING
         if self.state == self.States.DRAGGING:
-            new_pos = self.initial_pos + delta
-            handle = self.decorators[self.dragged_index]
-            handle['cx'], handle['cy'] = new_pos.x, new_pos.y
-            self.widget.waypoints[self.dragged_index] = new_pos
+            self.widget.router.dragHandle(ev)
             diagram.rerouteConnections(self.widget)
 
     def onKeyDown(self, diagram, ev):
         if ev.key == 'Delete':
-            if self.state != self.States.NONE and self.dragged_index is not None:
-                self.widget.waypoints.pop(self.dragged_index)
-                self.clear_decorations()
-                self.decorate()
+            if self.state != self.States.NONE:
+                self.widget.router.deleteWaypoint()
                 diagram.rerouteConnections(self.widget)
 
     def delete(self, diagram):
         if self.state != self.States.NONE:
             self.clear_decorations()
 
-    def clear_decorations(self):
-        for d in self.decorators:
-            d.remove()
-        self.decorators = []
-
     def decorate(self):
-        self.decorators = [svg.circle(cx=p.x, cy=p.y, r=5, stroke_width=0, fill="#29B6F2") for p in self.widget.waypoints]
-        def bind(i, d):
-            d.bind('mousedown', lambda ev: self.mouseDownHandle(i, ev))
-        for i, d in enumerate(self.decorators):
-            self.diagram.canvas <= d
-            # Python shares variables inside a for loop by reference
-            # So to avoid binding to the same handle x times, we need to call a function to make permanent copies.
-            bind(i, d)
+        self.widget.router.decorate(self.widget, self.diagram.canvas)
+
+    def clear_decorations(self):
+        self.widget.router.clear_decorations()
 
 
 class ConnectionEditor(BehaviourFSM):
@@ -652,7 +845,8 @@ class Diagram:
         return True
 
     def connect(self, a, b, cls):
-        connection = cls(start=a, finish=b, waypoints=[])
+        connection = cls(start=a, finish=b, waypoints=[], routing_method=RoutingMethod.Squared)
+        #connection = cls(start=a, finish=b, waypoints=[], routing_method=RoutingMethod.CenterTCenter)
         self.connections.append(connection)
         connection.route(self, self.children)
 
@@ -675,6 +869,7 @@ class Diagram:
         canvas.bind('mouseup', self.onMouseUp)
         canvas.bind('mousemove', self.onMouseMove)
         canvas.bind('mousedown', self.onMouseDown)
+        canvas.bind('handle_drag_start', self.handleDragStart)
         document.bind('keydown', self.onKeyDown)
 
     def clickChild(self, widget, ev):
@@ -704,6 +899,10 @@ class Diagram:
 
     def onKeyDown(self, ev):
         self.mouse_events_fsm and self.mouse_events_fsm.onKeyDown(self, ev)
+
+    def handleDragStart(self, ev):
+        console.log(f"Handle Drag Start {list(ev.__dict__.keys())}")
+        self.mouse_events_fsm and self.mouse_events_fsm.handleDragStart(self, ev)
 
     def onHover(self):
         pass
@@ -775,6 +974,62 @@ class BlockDefinitionDiagram(Diagram):
 
 diagrams = []
 
+
+def testSquareRouter():
+    def mkPoints(*args):
+        return [Point(x=x, y=y) for x, y in args]
+
+    # Straight horizontal center2center line
+    e = mkPoints((200,60), (300,60))
+    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((300,40),(100,40)), [])
+    assert e==r, f"Asser error: {r} is not as expected {e}"
+
+    # Straight vertical center2center line
+    e = mkPoints((150,80), (150,150))
+    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((100,150),(100,40)), [])
+    assert e==r, f"Asser error: {r} is not as expected {e}"
+
+    # Straight horizontal off-center line
+    e = mkPoints((200, 65), (300, 65))
+    r = routeSquare(mkPoints((100, 40), (100, 40)), mkPoints((300, 50), (100, 40)), [])
+    assert e == r, f"Asser error: {r} is not as expected {e}"
+
+    # Straight vertical off-center line
+    e = mkPoints((160, 80), (160, 150))
+    r = routeSquare(mkPoints((100, 40), (100, 40)), mkPoints((120, 150), (100, 40)), [])
+    assert e == r, f"Asser error: {r} is not as expected {e}"
+
+    # Horizontal stepped line
+    e = mkPoints((200, 60), (350,60), (350,120), (500,120))
+    r = routeSquare(mkPoints((100, 40), (100, 40)), mkPoints((500, 100), (100, 40)), [])
+    assert e == r, f"Asser error: {r} is not as expected {e}"
+
+    # Vertical stepped line
+    e = mkPoints((150,80), (150,210), (270,210), (270,340))
+    r = routeSquare(mkPoints((100, 40), (100, 40)), mkPoints((220, 340), (100, 40)), [])
+    assert e == r, f"Asser error: {r} is not as expected {e}"
+
+    # Horizontal by single waypoint above
+    e = mkPoints((150,80), (150,100), (350,100), (350,80))
+    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((300,40),(100,40)), mkPoints((inf,100)))
+    assert e==r, f"Asser error: {r} is not as expected {e}"
+
+    # Horizontal by single waypoint below
+    e = mkPoints((150,40), (150,20), (350,20), (350,40))
+    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((300,40),(100,40)), mkPoints((inf,20)))
+    assert e==r, f"Asser error: {r} is not as expected {e}"
+
+    # Vertical by single waypoint to left
+    e = mkPoints((200,60), (250,60), (250,170), (200,170))
+    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((100,150),(100,40)), mkPoints((250, inf)))
+    assert e==r, f"Asser error: {r} is not as expected {e}"
+
+    # Vertical by single waypoint to right
+    e = mkPoints((100,60), (50,60), (50,170), (100,170))
+    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((100,150),(100,40)), mkPoints((50, inf)))
+    assert e==r, f"Asser error: {r} is not as expected {e}"
+
+
 def test():
     canvas = document['canvas']
     #canvas.bind("click", lambda ev: alert("CLICK"))
@@ -786,7 +1041,8 @@ def test():
     diagram.drop(b1)
     diagram.drop(b2)
     diagram.connect(b1, b2, Relationship)
-    diagram.connections[0].router = routeSquare
+    c = diagram.connections[0]
+    #c.waypoints = [Point(x=250, y=75)]
 
     document['NormalEditBtn'].bind('click', lambda ev: diagram.changeFSM(None))
     document['EditConnectionsBtn'].bind('click', lambda ev: diagram.changeFSM(ConnectionEditor(Relationship)))
