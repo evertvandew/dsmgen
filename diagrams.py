@@ -19,7 +19,8 @@ from weakref import ref
 import enum
 import math
 from math import inf
-
+from square_routing import routeSquare
+from point import Point
 
 ###############################################################################
 ## Primitive shapes
@@ -124,33 +125,6 @@ class CP:
     def onDrag(self):
         pass
 
-
-@dataclass
-class Point:
-    x: float
-    y: float
-    def __str__(self):
-        return f"({self.x}, {self.y})"
-    def __add__(self, other):
-        return Point(self.x + other.x, self.y + other.y)
-    def __sub__(self, other):
-        return Point(self.x - other.x, self.y - other.y)
-    def __truediv__(self, scalar):
-        return Point(self.x/scalar, self.y/scalar)
-    def __mul__(self, scalar):
-        return Point(self.x*scalar, self.y*scalar)
-    def __rmul__(self, scalar):
-        return Point(self.x * scalar, self.y * scalar)
-    def __len__(self):
-        return math.sqrt(self.x*self.x + self.y*self.y)
-    def dot(self, other):
-        return self.x*other.x + self.y*other.y
-    def astuple(self):
-        return (int(self.x), int(self.y))
-    def transpose(self):
-        return Point(x=self.y, y=-self.x)
-
-
 class RoutingMethod(enum.IntEnum):
     CenterTCenter = 1
     Squared = 2
@@ -232,166 +206,11 @@ class RouteCenterToCenter(RoutingStragegy):
         shape.terminations = (i_a, i_b)
 
 
-class XP(enum.IntEnum):
-    LEFT = 1
-    OVERLAP = 2
-    RIGHT = 3
-class YP(enum.IntEnum):
-    BELOW = 1
-    OVERLAP = 2
-    ABOVE = 3
-
-Directions = enum.IntEnum('Directions', "TOP LEFT BOTTOM RIGHT")
-
-def routeSquare(start_block, finish_block, waypoints):
-    def extend_wp(w):
-        # Each wp will have one co-ordinate at infinity.
-        if abs(w.x) == inf:
-            return (Point(x=-inf, y=w.y), Point(x=inf, y=w.y))
-        return (Point(x=w.x, y=-inf), Point(x=w.x, y=inf))
-
-    ranges = [(start_block[0], start_block[0] + start_block[1])]
-    ranges.extend([extend_wp(wp) for wp in waypoints])
-    ranges.append((finish_block[0], finish_block[0] + finish_block[1]))
-    centers = [(r[0]+r[1])/2 for r in ranges]
-
-    points = []
-
-    for i, j in zip(range(len(ranges)-1), range(1, len(ranges))):
-
-        current_range, next_range = ranges[i], ranges[j]
-        current_center, next_center = centers[i], centers[j]
-
-        # Check if there can be a direct line between the ranges
-        xpos = XP.LEFT if next_range[1].x < current_range[0].x else (
-            XP.RIGHT if next_range[0].x > current_range[1].x else XP.OVERLAP
-        )
-        ypos = YP.BELOW if next_range[1].y < current_range[0].y else (
-            YP.ABOVE if next_range[0].y > current_range[1].y else YP.OVERLAP
-        )
-
-        # Detect a waypoint that runs through the start of finish object
-        handled = False
-        if i==0:
-            if next_range[0].x == -inf and (current_range[0].y <= next_center.y <= current_range[1].y):
-                # peek ahead to see which side of the object we need to be
-                if centers[j+1].x < current_center.x:
-                    points.append(Point(x=current_range[0].x, y=next_center.y))
-                else:
-                    points.append(Point(x=current_range[1].x, y=next_center.y))
-                handled = True
-            elif next_range[0].y == -inf and (current_range[0].x <= next_center.x <= current_range[1].x):
-                # peek ahead to see which side of the object we need to be
-                if centers[j + 1].y < current_center.y:
-                    points.append(Point(x=next_center.x, y=current_range[0].y))
-                else:
-                    points.append(Point(x=next_center.x, y=current_range[1].y))
-                handled = True
-        if j == len(ranges)-1:
-            if current_range[0].x == -inf and (next_range[0].y <= current_center.y <= next_range[1].y):
-                # Look behind to see which side of the object we need to be
-                if centers[i-1].x < next_center.x:
-                    points.append(Point(x=next_range[0].x, y=current_center.y))
-                else:
-                    points.append(Point(x=next_range[1].x, y=current_center.y))
-                handled = True
-            elif current_range[0].y == -inf and (next_range[0].x <= current_center.x <= next_range[1].x):
-                # look behind to see which side of the object we need to be
-                if centers[i- 1].y < next_center.y:
-                    points.append(Point(x=current_center.x, y=next_range[0].y))
-                else:
-                    points.append(Point(x=current_center.x, y=next_range[1].y))
-                handled = True
-
-        #Detect situations where there is overlap between objects or waypoints
-        if handled:
-            pass
-        elif ypos == YP.OVERLAP:
-            if current_center.x < next_center.x:
-                x1 = current_range[1].x
-                x2 = next_range[0].x
-            else:
-                x1 = current_range[0].x
-                x2 = next_range[1].x
-
-            # If the whole block is overlapped, draw the line from the center of the smallest
-            if current_range[0].y < next_range[0].y:
-                if current_range[1].y > next_range[1].y:
-                    y = next_center.y
-                else:
-                    y = (current_range[1].y + next_range[0].y) / 2
-            else:
-                if current_range[1].y > next_range[1].y:
-                    y = (next_range[1].y + current_range[0].y) / 2
-                else:
-                    y = current_center.y
-
-            points.append(Point(x=x1, y=y))
-            points.append(Point(x=x2, y=y))
-        elif xpos == XP.OVERLAP:
-            # A vertical line
-            if current_center.y < next_center.y:
-                y1 = current_range[1].y
-                y2 = next_range[0].y
-            else:
-                y1 = current_range[0].y
-                y2 = next_range[1].y
-
-            # If the whole block is overlapped, draw the line from the center of the smallest
-            if current_range[0].x < next_range[0].x:
-                if current_range[1].x > next_range[1].x:
-                    x = next_center.x
-                else:
-                    x = (current_range[1].x + next_range[0].x) / 2
-            else:
-                if current_range[1].x > next_range[1].x:
-                    x = (next_range[1].x + current_range[0].x) / 2
-                else:
-                    x = current_center.x
-
-
-            points.append(Point(x=x, y=y1))
-            points.append(Point(x=x, y=y2))
-        else:
-            # No overlap: draw a line in three parts.
-
-            v = next_center - current_center
-            if abs(v.y) > abs(v.x):
-                if v.y > 0:
-                    quadrant = Directions.TOP
-                    start = Point(current_center.x, current_range[1].y)
-                    end = Point(next_center.x, next_range[0].y)
-                else:
-                    quadrant = Directions.BOTTOM
-                    start = Point(current_center.x, current_range[0].y)
-                    end = Point(next_center.x, next_range[1].y)
-            elif v.x > 0:
-                quadrant = Directions.RIGHT
-                start = Point(current_range[1].x, current_center.y)
-                end = Point(next_range[0].x, next_center.y)
-            else:
-                quadrant = Directions.LEFT
-                start = Point(current_range[0].x, current_center.y)
-                end = Point(next_range[1].x, next_center.y)
-
-            middle = (start + end) / 2
-            if quadrant in [Directions.TOP, Directions.BOTTOM]:
-                    p1 = Point(current_center.x, middle.y)
-                    p2 = Point(next_center.x, middle.y)
-            else:
-                    p1 = Point(middle.x, current_center.y)
-                    p2 = Point(middle.x, next_center.y)
-
-            points.extend([start, p1, p2, end])
-
-    return points
-
 class RouteSquare(RoutingStragegy):
     def __init__(self):
         self.decorators = []
         self.dragged_index = None
     def mouseDownHandle(self, decorator_id, ev):
-        console.log("Handle was clicked on")
         self.dragged_index = decorator_id
         self.drag_start = getMousePos(ev)
         current = ev.target
@@ -402,9 +221,58 @@ class RouteSquare(RoutingStragegy):
         # WIth this router, new line segments are created differenly.
         pass
     def dragHandle(self, ev):
-        pass
+        wp_index = self.handle_wp_index[self.dragged_index]
+        console.log(f'Grabbing handle {self.dragged_index} for waypoint {wp_index} from {self.handle_wp_index}')
+        # Create a new waypoint if necessary
+        if (new := math.ceil(wp_index)) != wp_index:
+            # We need to create a new waypoint
+            console.log(f"Orientations: {self.handle_orientation}")
+            if self.handle_orientation[self.dragged_index] == 'X':
+                console.log("Creating a horizontal waypoint")
+                waypoint = Point(x=self.widget.points[self.dragged_index].x, y=inf)
+            else:
+                console.log("Creating a vertical waypoint")
+                waypoint = Point(x=inf, y=self.widget.points[self.dragged_index].y)
+            self.widget.waypoints.insert(new, waypoint)
+            self.handle_wp_index = self.getHandleWpIndices(self.widget.waypoints, self.widget.points)
+            wp_index = new
+            console.log(f'Created new waypoint: {new}, {self.widget.waypoints}')
+        # Now we can start moving the waypoint.
+        delta = getMousePos(ev) - self.drag_start
+        new_pos = self.initial_pos[self.dragged_index] + delta
+        if self.widget.waypoints[wp_index].x == inf:
+            self.widget.waypoints[wp_index].y = new_pos.y
+        else:
+            self.widget.waypoints[wp_index].x = new_pos.x
+
     def deleteWaypoint(self):
         pass
+
+    @staticmethod
+    def getHandleWpIndices(waypoints, points):
+        if not waypoints:
+            return [-0.5 for _ in points[:-1]]
+
+        current_wp_index = 0
+        indices = []
+        for p in points[:-1]:
+            if current_wp_index >= len(waypoints):
+                indices.append(len(waypoints)-0.5)
+                continue
+            wp = waypoints[current_wp_index]
+            if wp.x == inf:
+                if wp.y == p.y:
+                    indices.append(current_wp_index)
+                    current_wp_index += 1
+                else:
+                    indices.append(current_wp_index-0.5)
+            else:
+                if wp.x == p.x:
+                    indices.append(current_wp_index)
+                    current_wp_index += 1
+                else:
+                    indices.append(current_wp_index-0.5)
+        return indices
 
     def decorate(self, connection, canvas):
         def bind(i, d):
@@ -414,6 +282,7 @@ class RouteSquare(RoutingStragegy):
         self.initial_pos = {}
         self.widget = connection
         self.handle_orientation = []
+        self.handle_wp_index = self.getHandleWpIndices(self.widget.waypoints, self.widget.points)
         for p1, p2 in zip(self.widget.points[:-1], self.widget.points[1:]):
             v = (p2 - p1)
             vn = v / len(v)
@@ -434,7 +303,8 @@ class RouteSquare(RoutingStragegy):
         self.decorators = []
 
     def route(self, shape, all_blocks):
-        current_range = (shape.start.getPos(), shape.start.getPos() + shape.start.getSize())
+        # The actual algorithm for routing squared paths is quite complicated.
+        # Therefore it is delegated to a separate function.
         shape.points = routeSquare((shape.start.getPos(), shape.start.getSize()),
                                    (shape.finish.getPos(), shape.finish.getSize()),
                                    shape.waypoints)
@@ -751,6 +621,18 @@ class RerouteStates(BehaviourFSM):
         ev.stopPropagation()
         ev.preventDefault()
 
+    def dragHandle(self, ev):
+        console.log(f"Dragging handle: {self.dragged_index}")
+        delta = getMousePos(ev) - self.drag_start
+        new_pos = self.initial_pos + delta
+        handle = self.decorators[self.dragged_index]
+        if self.handle_orientation[self.dragged_index] == 'X':
+            handle['x1'] = handle['x2'] = new_pos.x
+            self.widget.waypoints[self.dragged_index] = Point(x=new_pos.x, y=inf)
+        else:
+            handle['y1'] = handle['y2'] = new_pos.y
+            self.widget.waypoints[self.dragged_index] = Point(x=inf, y=new_pos.y)
+
     def onMouseUp(self, diagram, ev):
         if self.state in [self.States.POTENTIAL_DRAG, self.States.DRAGGING]:
             self.state = self.States.DECORATED
@@ -975,74 +857,20 @@ class BlockDefinitionDiagram(Diagram):
 diagrams = []
 
 
-def testSquareRouter():
-    def mkPoints(*args):
-        return [Point(x=x, y=y) for x, y in args]
-
-    # Straight horizontal center2center line
-    e = mkPoints((200,60), (300,60))
-    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((300,40),(100,40)), [])
-    assert e==r, f"Asser error: {r} is not as expected {e}"
-
-    # Straight vertical center2center line
-    e = mkPoints((150,80), (150,150))
-    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((100,150),(100,40)), [])
-    assert e==r, f"Asser error: {r} is not as expected {e}"
-
-    # Straight horizontal off-center line
-    e = mkPoints((200, 65), (300, 65))
-    r = routeSquare(mkPoints((100, 40), (100, 40)), mkPoints((300, 50), (100, 40)), [])
-    assert e == r, f"Asser error: {r} is not as expected {e}"
-
-    # Straight vertical off-center line
-    e = mkPoints((160, 80), (160, 150))
-    r = routeSquare(mkPoints((100, 40), (100, 40)), mkPoints((120, 150), (100, 40)), [])
-    assert e == r, f"Asser error: {r} is not as expected {e}"
-
-    # Horizontal stepped line
-    e = mkPoints((200, 60), (350,60), (350,120), (500,120))
-    r = routeSquare(mkPoints((100, 40), (100, 40)), mkPoints((500, 100), (100, 40)), [])
-    assert e == r, f"Asser error: {r} is not as expected {e}"
-
-    # Vertical stepped line
-    e = mkPoints((150,80), (150,210), (270,210), (270,340))
-    r = routeSquare(mkPoints((100, 40), (100, 40)), mkPoints((220, 340), (100, 40)), [])
-    assert e == r, f"Asser error: {r} is not as expected {e}"
-
-    # Horizontal by single waypoint above
-    e = mkPoints((150,80), (150,100), (350,100), (350,80))
-    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((300,40),(100,40)), mkPoints((inf,100)))
-    assert e==r, f"Asser error: {r} is not as expected {e}"
-
-    # Horizontal by single waypoint below
-    e = mkPoints((150,40), (150,20), (350,20), (350,40))
-    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((300,40),(100,40)), mkPoints((inf,20)))
-    assert e==r, f"Asser error: {r} is not as expected {e}"
-
-    # Vertical by single waypoint to left
-    e = mkPoints((200,60), (250,60), (250,170), (200,170))
-    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((100,150),(100,40)), mkPoints((250, inf)))
-    assert e==r, f"Asser error: {r} is not as expected {e}"
-
-    # Vertical by single waypoint to right
-    e = mkPoints((100,60), (50,60), (50,170), (100,170))
-    r = routeSquare(mkPoints((100,40), (100,40)), mkPoints((100,150),(100,40)), mkPoints((50, inf)))
-    assert e==r, f"Asser error: {r} is not as expected {e}"
-
-
 def test():
     canvas = document['canvas']
     #canvas.bind("click", lambda ev: alert("CLICK"))
     diagram = BlockDefinitionDiagram()
     diagrams.append(diagram)
     diagram.bind(canvas)
-    b1 = Block(x=100, y=40, width=100, height=40, name='MyBlock1')
+    b1 = Block(x=100, y=400, width=100, height=40, name='MyBlock1')
     b2 = Block(x=300, y=40, width=100, height=40, name='MyBlock2')
     diagram.drop(b1)
     diagram.drop(b2)
     diagram.connect(b1, b2, Relationship)
     c = diagram.connections[0]
-    #c.waypoints = [Point(x=250, y=75)]
+    c.waypoints = [Point(x=570, y=inf), Point(x=inf, y=100)]
+    c.reroute([])
 
     document['NormalEditBtn'].bind('click', lambda ev: diagram.changeFSM(None))
     document['EditConnectionsBtn'].bind('click', lambda ev: diagram.changeFSM(ConnectionEditor(Relationship)))
