@@ -134,6 +134,8 @@ class RoutingStragegy:
         raise NotImplementedError
     def route(self, shape, all_blocks):
         raise NotImplementedError
+    def dragEnd(self, canvas):
+        pass
 
 class RouteCenterToCenter(RoutingStragegy):
     def __init__(self):
@@ -222,31 +224,40 @@ class RouteSquare(RoutingStragegy):
         pass
     def dragHandle(self, ev):
         wp_index = self.handle_wp_index[self.dragged_index]
-        console.log(f'Grabbing handle {self.dragged_index} for waypoint {wp_index} from {self.handle_wp_index}')
         # Create a new waypoint if necessary
         if (new := math.ceil(wp_index)) != wp_index:
             # We need to create a new waypoint
-            console.log(f"Orientations: {self.handle_orientation}")
             if self.handle_orientation[self.dragged_index] == 'X':
-                console.log("Creating a horizontal waypoint")
                 waypoint = Point(x=self.widget.points[self.dragged_index].x, y=inf)
             else:
-                console.log("Creating a vertical waypoint")
                 waypoint = Point(x=inf, y=self.widget.points[self.dragged_index].y)
             self.widget.waypoints.insert(new, waypoint)
             self.handle_wp_index = self.getHandleWpIndices(self.widget.waypoints, self.widget.points)
             wp_index = new
-            console.log(f'Created new waypoint: {new}, {self.widget.waypoints}')
         # Now we can start moving the waypoint.
         delta = getMousePos(ev) - self.drag_start
         new_pos = self.initial_pos[self.dragged_index] + delta
+        h = self.decorators[self.dragged_index]
         if self.widget.waypoints[wp_index].x == inf:
             self.widget.waypoints[wp_index].y = new_pos.y
+            h['y1'] = int(self.original_handle_pos[self.dragged_index][0].y + delta.y)
+            h['y2'] = int(self.original_handle_pos[self.dragged_index][0].y + delta.y)
         else:
             self.widget.waypoints[wp_index].x = new_pos.x
+            h['x1'] = int(self.original_handle_pos[self.dragged_index][0].x + delta.x)
+            h['x2'] = int(self.original_handle_pos[self.dragged_index][0].x + delta.x)
+
+    def dragEnd(self, canvas):
+        self.clear_decorations()
+        self.decorate(self.widget, canvas)
 
     def deleteWaypoint(self):
-        pass
+        wp_index = self.handle_wp_index[self.dragged_index]
+        if (new := math.ceil(wp_index)) != wp_index:
+            # There is no waypoint associated with this handle
+            return
+        self.widget.waypoints.pop(wp_index)
+        self.clear_decorations()
 
     @staticmethod
     def getHandleWpIndices(waypoints, points):
@@ -283,6 +294,7 @@ class RouteSquare(RoutingStragegy):
         self.widget = connection
         self.handle_orientation = []
         self.handle_wp_index = self.getHandleWpIndices(self.widget.waypoints, self.widget.points)
+        self.original_handle_pos = []
         for p1, p2 in zip(self.widget.points[:-1], self.widget.points[1:]):
             v = (p2 - p1)
             vn = v / len(v)
@@ -291,6 +303,7 @@ class RouteSquare(RoutingStragegy):
             self.handle_orientation.append('X' if abs(n.x) > abs(n.y) else 'Y')
             p1 = c + 10 * n - 20 * vn
             p2 = c + 10 * n + 20 * vn
+            self.original_handle_pos.append((p1, p2))
             decorator = svg.line(x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, stroke_width=6, stroke="#29B6F2")
             bind(len(self.decorators), decorator)
             self.initial_pos[len(self.decorators)] = c
@@ -635,6 +648,7 @@ class RerouteStates(BehaviourFSM):
 
     def onMouseUp(self, diagram, ev):
         if self.state in [self.States.POTENTIAL_DRAG, self.States.DRAGGING]:
+            self.widget.router.dragEnd(self.diagram.canvas)
             self.state = self.States.DECORATED
 
     def onMouseMove(self, diagram, ev):
