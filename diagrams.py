@@ -21,6 +21,7 @@ import math
 from math import inf
 from square_routing import routeSquare
 from point import Point
+from fontsizes import font_sizes
 
 ###############################################################################
 ## Primitive shapes
@@ -80,14 +81,14 @@ class Shape:
         if ev.buttons == 0:
             self.onHover(ev)
 
-    def getShape(self, diagram):
+    def getShape(self):
         return svg.rect(x=self.x,y=self.y, width=self.width, height=self.height, stroke_width="2",stroke="black",fill="white")
     def create(self, diagram, parent):
         self.diagram = ref(diagram)
 
         canvas = diagram.canvas
         self.subscribers = {}
-        self.shape = self.getShape(diagram)
+        self.shape = self.getShape()
         canvas <=  self.shape
 
         self.shape.bind('click', self.onClick)
@@ -434,21 +435,72 @@ def getMousePos(ev):
     CTM = ev.target.getScreenCTM()
     return Point(x=int((ev.clientX - CTM.e)/CTM.a), y=int((ev.clientY-CTM.f)/CTM.d))
 
-def moveSingleHandle(decorators, shape, orientation):
+def moveSingleHandle(decorators, widget, orientation):
     d = decorators[orientation]
-    x, y, width, height = [int(shape[k]) for k in ['x', 'y', 'width', 'height']]
+    x, y, width, height = [getattr(widget, k) for k in ['x', 'y', 'width', 'height']]
     d['cx'], d['cy'] = locations[orientation](x, y, width, height)
 
-def moveHandles(decorators, shape, orientation):
+def moveHandles(decorators, widget, orientation):
     # Determine which markers to move
     for o in to_update[orientation]:
-        moveSingleHandle(decorators, shape, o)
+        moveSingleHandle(decorators, widget, o)
 
-def moveAll(shape, decorators):
+def moveAll(widget, decorators):
     for o in Orientations:
-        moveSingleHandle(decorators, shape, o)
+        moveSingleHandle(decorators, widget, o)
 
 
+class VAlign(enum.IntEnum):
+    TOP = 1
+    CENTER = 2
+    BOTTOM = 3
+
+class HAlign(enum.IntEnum):
+    LEFT = 10
+    CENTER = 11
+    RIGHT = 12
+    JUSTIFIED = 13
+
+POINT_TO_PIXEL = 1.3333
+
+def wrapText(text, width, font='Arial.ttf', fontsize=10):
+    # Separate into words and determine the size of each part
+    font = font_sizes['Arial.ttf']['sizes']
+    parts = text.split()
+    normalized_width = width / POINT_TO_PIXEL / fontsize
+    sizes = [sum(font[ord(ch)] for ch in part) for part in parts]
+
+    # Now fill the lines
+    line_length = 0
+    lines = []
+    current_line = []
+    for size, part in zip(sizes, parts):
+        if line_length + size + font[32]*(len(current_line)-1) > normalized_width:
+            lines.append(' '.join(current_line))
+            current_line = []
+            line_length = 0
+        current_line.append(part)
+        line_length += size
+    if current_line:
+        lines.append(' '.join(current_line))
+    return lines
+
+def renderText(text, x, y, width, height, xmargin, ymargin, halign, valign, font='Arial', fontsize=16):
+    font_file = font+'.ttf'
+    lines = wrapText(text, width, font_file, fontsize)
+    # Now render these lines
+    anchor = {HAlign.LEFT: 'start', HAlign.CENTER: 'middle', HAlign.RIGHT: 'end'}[halign]
+    lineheight = font_sizes[font_file]['lineheight'] * fontsize
+    # Calculate where the text must be placed.
+    xpos = int({HAlign.LEFT: x+xmargin, HAlign.CENTER: x+width/2, HAlign.RIGHT: x+width-xmargin}[halign])
+    ypos = {#VAlign.TOP: y+ymargin,
+            VAlign.CENTER: y+(height-len(lines)*lineheight)/2
+            #VAlign.BOTTOM: y+height-len(lines)*lineheight*fontsize - ymargin
+           }[valign]
+
+    rendered = [svg.text(line, x=xpos, y=int(ypos+lineheight*(i+1)), text_anchor=anchor, font_size=fontsize, font_family='Arial')
+                for i, line in enumerate(lines)]
+    return rendered
 
 class BehaviourFSM:
     def mouseDownShape(self, diagram, widget, ev):
@@ -550,10 +602,9 @@ class ResizeStates(BehaviourFSM):
 
     def select(self, widget):
         self.widget = widget
-        shape = widget.shape
 
         self.decorators = {k: svg.circle(r=5, stroke_width=0, fill="#29B6F2") for k in Orientations}
-        x, y, width, height = [int(shape[k]) for k in ['x', 'y', 'width', 'height']]
+        x, y, width, height = [getattr(widget, k) for k in ['x', 'y', 'width', 'height']]
 
         for k, d in self.decorators.items():
             d['cx'], d['cy'] = locations[k](x, y, width, height)
@@ -570,7 +621,7 @@ class ResizeStates(BehaviourFSM):
             self.diagram.canvas <= d
             bind_decorator(d, orientation)
 
-        widget.subscribe(resize_role, lambda w: moveAll(w.shape, self.decorators))
+        widget.subscribe(resize_role, lambda w: moveAll(w, self.decorators))
 
     def onDrag(self, origin, original_size, delta):
         dx, dy, sx, sy, mx, my = orientation_details[self.dragged_handle]
@@ -582,7 +633,7 @@ class ResizeStates(BehaviourFSM):
         resizement = Point(x=original_size.x + sx * delta.x, y=original_size.y + sy * delta.y)
         shape.setSize(resizement)
 
-        moveHandles(self.decorators, shape.shape, self.dragged_handle)
+        moveHandles(self.decorators, shape, self.dragged_handle)
         self.diagram.rerouteConnections(shape)
 
 
@@ -822,9 +873,25 @@ class Note(Shape):
         f = self.fold_size
         return ' '.join(f'{x+a},{y+b}' for a, b in [(0,0), (w-f,0), (w,f), (w-f,f), (w-f,0), (w,f), (w,h), (0,h)])
     def getShape(self):
-        return svg.polygon(points=self.getPoints(), fill="yellow", stroke="black")
+        g = svg.g()
+        outline = svg.polygon(points=self.getPoints(), fill="#FFFBD6", stroke="black")
+        g <= outline
+        for line in renderText(self.description, self.x, self.y, self.width, self.height, 2, 2,
+                                HAlign.CENTER, VAlign.CENTER):
+            g <= line
+        return g
+
     def updateShape(self, shape):
-        shape['points'] = self.getPoints()
+        rect = shape.children[0]
+        rect['points'] = self.getPoints()
+        xpos = self.x + self.width / 2
+        lineheight = font_sizes['Arial.ttf']['lineheight']
+        for i, line in enumerate(shape.children[1:]):
+            # Remove the text elements
+            shape.removeChild(line)
+        for line in renderText(self.description, self.x, self.y, self.width, self.height, 2, 2,
+                                HAlign.CENTER, VAlign.CENTER):
+            shape <= line
 
 @dataclass
 class Constraint(Note):
@@ -877,7 +944,7 @@ def test():
     diagram = BlockDefinitionDiagram()
     diagrams.append(diagram)
     diagram.bind(canvas)
-    b1 = Block(x=100, y=400, width=100, height=40, name='MyBlock1')
+    b1 = Note(x=100, y=400, width=100, height=40, name='MyBlock1', description="Dit is een test blok.")
     b2 = Block(x=300, y=40, width=100, height=40, name='MyBlock2')
     diagram.drop(b1)
     diagram.drop(b2)
