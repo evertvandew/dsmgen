@@ -28,6 +28,17 @@ from fontsizes import font_sizes
 
 resize_role = 'resize_decorator'
 
+class Orientations(enum.IntEnum):
+    TL = 1
+    TOP = 2
+    TR = 3
+    RIGHT = 4
+    BR = 5
+    BOTTOM = 6
+    BL = 7
+    LEFT = 8
+
+
 @dataclass
 class Shape:
     x: float
@@ -114,8 +125,8 @@ class Shape:
 
 @dataclass
 class CP:
-    x: float
-    y: float
+    orientation: Orientations
+    order: int
 
     def onHover(self):
         pass
@@ -399,7 +410,6 @@ class Relationship:
         self.diagram.canvas <= self.path
 
 
-Orientations = enum.IntEnum("Orientations", "TL TOP TR RIGHT BR BOTTOM BL LEFT")
 to_update = {
     Orientations.TL: [Orientations.TR, Orientations.BL, Orientations.LEFT, Orientations.RIGHT, Orientations.TOP, Orientations.BOTTOM],
     Orientations.TOP: [Orientations.TL, Orientations.TR, Orientations.LEFT, Orientations.RIGHT, Orientations.TOP],
@@ -485,7 +495,7 @@ def wrapText(text, width, font='Arial.ttf', fontsize=10):
         lines.append(' '.join(current_line))
     return lines
 
-def renderText(text, x, y, width, height, xmargin, ymargin, halign, valign, font='Arial', fontsize=16):
+def renderText(text, x, y, width, height, xmargin=2, ymargin=2, halign=HAlign.CENTER, valign=VAlign.CENTER, font='Arial', fontsize=16):
     font_file = font+'.ttf'
     lines = wrapText(text, width, font_file, fontsize)
     # Now render these lines
@@ -889,8 +899,7 @@ class Note(Shape):
         for i, line in enumerate(shape.children[1:]):
             # Remove the text elements
             shape.removeChild(line)
-        for line in renderText(self.description, self.x, self.y, self.width, self.height, 2, 2,
-                                HAlign.CENTER, VAlign.CENTER):
+        for line in renderText(self.description, self.x, self.y, self.width, self.height):
             shape <= line
 
 @dataclass
@@ -908,6 +917,13 @@ class Anchor(Relationship):
 class FlowPort(CP):
     name: str
 
+    def getShape(self):
+        p = self.pos
+        return svg.rect(x=p.x-5, y=p.y-5, width=10, height=10, stroke_width=1, stroke='black', fill='lightgreen')
+    def updateShape(self, shape):
+        p = self.pos
+        shape['x'], shape['y'], shape['width'], shape['height'] = int(p.x-5), int(p.y-5), 10, 10
+
 @dataclass
 class FullPort(CP):
     name: str
@@ -918,6 +934,64 @@ class Block(Shape):
     description: str = ''
     ports: List[Union[FlowPort, FullPort]] = field(default_factory=list)
     children: List[Self] = field(default_factory=list)
+
+    def getPointPosFunc(self, orientation, ports):
+        match orientation:
+            case Orientations.LEFT:
+                return lambda i: Point(x=self.x, y=self.y + self.height / len(ports) / 2 * (2 * i + 1))
+            case Orientations.RIGHT:
+                return lambda i: Point(x=self.x + self.width,
+                                                y=self.y + self.height / len(ports) / 2 * (2 * i + 1))
+            case Orientations.TOP:
+                return lambda i: Point(x=self.x + self.width / len(ports) / 2 * (2 * i + 1), y=self.y)
+            case Orientations.BOTTOM:
+                return lambda i: Point(x=self.x + self.width / len(ports) / 2 * (2 * i + 1), y=self.y + self.height)
+
+    def getShape(self):
+        g = svg.g()
+        # Add the core rectangle
+        g <= svg.rect(x=self.x,y=self.y, width=self.width, height=self.height, stroke_width="2",stroke="black",fill="white")
+        # Add the ports
+        sorted_ports = {orientation: sorted([p for p in self.ports if p.orientation == orientation], key=lambda x: x.order) \
+                       for orientation in Orientations}
+        for orientation in [Orientations.LEFT, Orientations.RIGHT, Orientations.BOTTOM, Orientations.TOP]:
+            ports = sorted_ports[orientation]
+            pos_func = self.getPointPosFunc(orientation, ports)
+
+            for i, p in enumerate(ports):
+                p.pos = pos_func(i)
+                g <= p.getShape()
+
+        # Add the text
+        g <= renderText(self.name, x=self.x, y=self.y, width=self.width, height=self.height)
+
+        # Return the group of objects
+        return g
+
+    def updateShape(self, shape):
+        # Update the rect
+        rect = shape.children[0]
+        rect['x'], rect['y'], rect['width'], rect['height'] = self.x, self.y, self.width, self.height
+
+        # Update the ports
+        sorted_ports = {orientation: sorted([p for p in self.ports if p.orientation == orientation], key=lambda x: x.order) \
+                       for orientation in Orientations}
+        count = 0
+        for orientation in [Orientations.LEFT, Orientations.RIGHT, Orientations.BOTTOM, Orientations.TOP]:
+            ports = sorted_ports[orientation]
+            pos_func = self.getPointPosFunc(orientation, ports)
+
+            for i, p in enumerate(ports):
+                p.pos = pos_func(i)
+                p.updateShape(shape.children[i+1+count])
+            count += len(ports)
+
+        # Delete the previous
+        for i, line in enumerate(shape.children[1 + len(self.ports):]):
+            # Remove the text elements
+            shape.removeChild(line)
+        for line in renderText(self.name, self.x, self.y, self.width, self.height):
+            shape <= line
 
 @dataclass
 class FullPortConnection(Relationship):
@@ -945,7 +1019,16 @@ def test():
     diagrams.append(diagram)
     diagram.bind(canvas)
     b1 = Note(x=100, y=400, width=100, height=40, name='MyBlock1', description="Dit is een test blok.")
-    b2 = Block(x=300, y=40, width=100, height=40, name='MyBlock2')
+    b2 = Block(x=300, y=40, width=100, height=40, name='MyBlock2', ports=[
+        FlowPort(orientation=Orientations.LEFT, order=0, name='i1'),
+        FlowPort(orientation=Orientations.LEFT, order=1, name='i2'),
+        FlowPort(orientation=Orientations.RIGHT, order=0, name='o1'),
+        FlowPort(orientation=Orientations.RIGHT, order=1, name='o2'),
+        FlowPort(orientation=Orientations.TOP, order=0, name='i1'),
+        FlowPort(orientation=Orientations.TOP, order=1, name='i2'),
+        FlowPort(orientation=Orientations.BOTTOM, order=1, name='o2'),
+        FlowPort(orientation=Orientations.BOTTOM, order=0, name='o1')
+    ])
     diagram.drop(b1)
     diagram.drop(b2)
     diagram.connect(b1, b2, Relationship)
