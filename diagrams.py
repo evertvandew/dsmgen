@@ -1,4 +1,4 @@
-
+import json
 
 try:
     from browser import document, alert, svg, console, window
@@ -14,7 +14,7 @@ except:
 
 
 from typing import Union, Any, List, Self
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from weakref import ref
 import enum
 import math
@@ -112,6 +112,7 @@ class Shape:
 
     def getCenter(self):
         return self.getPos() + self.getSize()/2
+
     def getIntersection(self, b):
         halfsize = self.getSize()/2
         a = self.getCenter()
@@ -124,6 +125,14 @@ class Shape:
         rc = delta.x / delta.y
         i_top = Point(math.copysign(rc*halfsize.y, delta.x), math.copysign(halfsize.y, delta.y))
         return i_top + a
+
+    def getConnectionTarget(self, ev):
+        """ Determine if the user clicked on a child like a port """
+        # A basic shape has only one connection
+        return self
+
+    def isConnected(self, target):
+        return target == self
 
 @dataclass
 class CP:
@@ -772,25 +781,26 @@ class ConnectionEditor(BehaviourFSM):
         self.b_connection_role = None
         self.path = None
     def mouseDownShape(self, diagram, widget, ev):
+        party = widget.getConnectionTarget(ev)
         if self.state in [self.States.A_SELECTED, self.States.RECONNECTING]:
-            if diagram.allowsConnection(self.a_party, widget):
+            if diagram.allowsConnection(self.a_party, party):
                 if self.state == self.States.A_SELECTED:
-                    diagram.connect(self.a_party, widget, self.connectionFactory)
+                    diagram.connect(self.a_party, party, self.connectionFactory)
                 elif self.state == self.States.RECONNECTING:
                     match self.b_connection_role:
                         case self.ConnectionRoles.START:
-                            self.connection.start = widget
+                            self.connection.start = party
                         case self.ConnectionRoles.FINISH:
-                            self.connection.start = widget
+                            self.connection.start = party
                     diagram.reroute(self.connection)
 
                 self.path.remove()
                 self.state = self.States.NONE
         elif self.state == self.States.NONE:
             self.state = self.States.A_SELECTED
-            self.a_party = widget
+            self.a_party = party
             # Create a temporary path to follow the mouse
-            x, y = (widget.getPos() + widget.getSize()/2).astuple()
+            x, y = (self.a_party.getPos() + self.a_party.getSize()/2).astuple()
             self.path = svg.line(x1=x, y1=y, x2=x, y2=y, stroke_width=2, stroke="gray")
             diagram.canvas <= self.path
     def onMouseMove(self, diagram, ev):
@@ -805,6 +815,13 @@ class ConnectionEditor(BehaviourFSM):
     def delete(self, diagram):
         if self.state != self.States.NONE:
             self.path.remove()
+    def onKeyDown(self, diagram, ev):
+        if ev.key == 'Escape':
+            if self.state == self.States.A_SELECTED:
+                # Delete the connection
+                self.path.remove()
+                self.state = self.States.NONE
+
 
 class Diagram:
     def __init__(self):
@@ -835,7 +852,6 @@ class Diagram:
             for c in to_remove:
                 self.deleteConnection(c)
 
-
     def allowsConnection(self, a, b):
         return True
 
@@ -855,7 +871,7 @@ class Diagram:
             widget.reroute(self.children)
         else:
             for c in self.connections:
-                if c.start == widget or c.finish == widget:
+                if widget.isConnected(c.start) or widget.isConnected(c.finish):
                     c.reroute(self.children)
 
     def bind(self, canvas):
@@ -907,6 +923,12 @@ class Diagram:
 
     def onDrop(self):
         pass
+
+    def serialize(self):
+        # Output the model in JSON format
+        details = {'blocks': [asdict(b) for b in self.children],
+                   'connections': [asdict(c) for c in self.connections]}
+        return json.dumps(details)
 
 
 
@@ -962,9 +984,22 @@ class FlowPort(CP):
         p = self.pos
         shape['x'], shape['y'], shape['width'], shape['height'] = int(p.x-5), int(p.y-5), 10, 10
 
+    def getPos(self):
+        return self.pos
+    def getSize(self):
+        return Point(1,1)
+
 @dataclass
-class FullPort(CP):
-    name: str
+class FlowPortIn(FlowPort):
+    pass
+
+@dataclass
+class FlowPortOut(FlowPort):
+    pass
+
+@dataclass
+class FullPort(FlowPort):
+    pass
 
 @dataclass
 class Block(Shape):
@@ -990,6 +1025,7 @@ class Block(Shape):
         # Add the core rectangle
         g <= svg.rect(x=self.x,y=self.y, width=self.width, height=self.height, stroke_width="2",stroke="black",fill="white")
         # Add the ports
+        port_shape_lookup = {}      # A lookup for when the port is clicked.
         sorted_ports = {orientation: sorted([p for p in self.ports if p.orientation == orientation], key=lambda x: x.order) \
                        for orientation in Orientations}
         for orientation in [Orientations.LEFT, Orientations.RIGHT, Orientations.BOTTOM, Orientations.TOP]:
@@ -998,7 +1034,10 @@ class Block(Shape):
 
             for i, p in enumerate(ports):
                 p.pos = pos_func(i)
-                g <= p.getShape()
+                s = p.getShape()
+                g <= s
+                port_shape_lookup[s] = p
+        self.port_shape_lookup = port_shape_lookup
 
         # Add the text
         g <= renderText(self.name, x=self.x, y=self.y, width=self.width, height=self.height)
@@ -1031,18 +1070,21 @@ class Block(Shape):
         for line in renderText(self.name, self.x, self.y, self.width, self.height):
             shape <= line
 
+    def getConnectionTarget(self, ev):
+        # Determine if one of the ports was clicked on.
+        port = self.port_shape_lookup.get(ev.target, None)
+        if port is None:
+            return self
+        return port
+
+    def isConnected(self, target):
+        return (target == self) or target in self.ports
+
 @dataclass
 class FullPortConnection(Relationship):
     name: str
-    source: FullPort
-    Dest: FullPort
-
-@dataclass
-class FlowPortConnection(Relationship):
-    name: str
-    source: FlowPort
-    Dest: FlowPort
-
+    source: Union[FlowPort, FlowPortOut]
+    Dest: Union[FlowPort, FlowPortIn]
 
 class BlockDefinitionDiagram(Diagram):
     allowed_blocks = [Note, Block]
@@ -1059,16 +1101,16 @@ def test():
     b1 = Note(x=100, y=400, width=100, height=40, name='MyBlock1', description="Dit is een test blok.")
     b2 = Block(x=300, y=40, width=100, height=40, name='MyBlock2', ports=[
         FlowPort(orientation=Orientations.LEFT, order=0, name='i1'),
-        FlowPort(orientation=Orientations.LEFT, order=1, name='i2'),
-        FlowPort(orientation=Orientations.RIGHT, order=0, name='o1'),
         FlowPort(orientation=Orientations.RIGHT, order=1, name='o2'),
-        FlowPort(orientation=Orientations.TOP, order=0, name='i1'),
-        FlowPort(orientation=Orientations.TOP, order=1, name='i2'),
-        FlowPort(orientation=Orientations.BOTTOM, order=1, name='o2'),
-        FlowPort(orientation=Orientations.BOTTOM, order=0, name='o1')
     ])
+    b3 = Block(x=600, y=40, width=100, height=40, name='MyBlock3', ports=[
+        FlowPort(orientation=Orientations.LEFT, order=0, name='i1'),
+        FlowPort(orientation=Orientations.RIGHT, order=1, name='o2'),
+    ])
+
     diagram.drop(b1)
     diagram.drop(b2)
+    diagram.drop(b3)
     diagram.connect(b1, b2, Relationship)
     c = diagram.connections[0]
     c.waypoints = [Point(x=570, y=inf), Point(x=inf, y=100)]
