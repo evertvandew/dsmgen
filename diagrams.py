@@ -96,7 +96,7 @@ class Shape:
 
     def getShape(self):
         return svg.rect(x=self.x,y=self.y, width=self.width, height=self.height, stroke_width="2",stroke="black",fill="white")
-    def create(self, diagram, parent):
+    def create(self, diagram):
         self.diagram = ref(diagram)
 
         canvas = diagram.canvas
@@ -824,14 +824,17 @@ class ConnectionEditor(BehaviourFSM):
 
 
 class Diagram:
-    def __init__(self):
+    def __init__(self, widgets):
         self.selection = None
         self.mouse_events_fsm = None
         self.children = []
         self.connections = []
+        self.widgets = widgets
 
     def drop(self, block):
-        block.create(self, None)
+        if self.mouse_events_fsm is not None:
+            self.mouse_events_fsm.delete(self)
+        block.create(self)
         self.children.append(block)
 
     def deleteConnection(self, connection):
@@ -882,6 +885,8 @@ class Diagram:
         canvas.bind('mousedown', self.onMouseDown)
         canvas.bind('handle_drag_start', self.handleDragStart)
         document.bind('keydown', self.onKeyDown)
+        for widget in self.widgets:
+            widget(self)
 
     def clickChild(self, widget, ev):
         pass
@@ -936,7 +941,7 @@ class Diagram:
 ## Diagrams and shapes
 @dataclass
 class Note(Shape):
-    description: str
+    description: str = ''
     fold_size = 10
     def getPoints(self):
         x, y, w, h = self.x, self.y, self.width, self.height
@@ -968,14 +973,14 @@ class Constraint(Note):
 
 @dataclass
 class Anchor(Relationship):
-    source: Union[Note, Constraint]
-    dest: Any
+    source: Union[Note, Constraint] = None
+    dest: Any = None
     name: str = ''
 
 
 @dataclass
 class FlowPort(CP):
-    name: str
+    name: str = ''
 
     def getShape(self):
         p = self.pos
@@ -1003,7 +1008,6 @@ class FullPort(FlowPort):
 
 @dataclass
 class Block(Shape):
-    name: str
     description: str = ''
     ports: List[Union[FlowPort, FullPort]] = field(default_factory=list)
     children: List[Self] = field(default_factory=list)
@@ -1082,9 +1086,9 @@ class Block(Shape):
 
 @dataclass
 class FullPortConnection(Relationship):
-    name: str
-    source: Union[FlowPort, FlowPortOut]
-    Dest: Union[FlowPort, FlowPortIn]
+    name: str = ''
+    source: Union[FlowPort, FlowPortOut] = field(default_factory=list)
+    Dest: Union[FlowPort, FlowPortIn] = field(default_factory=list)
 
 class BlockDefinitionDiagram(Diagram):
     allowed_blocks = [Note, Block]
@@ -1092,10 +1096,40 @@ class BlockDefinitionDiagram(Diagram):
 diagrams = []
 
 
+class BlockCreateWidget:
+    height = 40
+    margin = 10
+    def __init__(self, diagram):
+        self.diagram = ref(diagram)
+        blocks = diagram.__class__.allowed_blocks
+        g = svg.g()
+        g <= svg.rect(x=0, width=2*self.margin+1.6*self.height, y=0, height=len(blocks)*(self.height+self.margin)+self.margin,
+                      fill='white', stroke='black', stroke_width="2")
+        for i, b in enumerate(blocks):
+            instance = b(name=b.__name__, x=self.margin, y=i*(self.height+self.margin)+self.margin,
+                         height=self.height, width=1.6*self.height)
+            shape = instance.getShape()
+            g <= shape
+
+            def bindFunc(index, block):
+                return lambda ev: self.onMouseDown(ev, index, block)
+
+            shape.bind('mousedown', bindFunc(i, b))
+        diagram.canvas <= g
+
+    def onMouseDown(self, ev, index, block):
+        diagram = self.diagram()
+        if diagram is None:
+            return
+        # Simply create a new block at the default position.
+        instance = block(name='', x=300, y=300, height=self.height, width=int(1.6*self.height))
+        diagram.drop(instance)
+
+
 def test():
     canvas = document['canvas']
     #canvas.bind("click", lambda ev: alert("CLICK"))
-    diagram = BlockDefinitionDiagram()
+    diagram = BlockDefinitionDiagram(widgets=[BlockCreateWidget])
     diagrams.append(diagram)
     diagram.bind(canvas)
     b1 = Note(x=100, y=400, width=100, height=40, name='MyBlock1', description="Dit is een test blok.")
