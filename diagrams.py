@@ -134,6 +134,12 @@ class Shape:
     def isConnected(self, target):
         return target == self
 
+    def update(self, values_json):
+        values = json.loads(values_json)
+        for key, value in values.items():
+            setattr(self, key, value)
+            self.updateShape(self.shape)
+
 @dataclass
 class CP:
     orientation: Orientations
@@ -686,6 +692,7 @@ class RerouteStates(BehaviourFSM):
         self.diagram.changeFSM(fsm)
         fsm.mouseDownShape(diagram, widget, ev)
 
+
     def mouseDownConnection(self, diagram, widget, ev):
         self.widget = widget
         if not self.decorators:
@@ -849,8 +856,9 @@ class Diagram:
 
             # Also delete all connections with this block or its ports
             to_remove = []
+            ports = getattr(block, 'ports', [])
             for c in self.connections:
-                if c.start == block or c.start in block.ports or c.finish == block or c.finish in block.ports:
+                if c.start == block or c.start in ports or c.finish == block or c.finish in ports:
                     to_remove.append(c)
             for c in to_remove:
                 self.deleteConnection(c)
@@ -895,6 +903,19 @@ class Diagram:
         if not self.mouse_events_fsm:
             self.mouse_events_fsm = ResizeStates(self)
         self.mouse_events_fsm.mouseDownShape(self, widget, ev)
+
+
+        # Also notify any listeners that an object was selected
+        details = json.dumps(asdict(widget))
+        self.canvas.dispatchEvent(window.CustomEvent.new("shape_selected", {
+            "bubbles":True,
+            "detail": {
+                "values": details,
+                "update": widget.update,
+                "object": widget
+            }
+        }))
+
 
     def mouseDownConnection(self, connection, ev):
         if not self.mouse_events_fsm:
@@ -973,7 +994,7 @@ class Constraint(Note):
 
 @dataclass
 class Anchor(Relationship):
-    source: Union[Note, Constraint] = None
+    source: (Note, Constraint) = None
     dest: Any = None
     name: str = ''
 
@@ -1009,8 +1030,8 @@ class FullPort(FlowPort):
 @dataclass
 class Block(Shape):
     description: str = ''
-    ports: List[Union[FlowPort, FullPort]] = field(default_factory=list)
-    children: List[Self] = field(default_factory=list)
+    ports: [FlowPort, FullPort] = field(default_factory=list)
+    children: [Self] = field(default_factory=list)
 
     def getPointPosFunc(self, orientation, ports):
         match orientation:
@@ -1087,8 +1108,8 @@ class Block(Shape):
 @dataclass
 class FullPortConnection(Relationship):
     name: str = ''
-    source: Union[FlowPort, FlowPortOut] = field(default_factory=list)
-    Dest: Union[FlowPort, FlowPortIn] = field(default_factory=list)
+    source: (FlowPort, FlowPortOut) = field(default_factory=list)
+    Dest: (FlowPort, FlowPortIn) = field(default_factory=list)
 
 class BlockDefinitionDiagram(Diagram):
     allowed_blocks = [Note, Block]
@@ -1126,6 +1147,16 @@ class BlockCreateWidget:
         diagram.drop(instance)
 
 
+def createDiagram(canvas_id, properties_id):
+    canvas = document[canvas_id]
+    diagram = BlockDefinitionDiagram(widgets=[BlockCreateWidget])
+    diagrams.append(diagram)
+    diagram.bind(canvas)
+
+
+
+
+
 def test():
     canvas = document['canvas']
     #canvas.bind("click", lambda ev: alert("CLICK"))
@@ -1153,4 +1184,4 @@ def test():
     document['NormalEditBtn'].bind('click', lambda ev: diagram.changeFSM(None))
     document['EditConnectionsBtn'].bind('click', lambda ev: diagram.changeFSM(ConnectionEditor(Relationship)))
 
-test()
+window.createDiagram = createDiagram

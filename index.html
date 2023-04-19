@@ -27,16 +27,71 @@
          </defs>
     </svg>
 
-    <script type="text/python" id="script8" src="diagrams.py"></script>
+    <div style="float:left; width=40%;"><h1>Properties</h1><div id="properties" /></div>
+    </div>
 
-    <p>
-    <pre class="python"></pre>
-    <p>
+    <script type="text/python">
+        from browser import document, console, html
+        import diagrams
+        from dataclasses import fields
+        import traceback
+        from typing import Hashable
+        import json
 
-    <span class="comment">
-    We start by importing the module <code class="module">math</code>, the same as in the Python standard distribution.
-    <p><a href="https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API" target="_blank">Canvas</a> is an API for drawing geometric forms in the page. The examples on the MDN pages are written in Javascript but can be easily translated for Brython.
-    </span>
+        diagrams.createDiagram("canvas", "properties");
+
+        type2HtmlInput = {
+                float: {'type': 'number', 'step': 'any'},
+                str: {'type': 'text'},
+                int: {'type': 'number', 'step': 1}
+            }
+
+
+        # Add the logic to edit parameters
+        # When a block is selected, the canvas throws an event with the details
+        def onBlockSelected(ev):
+            # Clear any remnants of a previous properties editor
+            properties_div = document['properties']
+            for e in properties_div.children:
+                e.remove()
+            # Use the annotations to create the properties editor
+            form = html.FORM()
+            o = ev.detail.object
+
+            editable_fields = [f for f in fields(o) if f.name not in ['x', 'y', 'height', 'width'] and isinstance(f.type, Hashable) and f.type in type2HtmlInput]
+
+            for field in editable_fields:
+                label = html.LABEL(field.name)
+                label.className ="col-sm-3 col-form-label"
+                ip = html.INPUT(id=f"edit_{field.name}", name=field.name, value=getattr(o, field.name), **type2HtmlInput[field.type])
+                ip.className = 'form-control'
+                form <= label
+                form <= ip
+                form <= html.BR()
+
+            port_fields = [f for f in fields(o) if type(field.type) == list and all(issubclass(t, diagrams.CP) for t in field.type)]
+
+            properties_div <= form
+
+            # Add a SAVE button
+            def onSave(_):
+                # Because this is a Closure, we can use the captured variables
+                # Get the new values for the editable fields
+                update = {}
+                for field in editable_fields:
+                    # Use the standard constructor for the type to do the conversion
+                    update[field.name] = field.type(document[f'edit_{field.name}'].value)
+                ev.detail.update(json.dumps(update))
+
+            b = html.BUTTON("Save", type="button")
+            b.className = "btn btn-primary"
+            b.bind("click", onSave)
+            properties_div <= b
+
+        canvas = document['canvas']
+        canvas.bind('shape_selected', onBlockSelected)
+    </script>
+
 </body>
 
 </html>
