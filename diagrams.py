@@ -164,7 +164,7 @@ class Shape:
         values = json.loads(values_json)
         for key, value in values.items():
             setattr(self, key, value)
-            self.updateShape(self.shape)
+        self.updateShape(self.shape)
 
 @dataclass
 class CP:
@@ -207,7 +207,6 @@ class RouteCenterToCenter(RoutingStragegy):
         self.decorate(connection, canvas)
 
     def dragHandle(self, ev):
-        console.log(f"Dragging handle: {self.dragged_index}")
         delta = getMousePos(ev) - self.drag_start
         new_pos = self.initial_pos + delta
         handle = self.decorators[self.dragged_index]
@@ -746,13 +745,11 @@ class RerouteStates(BehaviourFSM):
             self.initial_size = diagram.selection.getSize()
 
     def handleDragStart(self, index, ev):
-        console.log("Handle Drag Start")
         self.state = self.States.DRAGGING
         ev.stopPropagation()
         ev.preventDefault()
 
     def dragHandle(self, ev):
-        console.log(f"Dragging handle: {self.dragged_index}")
         delta = getMousePos(ev) - self.drag_start
         new_pos = self.initial_pos + delta
         handle = self.decorators[self.dragged_index]
@@ -966,7 +963,6 @@ class Diagram:
         self.mouse_events_fsm and self.mouse_events_fsm.onKeyDown(self, ev)
 
     def handleDragStart(self, ev):
-        console.log(f"Handle Drag Start {list(ev.__dict__.keys())}")
         self.mouse_events_fsm and self.mouse_events_fsm.handleDragStart(self, ev)
 
     def onHover(self):
@@ -1109,7 +1105,6 @@ class Block(Shape):
             shape.removeChild(line)
 
         # Update the ports
-        console.log(f'Ports: {self.ports}')
         sorted_ports = {orientation: sorted([p for p in self.ports if p.orientation == orientation], key=lambda x: x.order) \
                        for orientation in Orientations}
 

@@ -71,6 +71,10 @@ def createPortEditor(o, field):
     table.className = 'porttable'
     div <= html.H3(field.name) + '\n' + table
 
+    def bindRowToEditor(row, item, delete):
+        row.bind('click', lambda ev: editDialog(item))
+        delete.bind('click', lambda ev: (confirmDeleteDialog(item, row), ev.stopPropagation()))
+
     def fillTable():
         table.clear()
         sorted_ports = sorted(getattr(o, field.name), key = lambda p: 100*p.orientation.value + p.order)
@@ -78,7 +82,23 @@ def createPortEditor(o, field):
             row = html.TR()
             for f in fields(item):
                 row <= html.TD(str(getattr(item, f.name)))
+            # Add a delete button for each port
+            delete = html.BUTTON('X', style="background-color:red; color:white", type='button')
+            row <= delete
             table <= row
+            bindRowToEditor(row, item, delete)
+
+    def confirmDeleteDialog(item, row):
+        d = Dialog("Test", ok_cancel=('Yes', 'No'))
+        d.panel <=  "Delete this port?"
+
+        @bind(d.ok_button, "click")
+        def yes(ev):
+            """ Delete the item """
+            getattr(o, field.name).remove(item)
+            row.remove()
+            d.close()
+
 
     def editDialog(current=None):
         is_add = current is None
@@ -146,7 +166,6 @@ def dataClassEditor(objecttype, defaults=None, update=None):
     editable_fields = [f for f in fields(objecttype) if f.name not in ['x', 'y', 'height', 'width'] and isEditable(f)]
 
     for field in editable_fields:
-        console.log(f"Adding field: {field.type}")
         label = html.LABEL(field.name)
         label.className ="col-sm-3 col-form-label"
         form <= label
@@ -165,10 +184,9 @@ def dataClassEditor(objecttype, defaults=None, update=None):
         for field in editable_fields:
             # Use the standard constructor for the type to do the conversion
             update_data[field.name] = field.type(document[f'edit_{field.name}'].value)
-        if update:
+        if callable(update):
             update(json.dumps(update_data))
 
-    console.log("Adding button")
     b = html.BUTTON("Save", type="button")
     b.className = "btn btn-primary"
     b.bind("click", onSave)
