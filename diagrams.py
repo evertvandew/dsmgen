@@ -14,7 +14,7 @@ except:
 
 
 from typing import Union, Any, List, Self
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, is_dataclass
 from weakref import ref
 import enum
 import math
@@ -22,6 +22,13 @@ from math import inf
 from square_routing import routeSquare
 from point import Point
 from fontsizes import font_sizes
+
+
+class DataclassEncoder(json.JSONEncoder):
+    def default(self, o):
+        if is_dataclass(o):
+            return asdict(o)
+        return json.JSONEncoder.default(self, o)
 
 ###############################################################################
 ## Primitive shapes
@@ -38,6 +45,24 @@ class Orientations(enum.IntEnum):
     BL = 7
     LEFT = 8
 
+class BlockOrientations(enum.IntEnum):
+    TOP = 2
+    RIGHT = 4
+    BOTTOM = 6
+    LEFT = 8
+
+
+id_counter = 0
+def getId():
+    global id_counter
+    id_counter += 1
+    return id_counter
+
+
+class HIDDEN:
+    def __init__(self, t):
+        self.type = t
+
 
 @dataclass
 class Shape:
@@ -46,6 +71,7 @@ class Shape:
     height: float
     width: float
     name: str
+    id: HIDDEN(int) = field(default_factory=getId)
 
     def isResizable(self):
         return True
@@ -142,8 +168,9 @@ class Shape:
 
 @dataclass
 class CP:
-    orientation: Orientations
+    orientation: BlockOrientations
     order: int
+    id: HIDDEN(int) = field(default_factory=getId)
 
     def onHover(self):
         pass
@@ -365,6 +392,7 @@ class Relationship:
     finish: Point
     waypoints: List[Point]
     routing_method: RoutingMethod
+    id: HIDDEN(int) = field(default_factory=getId)
 
     @property
     def canvas(self):
@@ -906,7 +934,7 @@ class Diagram:
 
 
         # Also notify any listeners that an object was selected
-        details = json.dumps(asdict(widget))
+        details = json.dumps(widget, cls=DataclassEncoder)
         self.canvas.dispatchEvent(window.CustomEvent.new("shape_selected", {
             "bubbles":True,
             "detail": {
@@ -1075,23 +1103,35 @@ class Block(Shape):
         rect = shape.children[0]
         rect['x'], rect['y'], rect['width'], rect['height'] = self.x, self.y, self.width, self.height
 
+        # Delete the previous text
+        for line in shape.children[1 + len(self.port_shape_lookup):]:
+            # Remove the text elements
+            shape.removeChild(line)
+
         # Update the ports
+        console.log(f'Ports: {self.ports}')
         sorted_ports = {orientation: sorted([p for p in self.ports if p.orientation == orientation], key=lambda x: x.order) \
                        for orientation in Orientations}
-        count = 0
+
+        # Delete any ports no longer used
+        deleted = [s for s, p in self.port_shape_lookup.items() if p not in self.ports]
+        for s in deleted:
+            s.remove()
+        shape_lookup = {p.id: s for s, p in self.port_shape_lookup.items()}
+
         for orientation in [Orientations.LEFT, Orientations.RIGHT, Orientations.BOTTOM, Orientations.TOP]:
             ports = sorted_ports[orientation]
             pos_func = self.getPointPosFunc(orientation, ports)
-
             for i, p in enumerate(ports):
                 p.pos = pos_func(i)
-                p.updateShape(shape.children[i+1+count])
-            count += len(ports)
+                if p.id in shape_lookup:
+                    p.updateShape(shape_lookup[p.id])
+                else:
+                    s = p.getShape()
+                    shape <= s
+                    self.port_shape_lookup[s] = p
 
-        # Delete the previous
-        for i, line in enumerate(shape.children[1 + len(self.ports):]):
-            # Remove the text elements
-            shape.removeChild(line)
+        # Add the text
         for line in renderText(self.name, self.x, self.y, self.width, self.height):
             shape <= line
 
