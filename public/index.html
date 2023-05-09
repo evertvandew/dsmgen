@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="/src/brython.js"></script>
+<script type="text/javascript" src="/src/brython_stdlib.js"></script>
+</head>
+
+<body onload="brython(1)">
+    <div>
+        <div id="status"></div>
+        <input id="filename_edit" value=""/>
+        <button type="button" id="new_diagram_btn" class="btn btn-primary">
+          New Diagram
+        </button>
+        <!-- Button trigger modal file selection window -->
+        <button type="button" id="load_diagram_btn" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal">
+          Load Diagram
+        </button>
+    </div>
+    <button id="NormalEditBtn">Normal</button><button id="EditConnectionsBtn">Connect</button>
+    <svg id="canvas" width="100%" height="500px"
+        style="border-color:#000;border-style:solid;border-width:1px;margin-left:0px;">
+          <defs>
+            <marker id="startarrow" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+              <polygon points="10 0, 10 7, 0 3.5" fill="black" />
+            </marker>
+            <marker id="endarrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="strokeWidth">
+                <polygon points="0 0, 10 3.5, 0 7" fill="black" />
+            </marker>
+            <marker id="startarrow" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto">
+              <polygon points="10 0, 10 7, 0 3.5" fill="black" />
+            </marker>
+            <marker id="endarrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto" markerUnits="strokeWidth">
+                <polygon points="0 0, 10 3.5, 0 7" fill="black" />
+            </marker>
+         </defs>
+    </svg>
+
+    <div style="float:left; width=40%;"><h3>Properties</h3><div id="properties" /></div>
+
+    <script type="text/python">
+        from browser import document, console, html
+        import diagrams
+        from property_editor import dataClassEditor
+
+        diagrams.createDiagram("canvas", "properties");
+
+        # Add the logic to edit parameters
+        # When a block is selected, the canvas throws an event with the details
+        def onBlockSelected(ev):
+            # Clear any remnants of a previous properties editor
+            properties_div = document['properties']
+            for e in properties_div.children:
+                e.remove()
+            properties_div <= dataClassEditor(ev.detail.object, update=ev.detail.update)
+
+        canvas = document['canvas']
+        canvas.bind('shape_selected', onBlockSelected)
+    </script>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function(event) {
+        const canvas = document.querySelector("#canvas")
+        var unclean = false;
+        var prev_jsonString = "";
+        var status_div = document.querySelector("#status")
+        var fname_edit = document.querySelector("#filename_edit");
+        var current_document_name = "";
+        canvas.addEventListener("modified", e => {
+            unclean = true;
+            status_div.text = "Unsaved changes";
+        })
+
+        var intervalId = setInterval(function() {
+            if (!unclean) {
+                status_div.text = "";
+            } else {
+                let new_jsonString = canvas.serialize();
+                // Only send the diagram upstream when the user has stopped modifying it.
+                if (prev_jsonString == new_jsonString) {
+                    unclean = false;
+                    fetch(`/diagrams/${current_document_name}`, {
+                        method: 'POST',
+                        body: new_jsonString,
+                        headers: {
+                            "Content-type": "application/json; charset=UTF-8"
+                        }
+                    })
+                    .then((result) => {
+                        current_document_name = result;
+                        status_div.text = "";
+                        fname_edit.value = result;
+                    });
+                }
+                prev_jsonString = new_jsonString;
+            }
+        }, 5000);
+    });
+    </script>
+
+</body>
+
+</html>
