@@ -41,11 +41,11 @@
     <div style="float:left; width=40%;"><h3>Properties</h3><div id="properties" /></div>
 
     <script type="text/python">
-        from browser import document, console, html
-        import diagrams
+        from browser import document, console, html, window
+        from diagrams import Diagram, createDiagram
         from property_editor import dataClassEditor
 
-        diagrams.createDiagram("canvas", "properties");
+        createDiagram("canvas");
 
         # Add the logic to edit parameters
         # When a block is selected, the canvas throws an event with the details
@@ -58,6 +58,9 @@
 
         canvas = document['canvas']
         canvas.bind('shape_selected', onBlockSelected)
+
+        document['EditConnectionsBtn'].bind('click', lambda ev: canvas.dispatchEvent(window.CustomEvent.new(Diagram.ConnectionModeEvent, {})))
+        document['NormalEditBtn'].bind('click', lambda ev: canvas.dispatchEvent(window.CustomEvent.new(Diagram.NormalModeEvent, {})))
     </script>
 
     <script>
