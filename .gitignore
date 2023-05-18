@@ -2,3 +2,6 @@ fonts
 __pycache__
 *.pyc
 *.pyo
+diagrams/
+.idea/
+bin/

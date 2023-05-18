@@ -2,6 +2,7 @@
 # TODO:
 * Support multiple document types
 * Support for container blocks
+  * When objects are added to a group, they must be ordered above the group.
   * Limiting the position of internal waypoints to within the container
   * Dynamically create and remove ports as connections crossing the boundary are changed.
 * Allow conversion of one type element to another
