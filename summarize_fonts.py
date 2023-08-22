@@ -2,9 +2,10 @@
 
 # Summarize a number of standard fonts, and some fonts we like, for easy rendering in the diagrams.
 from fontTools import ttLib
-import json
 import glob
 import os.path
+import pprint
+import sys
 
 
 # For each font, create a table containing normalized widths of all characters.
@@ -14,7 +15,7 @@ import os.path
 all_details = {}
 
 for name in glob.glob('fonts/*.ttf'):
-    print(f'processing file {name}')
+    print(f'processing file {name}', file=sys.stderr)
     tt = ttLib.TTFont(name)
     emwidth = tt['head'].unitsPerEm
 
@@ -32,4 +33,4 @@ for name in glob.glob('fonts/*.ttf'):
     all_details[details['name']] = details
 
 with open('fontsizes.py', 'w') as out:
-    out.write(f'font_sizes = {repr(all_details)}')
+    out.write(f'font_sizes = {pprint.pformat(all_details)}')

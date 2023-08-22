@@ -5,6 +5,7 @@
 
 
 # TODO for the First Viable Product Release:
+* Add shape for Document
 * Support multiple document types
 * Support for container blocks
   * Limiting the position of internal waypoints to within the container
@@ -16,7 +17,7 @@
 * Support wide open lines
 * Support curved lines
 * Support scrolling of the diagram
-* Edit the styling of lines and objects.
+* Edit the styling of lines.
 * Button for copying styling from object to object(s)
 * Support styling multiple objects at once
 * Make a collection of diagrams, supporting at least UML and SYSML.
@@ -24,11 +25,12 @@
 # Future enhancements
 * Port to an environment where the javascript is pre-compiled. Probably pyjamas or pyjaco?
 * Add in-diagram buttons for the different editing modes.
-* 
+* Automatisch uitlijnen en grootte van blokken bepalen.
 
 
 
 # Done:
+* Edit the styling of objects.
 * Refactor for the locations of the source files
 * Allow styling of different model elements
 * Support for container blocks
