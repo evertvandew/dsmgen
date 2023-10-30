@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <head>
+        <meta charset="utf-8">
+        <script type="text/javascript" src="/src/brython.js"></script>
+        <script type="text/javascript" src="/src/brython_stdlib.js"></script>
+        <script type="text/javascript" src="/src/explorer.js"></script>
+    </head>
+
+</head>
+<body>
+
+<div id="explorer"  width="100%" height="500px">
+
+</div>
+
+<script>
+    document.onready = function(){
+        let testdata = [];
+        testdata.prototype.get_all = function(){return testdata;}
+        createExplorer("explorer", testdata);
+    };
+</script>
+
+</body>
+</html>
