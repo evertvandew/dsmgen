@@ -6,11 +6,82 @@
 
     The generated client uses the Brython Python-In-A-Browser technology.
 """
+
+from dataclasses import fields
+
 %>
+<!doctype html>
+<html>
+
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="/src/brython.js"></script>
+<script type="text/javascript" src="/src/brython_stdlib.js"></script>
+<link rel="stylesheet" type="text/css" href="/assets/css/fontawesome.min.css" />
+<link rel="stylesheet" type="text/css" href="/assets/css/solid.min.css" />
 
 
-"""
-Visual Modelling client.
-"""
+    <style>
+        .eline {margin-left: 1em;}
+    </style>
+</head>
 
-from diagrams import
+
+<body onload="brython(1)">
+    <div id="canvas" width="100%" height="700px"
+    </div>
+
+    <script type="text/python">
+        """
+        Visual Modelling client.
+        """
+
+        from browser import document, console, html, window, bind
+        from explorer import Element, make_explorer, ExplorerDataApi, context_menu_name
+        from dataclasses import dataclass, field
+        from typing import Self, List, Dict
+        from collections.abc import Iterable
+        import typing
+        import types
+        from enum import IntEnum
+
+        # Modelling 'Entities:'
+        % for entity in generator.ordered_items:
+        @dataclass
+        class ${entity.__name__}:
+            % for f in fields(entity):
+            ## All elements must have a default value so they can be created from scratch
+            ${f.name}: ${generator.get_type(f.type)} = ${generator.get_default(f.type)}
+            % endfor
+            % if not fields(entity):
+            pass
+            % endif
+
+        % endfor
+
+        allowed_children = {
+            % for name in generator.all_names.keys():
+            ${name}: [${', '.join(generator.children[name])}],
+            % endfor
+        }
+
+
+        class API(RestExplorerApi):
+            def get_allowed_children(self, id: str):
+                cls = getClass(id)
+                return allowed_children[cls]
+
+        blank = document["canvas"];
+        blank <= html.DIALOG(id=context_menu_name)
+        make_explorer(blank, API())
+
+        @bind(blank, 'click')
+        @bind(document[context_menu_name], 'click')
+        def close_contextmenu(ev):
+            ev.stopPropagation()
+            ev.preventDefault()
+            document[context_menu_name].close()
+    </script>
+</body>
+
+</html>
