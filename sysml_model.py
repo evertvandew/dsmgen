@@ -1,7 +1,10 @@
 
 from typing import Self, List, Dict
 from model_definition import (Entity, Relationship, Port, BlockDiagram, LogicalModel, ModelRoot, required,
-                              optional, selection, detail)
+                              optional, selection, detail, longstr, XRef, ModelVersion)
+
+ModelVersion('0.1')
+
 
 ###############################################################################
 ## Logical model
@@ -11,57 +14,67 @@ class RootModel:
 
 @LogicalModel
 class FunctionalModel:
-    parent: (Self, RootModel)
+    name: str
+    description: longstr
+    parent: XRef('children', Self, RootModel)
 
 @LogicalModel
 class StructuralModel:
-    parent: (Self, RootModel)
+    name: str
+    description: longstr
+    parent: XRef('children', Self, RootModel)
 
 ###############################################################################
 ## Entities for Notes & Constraints
 @Entity(styling = "shape:note")
 class Note:
-    description: (str, required)
+    description: (longstr, required)
 
 @Entity(styling = "shape:note")
 class Constraint:
-    description: (str, required)
+    description: (longstr, required)
 
 @Relationship(styling = "end:hat")
 class Anchor:
-    source: (Note, Constraint)
-    target: Entity
+    source: XRef('owner', Note, Constraint)
+    target: XRef('notes', Entity)
     name: str
 
 ###############################################################################
 ## Entities for structural diagrams
+@LogicalModel
+class ProtocolDefinition:
+    description: longstr
+    definition: longstr
+
+@Entity(styling = "shape:rect")
+class Block:
+    parent: XRef('children', Self, StructuralModel)
+    name: str
+    description: (longstr, detail)
+
 @Port(styling = "shape:square;fill:green")
 class FullPort:
     name: str
-    provides: [Entity, str]
-    requires: [Entity, str]
+    parent: XRef('ports', Block)
+    provides: XRef('producers', ProtocolDefinition, optional)
+    requires: XRef('consumers', ProtocolDefinition, optional)
 
 @Port(styling = "shape:square;fill:blue")
 class FlowPort:
     name: str
-    inputs: [Entity, str]
-    outputs: [Entity, str]
-
-@Entity(styling = "shape:rect")
-class Block:
-    parent: (Self, StructuralModel)
-    name: str
-    description: (str, detail)
-    ports: [FullPort, FlowPort]
+    parent: XRef('ports', Block)
+    inputs: XRef('consumers', ProtocolDefinition, optional)
+    outputs: XRef('producers', ProtocolDefinition, optional)
 
 @Relationship(styling = "end:funccall(end)")
 class BlockReference:
     stereotype: selection("None Association Aggregation Composition")
-    source: Block
-    target: Block
+    source: XRef('associations', Block)
+    target: XRef('associations', Block)
     source_multiplicity: selection("0-1 1 + *")
     target_multiplicity: selection("0-1 1 + *")
-    association: Block
+    association: XRef('associations', Block)
 
     def end(self):
         return {
@@ -73,23 +86,23 @@ class BlockReference:
 
 @Relationship()
 class BlockGeneralization:
-    source: Block
-    target: Block
+    source: XRef('parent', Block)
+    target: XRef('children', Block)
 
     styling = "end:opentriangle"
 
 @Relationship()
 class FullPortConnection:
-    source: FullPort
-    target: FullPort
+    source: XRef('consumers', FullPort)
+    target: XRef('producers', FullPort)
     name: str
 
     styling = "end:hat"
 
 @Relationship()
 class FlowPortConnection:
-    source: FlowPort
-    target: FlowPort
+    source: XRef('consumers', FlowPort)
+    target: XRef('producers', FlowPort)
     name: str
 
     styling = "end:hat"
@@ -97,15 +110,15 @@ class FlowPortConnection:
 @BlockDiagram
 class BlockDefinitionDiagram:
     entities: [Block, Note, Constraint]
-    parent: (Block, StructuralModel)
+    parent: XRef('children', Block, StructuralModel)
 
 
 ###############################################################################
 ## Entities for requirements
 @Entity()
 class Requirement:
-    parent: (Self, FunctionalModel)
+    parent: XRef('children', Self, FunctionalModel)
     name: str
-    description: (str, detail)
+    description: (longstr, detail)
     priority: (selection("NotApplicable Must Should Could Would"), detail)
     category: (str, detail)

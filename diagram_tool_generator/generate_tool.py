@@ -25,7 +25,6 @@ from config import Configuration
 
 
 home = os.path.dirname(__file__)
-client_template = Template(open(os.path.join(home, 'templates/client.tmpl')).read())
 
 
 def get_inner_types(owner, field_type):
@@ -36,6 +35,8 @@ def get_inner_types(owner, field_type):
             possible_types.append(owner)
         assert possible_types, f'No type defined for field {field_type}'
         return (t for ts in possible_types for t in get_inner_types(owner, ts))
+    if isinstance(field_type, mdef.XRef):
+        return [t for t in field_type.types if not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation))]
     return [field_type]
 
 
@@ -80,6 +81,7 @@ class Generator:
         self.children = children
 
         self.ordered_items = self.order_dependencies()
+        self.md = md
 
 
     def get_logical_children(self, name: str):
@@ -112,6 +114,7 @@ class Generator:
 
 
     def get_type(self, field_type):
+        """ Return the type of an attribute for use in the client """
         if isinstance(field_type, tuple):
             possible_types = [t for t in field_type if not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation)) ]
             assert possible_types, f'No type defined for field {field_type}'
@@ -122,6 +125,8 @@ class Generator:
             return f'[{", ".join(self.get_type(t) for t in field_type)}]'
         if isinstance(field_type, mdef.selection):
             return f'IntEnum("InstantEnum", "{" ".join(field_type.options)}")'
+        if isinstance(field_type, mdef.XRef):
+            return 'int'
         return field_type.__name__
 
     def get_default(self, field_type):
@@ -138,6 +143,8 @@ class Generator:
         if field_type is int:
             return '0'
         if field_type is str:
+            return '""'
+        if field_type is mdef.longstr:
             return '""'
         if field_type is float:
             return '0.0'
@@ -159,12 +166,18 @@ def generate_tool(config: Configuration):
     #    for f in fields(cls):
     #        print(f'{cls.__name__}.{f.name}: {get_type(f.type)} = {get_default(f.type)}')
 
-    the_client = client_template.render(
-        generator=generator
-    )
+    for tmpl, target in [
+        ('templates/client.tmpl', os.path.join(config.client_dir, f'{module_name}.html')),
+        ('templates/data_model.tmpl', os.path.join(config.server_dir, f'{module_name}_data.py'))
+    ]:
+        template = Template(open(os.path.join(home, tmpl)).read())
+        result = template.render(
+            config=config,
+            generator=generator
+        )
+        with open(target, 'w') as out:
+            out.write(result)
 
-    with open(os.path.join(config.target_dir, f'{module_name}.html'), 'w') as out:
-        out.write(the_client)
 
 
 if __name__ == '__main__':

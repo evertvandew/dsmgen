@@ -9,7 +9,7 @@ to define how different elements in the model are used in diagrams or in the und
 
 """
 
-
+from datetime import datetime, time
 from enum import IntEnum, auto
 from typing import List, Any
 from dataclasses import dataclass, field
@@ -110,6 +110,17 @@ def ModelRoot(cls):
 
 
 ###############################################################################
+## Bookkeeping helpers
+model_version = "0.0"
+def ModelVersion(v):
+    global model_version
+    model_version = v
+
+def get_version():
+    return model_version
+
+
+###############################################################################
 ## Definitions of additional annotations that can be used in the model, esp. with attributes
 
 class OptionalAnnotation: pass
@@ -123,3 +134,15 @@ class selection:
     def __init__(self, options):
         """ Options are set in a single string, separated by spaces. As in the IntEnum function. """
         self.options: List[str] = options.split()
+
+class longstr(str): pass
+
+class fmt_datetime(datetime):
+    def __init__(self, fmt):
+        self.fmt = fmt
+
+
+class XRef:
+    def __init__(self, remote_name:str, *types):
+        self.remote_name = remote_name
+        self.types = types

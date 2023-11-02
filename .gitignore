@@ -7,3 +7,4 @@ diagrams/
 bin/
 src/*.js
 test/*.js
+build/*
