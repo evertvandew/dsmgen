@@ -42,7 +42,7 @@ engine = create_engine("${config.dbase_url}")
 
 Session = sessionmaker(engine)
 
-Model = declarative_base(name='Model')
+Base = declarative_base()
 
 
 @contextmanager
@@ -69,15 +69,15 @@ def session_context():
 
 
 
-class Version(Model):
+class Version(Base):
     __tablename__ = 'version'
-    id = Column(Integer, primary_key = True)
+    Id = Column(Integer, primary_key = True)
     category =  Column(String)
     versionnr = Column(String)
 
 
 def init_db():
-    Model.metadata.create_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
     with session_context() as session:
         if session.query(Version).count() < 2:
             session.add(Version(category="generator", versionnr="0.1"))
@@ -94,48 +94,48 @@ def init_db():
 # # The contents of a diagram are stored in separate structures.
 
 
-class Block(Model):
+class _Block(Base):
     __tablename__ = 'block'
 
-    id = Column(Integer, primary_key=True)
+    Id = Column(Integer, primary_key=True)
     subtype = Column(String)
-    parent = Column(Integer, ForeignKey("block.id"))  # For subblocks and ports
+    parent = Column(Integer, ForeignKey("block.Id"))  # For subblocks and ports
     order = Column(Integer)
     details = Column("details", LargeBinary)
 
-class Relationship(Model):
+class _Relationship(Base):
     __tablename__ = 'relationship'
 
-    id = Column(Integer, primary_key=True)
+    Id = Column(Integer, primary_key=True)
     subtype = Column(String)
-    source_id  = Column(Integer, ForeignKey("block.id"))
-    target_id  = Column(Integer, ForeignKey("block.id"))
-    associate_id = Column(Integer, ForeignKey("block.id"))
+    source_id  = Column(Integer, ForeignKey("block.Id"))
+    target_id  = Column(Integer, ForeignKey("block.Id"))
+    associate_id = Column(Integer, ForeignKey("block.Id"))
     details = Column("details", LargeBinary)
 
-class Diagram(Model):
+class _Diagram(Base):
     __tablename__ = 'diagram'
 
-    id = Column(Integer, primary_key=True)
+    Id = Column(Integer, primary_key=True)
     subtype = Column(String)
 
-class BlockRepresentation(Model):
+class _BlockRepresentation(Base):
     __tablename__ = 'block_representation'
 
-    id = Column(Integer, primary_key=True)
-    diagram = Column(Integer, ForeignKey("diagram.id"))
-    block = Column(Integer, ForeignKey("block.id"))
+    Id = Column(Integer, primary_key=True)
+    diagram = Column(Integer, ForeignKey("diagram.Id"))
+    block = Column(Integer, ForeignKey("block.Id"))
     x = Column(Float)
     y = Column(Float)
     z = Column(Float)   # For placing blocks etc on top of each other
     styling = Column(String)
 
-class RelationshipRepresentation(Model):
+class _RelationshipRepresentation(Base):
     __tablename__ = "relationship_representation"
 
-    id = Column(Integer, primary_key=True)
-    diagram = Column(Integer, ForeignKey("diagram.id"))
-    relationship = Column(Integer, ForeignKey("relationship.id"))
+    Id = Column(Integer, primary_key=True)
+    diagram = Column(Integer, ForeignKey("diagram.Id"))
+    relationship = Column(Integer, ForeignKey("relationship.Id"))
     routing = Column(LargeBinary)       # JSON list of Co-ordinates of nodes
     z = Column(Float)                   # For ensuring the line goes over the right blocks.
     styling = Column(String)
@@ -144,10 +144,10 @@ class RelationshipRepresentation(Model):
 # ######################################
 # # Define a separate table for adding additional structure to the model
 
-class AdditionalHierarchy(Model):
+class _AdditionalHierarchy(Base):
     __tablename__ = "additional_hierarchy"
 
-    id = Column(Integer, primary_key=True)
+    Id = Column(Integer, primary_key=True)
     entity_table = Column(String)
     entity_id    = Column(Integer)
     parent_table = Column(String)
@@ -193,20 +193,46 @@ class longstr(str): pass
 
 class AWrapper:
     def store(self):
-        data_bytes = json.dumps(self, cls=ExtendibleJsonEncoder)
+        if self.id:
+            self.update()
+
+        data_bytes = json.dumps(self, cls=ExtendibleJsonEncoder).encode('utf8')
         table = self.get_db_table()
         # See if there already is a record for this item.
-        with db_session() as session:
-            if self.id:
-                record = session.query(table).filter_by(id=self.id)
-                record.details = data_bytes
-                self.update(record)
-            else:
-                session.add(table(self.extract_record_values(), details=data_bytes))
+        with session_context() as session:
+            record = table(**self.extract_record_values(), details=data_bytes)
+            session.add(record)
+            session.commit()        # Intermediate commit to determine the ID
+            # Update the original data with ID the record got from the dbase.
+            self.id = record.Id
+            data_bytes = json.dumps(self, cls=ExtendibleJsonEncoder).encode('utf8')
+            record.details = data_bytes
 
+    @classmethod
+    def retrieve(cls, id):
+        with session_context() as session:
+            record = session.query(cls.get_db_table()).filter_by(Id=id).first()
+            data_dict = json.loads(record.details.decode('utf8'))
+            return cls(**data_dict)
+
+    def update(self):
+        with session_context() as session:
+            record = session.query(self.get_db_table()).filter_by(Id=self.id).first()
+            data_bytes = json.dumps(self, cls=ExtendibleJsonEncoder).encode('utf8')
+            if record.details != data_bytes:
+                record.details = data_bytes
+                for key, value in self.extract_record_values().items():
+                    if getattr(record, key) != value:
+                        setattr(record, key, value)
+
+
+
+@dataclass
 class ABlock(AWrapper):
-    def get_db_table(self):
-        return Block
+    order: int = 0
+    @staticmethod
+    def get_db_table():
+        return _Block
     def extract_record_values(self):
         return {
             'subtype': self.__class__.__name__,
@@ -215,8 +241,23 @@ class ABlock(AWrapper):
         }
 
 class ARelationship(AWrapper):
-    def get_db_table(self):
-        return Relationship
+    @staticmethod
+    def get_db_table():
+        return _Relationship
+    def extract_record_values(self):
+        return {
+            'subtype':       self.__class__.__name__,
+            'source_id':     self.source,
+            'target_id':     self.target,
+            'associate_id':  getattr(self, 'association', None)
+        }
+
+@dataclass
+class APort(AWrapper):
+    order: int = 0
+    @staticmethod
+    def get_db_table():
+        return _Block   # Ports are stored in the block table.
     def extract_record_values(self):
         return {
             'subtype': self.__class__.__name__,
@@ -224,17 +265,15 @@ class ARelationship(AWrapper):
             'order': self.order
         }
 
-class APort(AWrapper):
-    def get_db_table(self):
-        return Block   # Ports are stored in the block table.
-
 class ADiagram(AWrapper):
-    def get_db_table(self):
-        return Diagram
+    @staticmethod
+    def get_db_table():
+        return _Diagram
 
 class ALogicalElement(AWrapper):
-    def get_db_table(self):
-        return AdditionalHierarchy
+    @staticmethod
+    def get_db_table():
+        return _AdditionalHierarchy
 
 # Generated dataclasses
 

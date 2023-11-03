@@ -1,3 +1,4 @@
+#!/bin/env python3.11
 """
 Generate and write source files for a complete model editing tool.
 
