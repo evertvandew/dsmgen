@@ -25,9 +25,6 @@ import model_definition as mdef
 from config import Configuration
 
 
-home = os.path.dirname(__file__)
-
-
 def get_inner_types(owner, field_type):
     """ Find out what the inner type of a field is. Used to find cross-references between items. """
     if type(field_type) in [list, tuple]:
@@ -55,8 +52,9 @@ def determine_dependencies(all_names):
 
 
 class Generator:
-    def __init__(self, config):
+    def __init__(self, config, module_name):
         self.config = config
+        self.module_name = module_name
 
         # Generate some look up tables and dependency lists
         md = mdef.model_definition
@@ -161,17 +159,37 @@ def generate_tool(config: Configuration):
     new_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(new_mod)
 
-    generator = Generator(config)
+    homedir = config.homedir
+    tooldir = os.path.dirname(__file__)
+
+
+
+
+    def ensure_dir_exists(p):
+        ap = os.path.normpath(os.path.join(homedir, p))
+        if not os.path.exists(ap):
+            os.mkdir(ap)
+        return ap
+
+    config.server_dir = ensure_dir_exists(config.server_dir)
+    config.client_dir = ensure_dir_exists(config.client_dir)
+
+    def hdir(basedir, p):
+        """ Return a directory relative to the homedir """
+        return os.path.normpath(os.path.join(homedir, basedir, p))
+
+    generator = Generator(config, module_name)
 
     #for cls in mdef.model_definition.entity:
     #    for f in fields(cls):
     #        print(f'{cls.__name__}.{f.name}: {get_type(f.type)} = {get_default(f.type)}')
 
     for tmpl, target in [
-        ('templates/client.tmpl', os.path.join(config.client_dir, f'{module_name}.html')),
-        ('templates/data_model.tmpl', os.path.join(config.server_dir, f'{module_name}_data.py'))
+        ('templates/client.tmpl', f'{config.client_dir}/{module_name}.html'),
+        ('templates/data_model.py', f'{config.server_dir}/{module_name}_data.py'),
+        ('templates/server.py', f'{config.server_dir}/{module_name}_run.py'),
     ]:
-        template = Template(open(os.path.join(home, tmpl)).read())
+        template = Template(open(hdir(tooldir, tmpl)).read())
         result = template.render(
             config=config,
             generator=generator

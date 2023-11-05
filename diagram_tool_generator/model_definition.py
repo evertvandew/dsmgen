@@ -30,6 +30,7 @@ class ModelDefinition:
     block_diagram: List[Any] = field(default_factory=list)
     laned_diagram: List[Any] = field(default_factory=list)
     logical_model: List[Any] = field(default_factory=list)
+    initial_records: List[Any] = None
     model_root: Any = None
 
     @property
@@ -146,3 +147,7 @@ class XRef:
     def __init__(self, remote_name:str, *types):
         self.remote_name = remote_name
         self.types = types
+
+
+def initial_state(records):
+    model_definition.initial_records = records

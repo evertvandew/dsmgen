@@ -1,7 +1,7 @@
 
 from typing import Self, List, Dict
 from model_definition import (Entity, Relationship, Port, BlockDiagram, LogicalModel, ModelRoot, required,
-                              optional, selection, detail, longstr, XRef, ModelVersion)
+                              optional, selection, detail, longstr, XRef, ModelVersion, initial_state)
 
 ModelVersion('0.1')
 
@@ -122,3 +122,9 @@ class Requirement:
     description: (longstr, detail)
     priority: (selection("NotApplicable Must Should Could Would"), detail)
     category: (str, detail)
+
+
+initial_state([
+    FunctionalModel('Functional Model', '', None),
+    StructuralModel('Structural Model', '', None)
+])

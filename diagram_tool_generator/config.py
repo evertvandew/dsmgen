@@ -2,7 +2,7 @@
 
 
 from dataclasses import dataclass
-
+import os
 
 @dataclass
 class Configuration:
@@ -12,4 +12,4 @@ class Configuration:
     dbase_url: str    = 'sqlite:///data/diagrams.sqlite3'
     dbase_uname: str  = ''
     dbase_pwd: str    = ''
-
+    homedir: str      = os.getcwd()
