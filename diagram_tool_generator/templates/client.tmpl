@@ -35,25 +35,29 @@ from dataclasses import fields
         Visual Modelling client.
         """
 
-        from browser import document, console, html, window, bind
+        from browser import document, console, html, window, bind, ajax
         from explorer import Element, make_explorer, ExplorerDataApi, context_menu_name
         from dataclasses import dataclass, field
-        from typing import Self, List, Dict
+        from typing import Self, List, Dict, Any
         from collections.abc import Iterable
         import typing
         import types
         from enum import IntEnum
 
+        class longstr(str): pass
+
         # Modelling 'Entities:'
         % for entity in generator.ordered_items:
         @dataclass
         class ${entity.__name__}:
+            Id: int = 0
             % for f in fields(entity):
             ## All elements must have a default value so they can be created from scratch
             ${f.name}: ${generator.get_type(f.type)} = ${generator.get_default(f.type)}
             % endfor
-            % if not fields(entity):
-            pass
+            % if not entity in generator.md.relationship:
+            order: int = 0
+            children: List[Any] = field(default_factory=list)
             % endif
 
         % endfor
@@ -65,10 +69,38 @@ from dataclasses import fields
         }
 
 
-        class API(RestExplorerApi):
+        class API(ExplorerDataApi):
             def get_allowed_children(self, id: str):
                 cls = getClass(id)
                 return allowed_children[cls]
+            def get_elements_async(self, cb):
+                def on_data(data):
+                    console.log(f'data: {data}')
+                    records = []
+                    for d in data.json:
+                        cls = globals()[d['__classname__']]
+                        ddict = {k:v for k, v in d.items() if k != '__classname__'}
+                        records.append(cls(**ddict))
+                    self.records = records
+                    console.log(f'records: {records}')
+                    cb(self.records)
+                ajax.get('data/hierarchy', mode="json", oncomplete=on_data)
+            def get_element(self, id: str) -> Element:
+                raise NotImplementedError
+            def add_element(self, details: Element, parent: str):
+                """ Persist a new element created with the right-click menu """
+                raise NotImplementedError
+            def move_element(self, id: str):
+                """ Called when an element is moved in the hierarchy. """
+                raise NotImplementedError
+            def delete_element(self, id: str) -> bool:
+                """ Called when an element is deleted.
+                    Returns True if the delete was successful, false if not.
+                """
+                raise NotImplementedError
+            def on_click(self, id: str):
+                """ Called when an element was left-clicked. """
+                raise NotImplementedError
 
         blank = document["canvas"];
         blank <= html.DIALOG(id=context_menu_name)

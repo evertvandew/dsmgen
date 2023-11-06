@@ -223,6 +223,8 @@ class AWrapper:
         typename = record.subtype
         cls = globals().get(typename)
         data_dict = json.loads(record.details.decode('utf8'))
+        assert typename == data_dict['__classname__']
+        data_dict = {k:v for k,v in data_dict.items() if k != '__classname__'}
         return cls(**data_dict)
 
 @dataclass
@@ -270,7 +272,7 @@ class ALogicalElement(ABlock): pass
 %>
 @dataclass
 class ${entity.__name__}(${stereotype}):
-    id: int = 0
+    Id: int = 0
     % for f in fields(entity):
     ## All elements must have a default value so they can be created from scratch
     ${f.name}: ${get_type(f.type)} = ${generator.get_default(f.type)}
