@@ -129,6 +129,7 @@ class OptionalAnnotation: pass
 class required(OptionalAnnotation): pass    # An instance must ALWAYS have this attribute set.
 class optional(OptionalAnnotation): pass    # An instance does not need this attribute filled in
 class detail(OptionalAnnotation): pass      # This attribute is a detail only shown in a detail editor.
+class hidden(OptionalAnnotation): pass      # This attribute is not to be seen or edited by the user.
 
 class selection:
     """ Define an attribute that must be set to one of several options. """

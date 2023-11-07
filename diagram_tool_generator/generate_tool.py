@@ -18,9 +18,11 @@ import sys
 import importlib
 from dataclasses import fields
 from typing import Self, Any
+from itertools import chain
 
 from mako.template import Template
 
+import model_definition
 import model_definition as mdef
 from config import Configuration
 
@@ -69,11 +71,14 @@ class Generator:
         children = {n: set() for n in all_names}
         # First invert the "parent" relationship
         for cls in mdef.model_definition.all_model_items:
+            pass
             if t := cls.__annotations__.get('parent', False):
                 for d in get_inner_types(cls, t):
                     name = d.__name__
                     if name in all_names:
                         children[name].add(cls.__name__)
+                    elif name == 'Self':
+                        children[cls.__name__].add(cls.__name__)
         # Also look at the allowed "entities" in diagrams.
         for cls in [c for c in mdef.model_definition.all_model_items if 'entities' in c.__annotations__]:
             children[cls.__name__] |= {c.__name__ for c in get_inner_types(cls, cls.__annotations__['entities'])}
@@ -128,6 +133,19 @@ class Generator:
             return 'int'
         return field_type.__name__
 
+    @staticmethod
+    def get_type_options(field_type):
+        if isinstance(field_type, model_definition.XRef):
+            return Generator.get_type_options(field_type.types)
+        if isinstance(field_type, list) or isinstance(field_type, tuple):
+            return [o for t in field_type for o in Generator.get_type_options(t)]
+        return [field_type] if isinstance(field_type, type) and issubclass(field_type, mdef.OptionalAnnotation) else []
+
+    def get_html_type(self, field_type):
+        if mdef.hidden in self.get_type_options(field_type):
+            return 'diagrams.HIDDEN'
+        return self.get_type(field_type)
+
     def get_default(self, field_type):
         if isinstance(field_type, list):
             return 'field(default_factory=list)'
@@ -148,8 +166,6 @@ class Generator:
         if field_type is float:
             return '0.0'
         return None
-
-
 
 
 def generate_tool(config: Configuration):

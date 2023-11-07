@@ -18,6 +18,9 @@ def get_request_data():
             new_data = flask.request.data.decode('base64')
         else:
             new_data = flask.request.data
+
+        if isinstance(new_data, bytes) and flask.request.is_json:
+            new_data = json.loads(new_data.decode('utf8'))
     else:
         # The data is encoded as form data. Just save them as JSON
         new_data = flask.request.values.to_dict()
@@ -63,14 +66,19 @@ def update_${entity.__name__}_data(index):
     for key, value in data:
         setattr(record, key, value)
     record.update()
-    return flask.make_response('Accepted', 202)
+    result = record.asjson()
+    return flask.make_response(result, 202)
 
 @app.route("/data/${entity.__name__}", methods=['POST', 'PUT'])
-def add_${entity.__name__}_data(index):
+def add_${entity.__name__}_data():
     data = get_request_data()
+    data = {k:v for k, v in data.items() if k not in ['children', '__classname__']}
+
+
     record = dm.${entity.__name__}(**data)
     record.store()
-    return flask.make_response('Created', 201)
+    result = record.asjson()
+    return flask.make_response(result, 201)
 
 % endfor
 
@@ -82,26 +90,14 @@ def add_${entity.__name__}_data(index):
 @app.route("/data/hierarchy", methods=['GET'])
 def get_hierarchy():
     # Just load all elements in the hierarchy.
+    # The actual hierarchy is not formed here but in the client,
+    # because it is bothersome to deserialize from JSON.
     with dm.session_context() as session:
         entities = session.query(dm._Entity).all()
-        block_lu = {r.Id:dm.AWrapper.load_from_db(r) for r in entities}
+        blocks = [dm.AWrapper.load_from_db(r) for r in entities]
 
-    for b in block_lu.values():
-        b.children = []
-
-    # Determine the hierarchy and find the root element(s)
-    roots = []
-    for b in block_lu.values():
-        if b.parent:
-            block_lu[b.parent].children.append(b)
-        else:
-            roots.append(b)
-    # Order the children
-    for b in block_lu.values():
-        b.children.sort(key=lambda o: o.order)
-    roots.sort(key=lambda o: o.order)
     response = flask.make_response(
-        json.dumps(roots, cls=dm.ExtendibleJsonEncoder).encode('utf8'),
+        json.dumps(blocks, cls=dm.ExtendibleJsonEncoder).encode('utf8'),
         200
     )
     response.headers['Content-Type'] = 'application/json'

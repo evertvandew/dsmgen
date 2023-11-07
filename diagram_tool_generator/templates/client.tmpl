@@ -36,13 +36,15 @@ from dataclasses import fields
         """
 
         from browser import document, console, html, window, bind, ajax
+        import json
         from explorer import Element, make_explorer, ExplorerDataApi, context_menu_name
-        from dataclasses import dataclass, field
+        from dataclasses import dataclass, field, is_dataclass, asdict
         from typing import Self, List, Dict, Any
         from collections.abc import Iterable
         import typing
         import types
         from enum import IntEnum
+        import diagrams
 
         class longstr(str): pass
 
@@ -50,14 +52,14 @@ from dataclasses import fields
         % for entity in generator.ordered_items:
         @dataclass
         class ${entity.__name__}:
-            Id: int = 0
+            Id: diagrams.HIDDEN = 0
             % for f in fields(entity):
             ## All elements must have a default value so they can be created from scratch
-            ${f.name}: ${generator.get_type(f.type)} = ${generator.get_default(f.type)}
+            ${f.name}: ${generator.get_html_type(f.type)} = ${generator.get_default(f.type)}
             % endfor
             % if not entity in generator.md.relationship:
-            order: int = 0
-            children: List[Any] = field(default_factory=list)
+            order: diagrams.HIDDEN = 0
+            children: diagrams.HIDDEN = field(default_factory=list)
             % endif
 
         % endfor
@@ -69,38 +71,78 @@ from dataclasses import fields
         }
 
 
+        def flatten(data):
+            if isinstance(data, Iterable):
+                for d in data:
+                    yield from flatten(d)
+            else:
+                yield data
+                if hasattr(data, 'children'):
+                    yield from flatten(data.children)
+
+        class ExtendibleJsonEncoder(json.JSONEncoder):
+            def default(self, o):
+                """ We have three tricks to jsonify objects that are not normally supported by JSON.
+                    * Dataclass instances are serialised as dicts.
+                    * For objects that define a __json__ method, that method is called for serialisation.
+                    * For other objects, the str() protocol is used, i.e. the __str__ method is called.
+                """
+                if hasattr(o, '__json__'):
+                    return o.__json__()
+                if is_dataclass(o):
+                    result = asdict(o)
+                    result['__classname__'] = type(o).__name__
+                    return result
+                return str(o)
+
         class API(ExplorerDataApi):
-            def get_allowed_children(self, id: str):
-                cls = getClass(id)
+            def get_allowed_children(self, id: int):
+                element = self.records[id]
+                cls = type(element)
                 return allowed_children[cls]
             def get_elements_async(self, cb):
                 def on_data(data):
-                    console.log(f'data: {data}')
                     records = []
                     for d in data.json:
                         cls = globals()[d['__classname__']]
                         ddict = {k:v for k, v in d.items() if k != '__classname__'}
                         records.append(cls(**ddict))
-                    self.records = records
-                    console.log(f'records: {records}')
-                    cb(self.records)
-                ajax.get('data/hierarchy', mode="json", oncomplete=on_data)
-            def get_element(self, id: str) -> Element:
+                    self.records = {r.Id: r for r in records}
+                    # Determine the actual hierarchy.
+                    for r in self.records.values():
+                        r.children = []
+                    roots = []
+                    for r in self.records.values():
+                        if r.parent:
+                            self.records[r.parent].children.append(r)
+                        else:
+                            roots.append(r)
+                    self.hierarchy = roots
+                    cb(self.hierarchy)
+                ajax.get('/data/hierarchy', mode="json", oncomplete=on_data)
+            def get_element(self, id: int) -> Element:
                 raise NotImplementedError
-            def add_element(self, details: Element, parent: str):
+            def add_element(self, details: Element):
                 """ Persist a new element created with the right-click menu """
-                raise NotImplementedError
-            def move_element(self, id: str):
+                data = json.dumps(details, cls=ExtendibleJsonEncoder)
+                def on_complete(update):
+                    details.Id = update.json['Id']
+                    self.records[details.Id] = details
+                    parent = self.records[details.parent]
+                    parent.children.append(details)
+                ajax.post(f'/data/{type(details).__name__}', blocking=True, data=data, oncomplete=on_complete,
+                          headers={"Content-Type": "application/json"})
+            def move_element(self, id: int):
                 """ Called when an element is moved in the hierarchy. """
                 raise NotImplementedError
-            def delete_element(self, id: str) -> bool:
+            def delete_element(self, id: int) -> bool:
                 """ Called when an element is deleted.
                     Returns True if the delete was successful, false if not.
                 """
                 raise NotImplementedError
-            def on_click(self, id: str):
+            def on_click(self, id: int):
                 """ Called when an element was left-clicked. """
-                raise NotImplementedError
+                console.log(f"Clicked on element {id}")
 
         blank = document["canvas"];
         blank <= html.DIALOG(id=context_menu_name)

@@ -163,6 +163,8 @@ class ExtendibleJsonEncoder(json.JSONEncoder):
         if is_dataclass(o):
             result = asdict(o)
             result['__classname__'] = type(o).__name__
+            if hasattr(o, 'children'):
+                result['children'] = o.children
             return result
         return str(o)
 
@@ -182,19 +184,20 @@ class AWrapper:
             with session_context() as session:
                 self.store(session)
         else:
-            if self.id:
+            if self.Id and int(self.Id):
                 self.update()
 
             data_bytes = self.asjson()
             table = self.get_db_table()
-            # See if there already is a record for this item.
+            # Add the record to the database to get its ID.
             record = table(**self.extract_record_values(), details=data_bytes)
             session.add(record)
             session.commit()        # Intermediate commit to determine the ID
             # Update the original data with ID the record got from the dbase.
-            self.id = record.Id
+            self.Id = record.Id
             data_bytes = self.asjson()
             record.details = data_bytes
+            session.commit()
 
     def asjson(self):
         return json.dumps(self, cls=ExtendibleJsonEncoder).encode('utf8')
@@ -253,12 +256,32 @@ class ARelationship(AWrapper):
             'associate_id':  getattr(self, 'association', None)
         }
 
-@dataclass
-class APort(ABlock): pass
+class APort(ABlock):
+    def extract_record_values(self):
+        return {
+            'type': EntityType.Port,
+            'subtype': self.__class__.__name__,
+            'parent': self.parent if hasattr(self, 'parent') else None,
+            'order': self.order
+        }
 
-class ADiagram(ABlock): pass
+class ADiagram(ABlock):
+    def extract_record_values(self):
+        return {
+            'type': EntityType.Diagram,
+            'subtype': self.__class__.__name__,
+            'parent': self.parent if hasattr(self, 'parent') else None,
+            'order': self.order
+        }
 
-class ALogicalElement(ABlock): pass
+class ALogicalElement(ABlock):
+    def extract_record_values(self):
+        return {
+            'type': EntityType.LogicalElement,
+            'subtype': self.__class__.__name__,
+            'parent': self.parent if hasattr(self, 'parent') else None,
+            'order': self.order
+        }
 
 # Generated dataclasses
 
