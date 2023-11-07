@@ -152,3 +152,8 @@ class XRef:
 
 def initial_state(records):
     model_definition.initial_records = records
+
+
+def style(cls, **styling):
+    previous = styling_definition.setdefault(cls.__name__, {})
+    previous.update(styling)

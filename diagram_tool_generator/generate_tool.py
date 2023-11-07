@@ -86,6 +86,7 @@ class Generator:
 
         self.ordered_items = self.order_dependencies()
         self.md = md
+        self.styling = mdef.styling_definition
 
 
     def get_logical_children(self, name: str):

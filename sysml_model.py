@@ -2,7 +2,7 @@
 from typing import Self, List, Dict
 from model_definition import (Entity, Relationship, Port, BlockDiagram, LogicalModel, ModelRoot, required,
                               optional, selection, detail, longstr, XRef, ModelVersion, initial_state,
-                              hidden)
+                              hidden, style)
 
 ModelVersion('0.1')
 
@@ -112,6 +112,7 @@ class FlowPortConnection:
 class BlockDefinitionDiagram:
     entities: [Block, Note, Constraint]
     parent: XRef('children', Block, StructuralModel, hidden)
+    name: str
 
 
 ###############################################################################
@@ -129,3 +130,14 @@ initial_state([
     FunctionalModel('Functional Model', '', None),
     StructuralModel('Structural Model', '', None)
 ])
+
+
+style(Note, icon='message')
+style(Constraint, icon='note-sticky')
+style(Requirement, icon='file-lines')
+style(Block, icon='square-full')
+style(BlockDefinitionDiagram, icon='image')
+style(FlowPort, icon='arrows-alt-h')
+style(FullPort, icon='arrows-alt-h')
+style(FunctionalModel, icon='folder')
+style(StructuralModel, icon='folder')

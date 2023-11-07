@@ -60,6 +60,9 @@ from dataclasses import fields
             % if not entity in generator.md.relationship:
             order: diagrams.HIDDEN = 0
             children: diagrams.HIDDEN = field(default_factory=list)
+
+            def get_icon(self):
+                return "${generator.styling.get(entity.__name__, {}).get('icon') or 'folder'}"
             % endif
 
         % endfor
