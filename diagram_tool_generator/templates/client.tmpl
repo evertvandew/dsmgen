@@ -137,11 +137,18 @@ from dataclasses import fields
             def move_element(self, id: int):
                 """ Called when an element is moved in the hierarchy. """
                 raise NotImplementedError
-            def delete_element(self, id: int) -> bool:
+            def delete_element(self, id: int, clsname: str) -> bool:
                 """ Called when an element is deleted.
                     Returns True if the delete was successful, false if not.
                 """
-                raise NotImplementedError
+                result = False
+                def oncomplete(response):
+                    nonlocal result
+                    if response.status >= 200 and response.status < 300:
+                        console.log("Got a good response from the server")
+                        result = True
+                ajax.delete(f'/data/{clsname}/{id}', blocking=True, oncomplete=oncomplete)
+                return result
             def on_click(self, id: int):
                 """ Called when an element was left-clicked. """
                 console.log(f"Clicked on element {id}")

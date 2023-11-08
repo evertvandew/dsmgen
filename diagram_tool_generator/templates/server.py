@@ -81,6 +81,14 @@ def add_${entity.__name__}_data():
     result = record.asjson()
     return flask.make_response(result, 201)
 
+@app.route("/data/${entity.__name__}/<int:index>", methods=['DELETE'])
+def delete_${entity.__name__}_data(index):
+    record = dm.${entity.__name__}.retrieve(index)
+    if type(record).__name__ != "${entity.__name__}":
+        return flask.make_response('Object not found', 405)
+    record.delete()
+    return flask.make_response('Deleted', 204)
+
 % endfor
 
 

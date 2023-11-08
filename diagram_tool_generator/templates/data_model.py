@@ -199,6 +199,11 @@ class AWrapper:
             record.details = data_bytes
             session.commit()
 
+    def delete(self):
+        with session_context() as session:
+            table = self.get_db_table()
+            session.query(table).filter_by(Id=self.Id).delete()
+
     def asjson(self):
         return json.dumps(self, cls=ExtendibleJsonEncoder).encode('utf8')
 
