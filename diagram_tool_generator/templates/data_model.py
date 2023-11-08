@@ -209,11 +209,14 @@ class AWrapper:
             if record.subtype != cls.__name__:
                 raise WrongType()
             data_dict = json.loads(record.details.decode('utf8'))
+            data_dict = json.loads(record.details.decode('utf8'))
+            assert data_dict['__classname__'] == cls.__name__
+            del data_dict['__classname__']
             return cls(**data_dict)
 
     def update(self):
         with session_context() as session:
-            record = session.query(self.get_db_table()).filter_by(Id=self.id).first()
+            record = session.query(self.get_db_table()).filter_by(Id=self.Id).first()
             data_bytes = self.asjson()
             if record.details != data_bytes:
                 record.details = data_bytes

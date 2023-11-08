@@ -63,8 +63,9 @@ def get_${entity.__name__}_data(index):
 def update_${entity.__name__}_data(index):
     data = get_request_data()
     record = dm.${entity.__name__}.retrieve(index)
-    for key, value in data:
-        setattr(record, key, value)
+    for key, value in data.items():
+        if hasattr(record, key):
+            setattr(record, key, value)
     record.update()
     result = record.asjson()
     return flask.make_response(result, 202)

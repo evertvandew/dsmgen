@@ -133,7 +133,7 @@ from dataclasses import fields
                     parent = self.records[details.parent]
                     parent.children.append(details)
                 ajax.post(f'/data/{type(details).__name__}', blocking=True, data=data, oncomplete=on_complete,
-                          headers={"Content-Type": "application/json"})
+                          mode='json', headers={"Content-Type": "application/json"})
             def move_element(self, id: int):
                 """ Called when an element is moved in the hierarchy. """
                 raise NotImplementedError
@@ -145,6 +145,10 @@ from dataclasses import fields
             def on_click(self, id: int):
                 """ Called when an element was left-clicked. """
                 console.log(f"Clicked on element {id}")
+            def update_element(self, id: int, clsname: str, update: Dict[str, Any]):
+                jstr = json.dumps(update)
+                ajax.post(f'/data/{clsname}/{id}', blocking=True, data=jstr,
+                      mode='json', headers={"Content-Type": "application/json"})
 
         blank = document["explorer"];
         blank <= html.DIALOG(id=context_menu_name)
