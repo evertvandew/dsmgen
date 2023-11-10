@@ -5,6 +5,7 @@ import json
 import logging
 import flask
 import magic
+import sys
 import ${generator.module_name}_data as dm
 
 
@@ -53,7 +54,7 @@ def my_get_mime(path):
 def get_${entity.__name__}_data(index):
     try:
         record = dm.${entity.__name__}.retrieve(index)
-    except dm.WrongType:
+    except dm.WrongType | dm.NotFound:
         return flask.make_response('Not found', 404)
     result = flask.make_response(record.asjson(), 200)
     result.headers['Content-Type'] = 'application/json'
@@ -140,4 +141,5 @@ if __name__ == '__main__':
     if not os.path.exists('data'):
         os.mkdir('data')
     dm.init_db()
-    app.run(threaded=True, host='0.0.0.0', port=5100)
+    port = sys.argv[1] if len(sys.argv) > 1 else '5100'
+    app.run(threaded=True, host='0.0.0.0', port=int(port))

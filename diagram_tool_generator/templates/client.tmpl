@@ -38,6 +38,7 @@ import model_definition as mdef
         from browser import document, console, html, window, bind, ajax
         import json
         from explorer import Element, make_explorer, ExplorerDataApi, context_menu_name
+        from rest_api import RestApi
         from dataclasses import dataclass, field, is_dataclass, asdict
         from typing import Self, List, Dict, Any
         from collections.abc import Iterable
@@ -70,7 +71,7 @@ import model_definition as mdef
 
         ## Create the representations of the various blocks and relationships
         # Representations of the various graphical elements
-        % for cls in generator.md.entity:
+        % for cls in generator.md.entity + generator.md.port:
         @dataclass
         class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 'Block')}):
             % for attr in generator.get_diagram_attributes(cls):
@@ -86,7 +87,10 @@ import model_definition as mdef
                     types = [t for t in field_type.types if not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation))]
                     type_names = ', '.join(get_relationship_type(t) for t in types)
                     return f"[{type_names}]"
-                return generator.get_html_type(field_type)
+                result = generator.get_html_type(field_type)
+                if result == 'Entity':
+                    return 'diagrams.Shape'
+                return result
         %>
         % for cls in generator.md.relationship:
         @dataclass
@@ -118,7 +122,16 @@ import model_definition as mdef
             % endfor
         }
 
+        explorer_classes = {
+            <%  lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.all_model_items] %>
+            ${',\n            '.join(lines)}
+        }
 
+        diagram_classes = {
+            <%  lines = [f'"{c.__name__}Representation": {c.__name__}Representation'
+                for c in generator.md.entity + generator.md.port + generator.md.relationship] %>
+            ${',\n            '.join(lines)}
+        }
 
         def flatten(data):
             if isinstance(data, Iterable):
@@ -130,8 +143,14 @@ import model_definition as mdef
                     yield from flatten(data.children)
 
         class EAPI(RestApi, ExplorerDataApi):
+            def __init__(self):
+                super().__init__()
+                self.bind('click', self.on_click)
+                self.bind('dblclick', self.on_dblclick)
             def get_many_url(self):
                 return '/data/hierarchy'
+            def get_classes(self):
+                return explorer_classes
             def get_allowed_children(self, id: int):
                 element = self.records[id]
                 cls = type(element)
@@ -155,11 +174,9 @@ import model_definition as mdef
                 RestApi.add_element(self, details)
                 parent = self.records[details.parent]
                 parent.children.append(details)
-            @self.bind('click')
             def on_click(self, id: int, clsname: str):
                 """ Called when an element was left-clicked. """
                 console.log(f"Clicked on element {id}")
-            @self.bind('dblclick')
             def on_dblclick(self, id: int, clsname: str):
                 """ Called when an element was left-clicked. """
                 console.log(f"Double-Clicked on element {id}")
@@ -172,6 +189,8 @@ import model_definition as mdef
         class DApi(diagrams.DiagramDataApi):
             def __init__(self, diagram_id):
                 self.diagram_id = diagram_id
+            def get_classes(self):
+                return diagram_classes
             def get_elements_async(self, cb):
                 """ Retrieve a list of elements.
                     Some of these elements can have children, representing a hierarchy
@@ -203,7 +222,6 @@ import model_definition as mdef
         make_explorer(blank, EAPI())
 
         @bind(blank, 'click')
-        @bind(document[context_menu_name], 'click')
         def close_contextmenu(ev):
             ev.stopPropagation()
             ev.preventDefault()

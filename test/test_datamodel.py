@@ -1,44 +1,8 @@
 
 import subprocess
 import os
-import sys
-import logging
 from dataclasses import fields
-
-###############################################################################
-## Test framework
-## Testing in python is so easy, wtf use frameworks?
-
-all_tests = []
-preparations = []
-
-def test(func):
-    all_tests.append(func)
-    return func
-
-def prepare(func):
-    preparations.append(func)
-    return func
-
-def run_tests():
-    for p in preparations:
-        p()
-
-    successes = []
-    failures = []
-    for t in all_tests:
-        try:
-            t()
-            successes.append(t)
-        except Exception as e:
-            logging.exception(f'Error failed: {str(e)}')
-            failures.append(t)
-
-    logging.info(f"Failures: {len(failures)} / {len(all_tests)}")
-    if failures:
-        sys.exit(1)
-
-
+from test_frame import prepare, test, run_tests
 
 ###############################################################################
 ## The actual tests.
