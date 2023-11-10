@@ -60,19 +60,19 @@ def init():
     def store_retrieve_update_note():
         note = dm.Note(description="Dit is een opmerking")
         note.store()
-        the_id = note.id     # Actual value depends on database state
+        the_id = note.Id     # Actual value depends on database state
         assert the_id >= 1
 
         # Try to query the database and get the record
         note2 = dm.Note.retrieve(the_id)
-        assert note.id == note2.id
+        assert note.Id == note2.Id
         assert note.description == note2.description
 
         # Try to update the record
         note.description = "Creëren van Koeïen"
         note.store()
-        note2 = dm.Note.retrieve(note.id)
-        assert note.id == note2.id
+        note2 = dm.Note.retrieve(note.Id)
+        assert note.Id == note2.Id
         assert note.description == note2.description
 
     @test
@@ -85,17 +85,17 @@ def init():
             block.store()
 
         ports = [
-            dm.FlowPort(name='output', parent=blocks[0].id),
-            dm.FlowPort(name='input', parent=blocks[1].id)
+            dm.FlowPort(name='output', parent=blocks[0].Id),
+            dm.FlowPort(name='input', parent=blocks[1].Id)
         ]
         for port in ports:
             port.store()
 
-        connection = dm.FlowPortConnection(source=ports[0].id, target=ports[1].id)
+        connection = dm.FlowPortConnection(source=ports[0].Id, target=ports[1].Id)
         connection.store()
 
         for o in blocks + ports + [connection]:
-            o2 = type(o).retrieve(o.id)
+            o2 = type(o).retrieve(o.Id)
             for f in fields(o):
                 assert getattr(o, f.name) == getattr(o2, f.name)
 

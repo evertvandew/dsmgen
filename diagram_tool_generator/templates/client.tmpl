@@ -7,7 +7,8 @@
     The generated client uses the Brython Python-In-A-Browser technology.
 """
 
-from dataclasses import fields
+from dataclasses import fields, is_dataclass
+import model_definition as mdef
 
 %><!doctype html>
 <html>
@@ -66,11 +67,57 @@ from dataclasses import fields
 
         % endfor
 
+
+        ## Create the representations of the various blocks and relationships
+        # Representations of the various graphical elements
+        % for cls in generator.md.entity:
+        @dataclass
+        class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 'Block')}):
+            % for attr in generator.get_diagram_attributes(cls):
+            ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
+            % endfor
+
+        % endfor
+        <%
+            def get_relationship_type(field_type):
+                if is_dataclass(field_type):
+                    return field_type.__name__ + 'Representation'
+                if isinstance(field_type, mdef.XRef):
+                    types = [t for t in field_type.types if not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation))]
+                    type_names = ', '.join(get_relationship_type(t) for t in types)
+                    return f"[{type_names}]"
+                return generator.get_html_type(field_type)
+        %>
+        % for cls in generator.md.relationship:
+        @dataclass
+        class ${cls.__name__}Representation(diagrams.Relationship):
+            % for attr in fields(cls):
+            ${attr.name}: ${get_relationship_type(attr.type)} = ${generator.get_default(attr.type)}
+            % endfor
+
+        % endfor
+
+        ## Create the diagram definitions
+        # Definitions for rendering the various diagrams
+        % for cls in generator.md.diagrams:
+        <% block_names = [f'{e.__name__}Representation' for e in cls.__annotations__['entities']] %>
+        class ${cls.__name__}Representation(diagrams.Diagram):
+            allowed_blocks = [${", ".join(block_names)}]
+
+        % endfor
+
         allowed_children = {
             % for name in generator.all_names.keys():
             ${name}: [${', '.join(generator.children[name])}],
             % endfor
         }
+
+        diagram_definitions = {
+            % for cls in generator.md.diagrams:
+            "${cls.__name__}": ${cls.__name__}Representation,
+            % endfor
+        }
+
 
 
         def flatten(data):
@@ -82,84 +129,78 @@ from dataclasses import fields
                 if hasattr(data, 'children'):
                     yield from flatten(data.children)
 
-        class ExtendibleJsonEncoder(json.JSONEncoder):
-            def default(self, o):
-                """ We have three tricks to jsonify objects that are not normally supported by JSON.
-                    * Dataclass instances are serialised as dicts.
-                    * For objects that define a __json__ method, that method is called for serialisation.
-                    * For other objects, the str() protocol is used, i.e. the __str__ method is called.
-                """
-                if hasattr(o, '__json__'):
-                    return o.__json__()
-                if is_dataclass(o):
-                    result = asdict(o)
-                    result['__classname__'] = type(o).__name__
-                    return result
-                return str(o)
-
-        class API(ExplorerDataApi):
+        class EAPI(RestApi, ExplorerDataApi):
+            def get_many_url(self):
+                return '/data/hierarchy'
             def get_allowed_children(self, id: int):
                 element = self.records[id]
                 cls = type(element)
                 return allowed_children[cls]
             def get_elements_async(self, cb):
-                def on_data(data):
-                    records = []
-                    for d in data.json:
-                        cls = globals()[d['__classname__']]
-                        ddict = {k:v for k, v in d.items() if k != '__classname__'}
-                        records.append(cls(**ddict))
-                    self.records = {r.Id: r for r in records}
+                def on_data(records):
                     # Determine the actual hierarchy.
-                    for r in self.records.values():
+                    for r in records.values():
                         r.children = []
                     roots = []
-                    for r in self.records.values():
+                    for r in records.values():
                         if r.parent:
-                            self.records[r.parent].children.append(r)
+                            records[r.parent].children.append(r)
                         else:
                             roots.append(r)
                     self.hierarchy = roots
                     cb(self.hierarchy)
-                ajax.get('/data/hierarchy', mode="json", oncomplete=on_data)
-            def get_element(self, id: int) -> Element:
-                raise NotImplementedError
+                RestApi.get_elements_async(self, on_data)
             def add_element(self, details: Element):
                 """ Persist a new element created with the right-click menu """
-                data = json.dumps(details, cls=ExtendibleJsonEncoder)
-                def on_complete(update):
-                    details.Id = update.json['Id']
-                    self.records[details.Id] = details
-                    parent = self.records[details.parent]
-                    parent.children.append(details)
-                ajax.post(f'/data/{type(details).__name__}', blocking=True, data=data, oncomplete=on_complete,
-                          mode='json', headers={"Content-Type": "application/json"})
-            def move_element(self, id: int):
-                """ Called when an element is moved in the hierarchy. """
+                RestApi.add_element(self, details)
+                parent = self.records[details.parent]
+                parent.children.append(details)
+            @self.bind('click')
+            def on_click(self, id: int, clsname: str):
+                """ Called when an element was left-clicked. """
+                console.log(f"Clicked on element {id}")
+            @self.bind('dblclick')
+            def on_dblclick(self, id: int, clsname: str):
+                """ Called when an element was left-clicked. """
+                console.log(f"Double-Clicked on element {id}")
+                # If a diagram is double-clicked, open it.
+                def oncomplete(response):
+                    load_diagram(id, diagram_definitions[clsname], self, document['canvas'])
+                if clsname in [${', '.join(f'"{c.__name__}"' for c in generator.md.diagrams)}]:
+                    ajax.get(f'/data/diagram_contents/{id}', oncomplete=oncomplete)
+
+        class DApi(diagrams.DiagramDataApi):
+            def __init__(self, diagram_id):
+                self.diagram_id = diagram_id
+            def get_elements_async(self, cb):
+                """ Retrieve a list of elements.
+                    Some of these elements can have children, representing a hierarchy
+                """
+                def on_data(response):
+                    if response.status >=200 and response.status < 300:
+                        records = []
+                        for d in data.json:
+                            cls = globals()[d['__classname__']]
+                            ddict = {k:v for k, v in d.items() if k != '__classname__'}
+                            records.append(cls(**ddict))
+                        cb(records)
+                ajax.get(f'/data/diagram_contents/{self.diagram_id}', mode='json', oncomplete=on_data)
+            def add_element(self, details: Any):
+                """ Persist a new element created with the right-click menu """
                 raise NotImplementedError
-            def delete_element(self, id: int, clsname: str) -> bool:
+            def delete_element(self, details: Any) -> bool:
                 """ Called when an element is deleted.
                     Returns True if the delete was successful, false if not.
                 """
-                result = False
-                def oncomplete(response):
-                    nonlocal result
-                    if response.status >= 200 and response.status < 300:
-                        console.log("Got a good response from the server")
-                        result = True
-                ajax.delete(f'/data/{clsname}/{id}', blocking=True, oncomplete=oncomplete)
-                return result
-            def on_click(self, id: int):
+                raise NotImplementedError
+            def update_element(self, details: Any):
+                raise NotImplementedError
+            def trigger_event(self, event_name, details):
                 """ Called when an element was left-clicked. """
-                console.log(f"Clicked on element {id}")
-            def update_element(self, id: int, clsname: str, update: Dict[str, Any]):
-                jstr = json.dumps(update)
-                ajax.post(f'/data/{clsname}/{id}', blocking=True, data=jstr,
-                      mode='json', headers={"Content-Type": "application/json"})
+                raise NotImplementedError
 
         blank = document["explorer"];
-        blank <= html.DIALOG(id=context_menu_name)
-        make_explorer(blank, API())
+        make_explorer(blank, EAPI())
 
         @bind(blank, 'click')
         @bind(document[context_menu_name], 'click')

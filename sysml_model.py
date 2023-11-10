@@ -2,24 +2,24 @@
 from typing import Self, List, Dict
 from model_definition import (Entity, Relationship, Port, BlockDiagram, LogicalModel, ModelRoot, required,
                               optional, selection, detail, longstr, XRef, ModelVersion, initial_state,
-                              hidden, style)
+                              hidden)
 
 ModelVersion('0.1')
 
 
 ###############################################################################
 ## Logical model
-@ModelRoot
+@ModelRoot(styling='icon:folder')
 class RootModel:
     pass
 
-@LogicalModel
+@LogicalModel(styling='icon:folder')
 class FunctionalModel:
     name: str
     description: longstr
     parent: XRef('children', Self, RootModel, hidden)
 
-@LogicalModel
+@LogicalModel(styling='icon:folder')
 class StructuralModel:
     name: str
     description: longstr
@@ -27,11 +27,11 @@ class StructuralModel:
 
 ###############################################################################
 ## Entities for Notes & Constraints
-@Entity(styling = "shape:note")
+@Entity(styling = "shape:note;structure:Note;icon:message")
 class Note:
     description: (longstr, required)
 
-@Entity(styling = "shape:note")
+@Entity(styling = "shape:note;structure:Note;icon:note-sticky")
 class Constraint:
     description: (longstr, required)
 
@@ -48,20 +48,20 @@ class ProtocolDefinition:
     description: longstr
     definition: longstr
 
-@Entity(styling = "shape:rect")
+@Entity(styling = "shape:rect;structure:Block;icon:square-full")
 class Block:
     parent: XRef('children', Self, StructuralModel, hidden)
     name: str
     description: (longstr, detail)
 
-@Port(styling = "shape:square;fill:green")
+@Port(styling = "shape:square;fill:green;icon:arrows-alt-h")
 class FullPort:
     name: str
     parent: XRef('ports', Block, hidden)
     provides: XRef('producers', ProtocolDefinition, optional)
     requires: XRef('consumers', ProtocolDefinition, optional)
 
-@Port(styling = "shape:square;fill:blue")
+@Port(styling = "shape:square;fill:blue;icon:arrows-alt-h")
 class FlowPort:
     name: str
     parent: XRef('ports', Block, hidden)
@@ -108,7 +108,7 @@ class FlowPortConnection:
 
     styling = "end:hat"
 
-@BlockDiagram
+@BlockDiagram(styling='icon:image')
 class BlockDefinitionDiagram:
     entities: [Block, Note, Constraint]
     parent: XRef('children', Block, StructuralModel, hidden)
@@ -117,7 +117,7 @@ class BlockDefinitionDiagram:
 
 ###############################################################################
 ## Entities for requirements
-@Entity()
+@Entity(styling = "shape:ellipse;structure:Block;icon:file-lines")
 class Requirement:
     parent: XRef('children', Self, FunctionalModel, hidden)
     name: str
@@ -131,13 +131,3 @@ initial_state([
     StructuralModel('Structural Model', '', None)
 ])
 
-
-style(Note, icon='message')
-style(Constraint, icon='note-sticky')
-style(Requirement, icon='file-lines')
-style(Block, icon='square-full')
-style(BlockDefinitionDiagram, icon='image')
-style(FlowPort, icon='arrows-alt-h')
-style(FullPort, icon='arrows-alt-h')
-style(FunctionalModel, icon='folder')
-style(StructuralModel, icon='folder')

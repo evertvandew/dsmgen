@@ -77,37 +77,46 @@ def Port(styling=''):
         return cls
     return decorate
 
-def BlockDiagram(cls):
+def BlockDiagram(styling=''):
     """ Diagram where entities can be placed anywhere on the grid, and connected freely. """
-    cls = dataclass(cls)
-    model_definition.block_diagram.append(cls)
-    return cls
+    def decorate(cls):
+        cls = dataclass(cls)
+        model_definition.block_diagram.append(cls)
+        styling_definition[cls] = styling
+        return cls
+    return decorate
 
 
-def LanedDiagram(lane_direction: LaneDirection):
+def LanedDiagram(styling=''):
     """ A diagram with "lanes", e.g. an UML sequence diagram. """
     def decorate(cls):
         cls = dataclass(cls)
         model_definition.laned_diagram.append(cls)
+        styling_definition[cls] = styling
         return cls
 
     return decorate
 
-def LogicalModel(cls):
+def LogicalModel(styling=''):
     """ Part of the underlying logical model. The user can browse the data in the tool following these elements. """
-    cls = dataclass(cls)
-    model_definition.logical_model.append(cls)
-    return cls
+    def decorate(cls):
+        cls = dataclass(cls)
+        model_definition.logical_model.append(cls)
+        styling_definition[cls] = styling
+        return cls
+    return decorate
 
-
-def ModelRoot(cls):
+def ModelRoot(styling=''):
     """ The root of the underlying logical model. From this element, the user can build
         a model using the tool.
     """
-    cls = dataclass(cls)
-    assert model_definition.model_root is None
-    model_definition.model_root = cls
-    return cls
+    def decorate(cls):
+        cls = dataclass(cls)
+        assert model_definition.model_root is None
+        model_definition.model_root = cls
+        styling_definition[cls] = styling
+        return cls
+    return decorate
 
 
 ###############################################################################
@@ -153,7 +162,5 @@ class XRef:
 def initial_state(records):
     model_definition.initial_records = records
 
-
-def style(cls, **styling):
-    previous = styling_definition.setdefault(cls.__name__, {})
-    previous.update(styling)
+def get_style(cls, key, default):
+    return styling_definition.get(cls.__name__, {}).get(key, default)

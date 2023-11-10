@@ -98,6 +98,12 @@ class Generator:
 
         return children
 
+    def get_diagram_attributes(self, cls):
+        """ Retrieve the attributes of a class that a intended for editing by a user. """
+        attrs = [f for f in fields(cls) if not mdef.hidden in self.get_type_options(f.type)]
+        return attrs
+
+
     def order_dependencies(self):
         # Order the elements by the number of xrefs they have
         order_items = []
