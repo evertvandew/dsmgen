@@ -54,7 +54,7 @@ def my_get_mime(path):
 def get_${entity.__name__}_data(index):
     try:
         record = dm.${entity.__name__}.retrieve(index)
-    except dm.WrongType | dm.NotFound:
+    except (dm.WrongType, dm.NotFound):
         return flask.make_response('Not found', 404)
     result = flask.make_response(record.asjson(), 200)
     result.headers['Content-Type'] = 'application/json'

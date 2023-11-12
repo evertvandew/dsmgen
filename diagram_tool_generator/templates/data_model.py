@@ -174,6 +174,7 @@ class ExtendibleJsonEncoder(json.JSONEncoder):
 
 
 class WrongType(RuntimeError): pass
+class NotFound(RuntimeError): pass
 
 
 class longstr(str): pass
@@ -211,9 +212,10 @@ class AWrapper:
     def retrieve(cls, id):
         with session_context() as session:
             record = session.query(cls.get_db_table()).filter_by(Id=id).first()
+            if record is None:
+                raise NotFound()
             if record.subtype != cls.__name__:
                 raise WrongType()
-            data_dict = json.loads(record.details.decode('utf8'))
             data_dict = json.loads(record.details.decode('utf8'))
             assert data_dict['__classname__'] == cls.__name__
             del data_dict['__classname__']
