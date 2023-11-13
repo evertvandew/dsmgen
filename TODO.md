@@ -23,6 +23,8 @@
 * Make a collection of diagrams, supporting at least UML and SYSML.
 
 # Future enhancements
+* Implement a proper Z-order in the diagrams.
+* The explorer should handle create and rename events from entities created while editing a diagram.
 * Port to an environment where the javascript is pre-compiled. Probably pyjamas or pyjaco?
 * Add in-diagram buttons for the different editing modes.
 * Automatisch uitlijnen en grootte van blokken bepalen.

@@ -13,12 +13,12 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver import ActionChains
 import requests
+import build.sysml_model_data as sm
 
 ###############################################################################
-## The actual tests.
+## Some scripts to prepare stuff
 
-@prepare
-def explorer_tests():
+def generate_tool():
     # Generate the tool, create directories, clean up etc.
     for d in ['public', 'build', 'build/data']:
         if not os.path.exists(d):
@@ -31,26 +31,46 @@ def explorer_tests():
     if os.path.exists(db):
         os.remove(db)
 
+def run_server():
+    """ Start the server in a seperate process. Return the URL to access it. """
     server = subprocess.Popen(['/usr/local/bin/python3.11', 'sysml_model_run.py', '5200'], cwd=os.getcwd()+'/build')
-    client_url = 'http://localhost:5200/sysml_model.html'
     @cleanup
     def stop_server():
         server.terminate()
-        server.poll()
+        server.wait()
+    return  'http://localhost:5200/sysml_model.html'
 
+def start_driver():
     os.environ['TMPDIR'] =  f'{os.environ["HOME"]}/tmp'
     driver = webdriver.Firefox()
     driver.implicitly_wait(2)
     @cleanup
     def stop_driver():
         driver.close()
+    return driver
+
+def db_store(records):
+    with sm.session_context() as session:
+        for r in records:
+            r.store(session)
+
+###############################################################################
+## The actual tests.
+
+#@prepare
+def explorer_tests():
+    generate_tool()
+
+    client_url = run_server()
+
+    driver = start_driver()
 
 
     # Class for lines in the explorer window
     line_cls = 'eline'
 
     @test
-    def test_create_block():
+    def test_create_modify_delete_block():
         driver.get(client_url)
         # Get the line for the "structural" model
         for attempt in range(5):
@@ -90,11 +110,29 @@ def explorer_tests():
         assert response.status_code == 200
         assert response.text == '{"order": 0, "Id": 3, "parent": 2, "name": "test block 1", "description": "", "__classname__": "Block"}'
 
-        # Now try to delete it
         # Expand the parent
         e = driver.find_elements(By.ID, f'2')
         c = e[0].find_elements(By.CLASS_NAME, 'caret')
         c[0].click()
+
+        # Try to rename the new block
+        e = driver.find_elements(By.ID, f'3')
+        chain.context_click(e[0]).perform()
+        options = [o for o in e[0].find_elements(By.TAG_NAME, 'li') if o.text == 'Rename']
+        options[0].click()
+        i = driver.find_elements(By.TAG_NAME, 'input')
+        assert i
+        new_name = 'renamed block 3'
+        i[0].send_keys(new_name)
+        b = [tag for tag in driver.find_elements(By.CLASS_NAME, 'brython-dialog-button') if tag.text == 'Ok']
+        assert b
+        b[0].click()
+        e = driver.find_elements(By.ID, f'3')
+        n = e[0].find_elements(By.CLASS_NAME, 'ename')
+        assert n
+        assert new_name in n[0].text
+
+        # Now try to delete it
         e = driver.find_elements(By.ID, f'3')
         chain.context_click(e[0]).perform()
         options = [o for o in e[0].find_elements(By.TAG_NAME, 'li') if o.text == 'Remove']
@@ -120,5 +158,31 @@ def explorer_tests():
                 break
         assert ok, "The two model roots were not found"
 
+
+
+@prepare
+def diagramming_tests():
+    generate_tool()
+    client_url = run_server()
+    driver = start_driver()
+
+    db_store([
+        sm.BlockDefinitionDiagram(parent=2, name='Block Diagram'),
+        sm.Block(parent=2, name='Testje')
+    ])
+
+    @test
+    def open_diagram():
+        driver.get(client_url)
+        # Show the diagram in the explorer
+        driver.find_element(By.ID, '2').find_element(By.CLASS_NAME, 'caret').click()
+        # Double-click on the diagram.
+        e = driver.find_element(By.ID, '3')
+        chain = ActionChains(driver)
+        chain.double_click(e).perform()
+
+
+
+
 if __name__ == '__main__':
-    run_tests()
+    run_tests('diagramming_tests')

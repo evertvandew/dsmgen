@@ -134,6 +134,8 @@ class _BlockRepresentation(Base):
     x = Column(Float)
     y = Column(Float)
     z = Column(Float)   # For placing blocks etc on top of each other
+    width = Column(Float)
+    height = Column(Float)
     styling = Column(String)
 
 class _RelationshipRepresentation(Base):
@@ -209,9 +211,9 @@ class AWrapper:
         return json.dumps(self, cls=ExtendibleJsonEncoder).encode('utf8')
 
     @classmethod
-    def retrieve(cls, id):
+    def retrieve(cls, Id):
         with session_context() as session:
-            record = session.query(cls.get_db_table()).filter_by(Id=id).first()
+            record = session.query(cls.get_db_table()).filter_by(Id=Id).first()
             if record is None:
                 raise NotFound()
             if record.subtype != cls.__name__:

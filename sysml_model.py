@@ -1,5 +1,5 @@
 
-from typing import Self, List, Dict
+from typing import Self, Any
 from model_definition import (Entity, Relationship, Port, BlockDiagram, LogicalModel, ModelRoot, required,
                               optional, selection, detail, longstr, XRef, ModelVersion, initial_state,
                               hidden)
@@ -30,10 +30,12 @@ class StructuralModel:
 @Entity(styling = "shape:note;structure:Note;icon:message")
 class Note:
     description: (longstr, required)
+    parent: XRef('children', Any, hidden)
 
 @Entity(styling = "shape:note;structure:Note;icon:note-sticky")
 class Constraint:
     description: (longstr, required)
+    parent: XRef('children', Any, hidden)
 
 @Relationship(styling = "end:hat")
 class Anchor:

@@ -1,6 +1,7 @@
-###############################################################################
-## Test framework
-## Testing in python is so easy, wtf use frameworks?
+"""
+Test framework
+Inspired by some testing frameworks in Javascript. Very simple and extendible.
+"""
 
 import logging
 import sys
@@ -38,7 +39,8 @@ def run_tests():
                 logging.exception(f'Error failed: {str(e)}')
                 failures.append(t)
 
-        for p in cleanups:
+        # Cleanup is in reversed order, hopefully keeping dependencies alive while needed.
+        for p in reversed(cleanups):
             p()
 
     logging.info(f"Failures: {len(failures)} / {len(all_tests)}")

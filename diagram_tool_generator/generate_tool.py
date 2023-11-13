@@ -208,10 +208,12 @@ def generate_tool(config: Configuration):
     #        print(f'{cls.__name__}.{f.name}: {get_type(f.type)} = {get_default(f.type)}')
 
     for tmpl, target in [
-        ('templates/client.tmpl', f'{config.client_dir}/{module_name}.html'),
+        ('templates/client.html', f'{config.client_dir}/{module_name}.html'),
+        ('templates/client.py', f'{config.client_dir}/{module_name}.py'),
         ('templates/data_model.py', f'{config.server_dir}/{module_name}_data.py'),
         ('templates/server.py', f'{config.server_dir}/{module_name}_run.py'),
     ]:
+        print(f'Rendering {tmpl} to {target}')
         template = Template(open(hdir(tooldir, tmpl)).read())
         result = template.render(
             config=config,

@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+
+<head>
+<meta charset="utf-8">
+<script type="text/javascript" src="/src/brython.js"></script>
+<script type="text/javascript" src="/src/brython_stdlib.js"></script>
+<link rel="stylesheet" type="text/css" href="/assets/css/fontawesome.min.css" />
+<link rel="stylesheet" type="text/css" href="/assets/css/solid.min.css" />
+<link rel="stylesheet" type="text/css" href="/stylesheet.css" />
+
+
+</head>
+
+
+<body onload="brython(1)">
+    <div id="explorer"></div>
+    <div id="canvas"></div>
+    <div id="details"></div>
+
+    <script type="text/python">
+        from ${generator.module_name} import run
+        run('explorer', 'canvas', 'details')
+    </script>
+</body>
+
+</html>

@@ -113,6 +113,20 @@ def get_hierarchy():
     response.headers['Content-Type'] = 'application/json'
     return response
 
+@app.route('/data/diagram_contents/<int:index>', methods=['GET'])
+def diagram_contents(index):
+    with dm.session_context() as session:
+        # Get the representations shown in the diagram.
+        block_reps = session.query(dm._BlockRepresentation).filter(dm._BlockRepresentation.diagram==index).all()
+        relat_reps = session.query(dm._RelationshipRepresentation).filter(dm._RelationshipRepresentation.diagram==index).all()
+
+    response = flask.make_response(
+        json.dumps(block_reps + relat_reps, cls=dm.ExtendibleJsonEncoder).encode('utf8'),
+        200
+    )
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
 # #############################################################################
 # # Serve the static data (HTML, JS and other resources)
 @app.route('/<path:chapter>/<path:path>')
