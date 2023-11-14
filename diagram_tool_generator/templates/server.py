@@ -74,6 +74,8 @@ def get_entity_data(path, index):
     if issubclass(table, dm.Base):
         with dm.session_context() as session:
             record = session.query(table).filter(table.Id==index).first()
+            if not record:
+                return flask.make_response('Not found', 404)
             data = json.dumps(record.asdict())
             result = flask.make_response(data, 200)
             result.headers['Content-Type'] = 'application/json'
@@ -142,7 +144,7 @@ def delete_entity_data(path, index):
         with dm.session_context() as session:
             record = session.query(table).filter(table.Id==index).all()
             if record:
-                record.delete()
+                session.delete(record[0])
                 return flask.make_response('Deleted', 204)
             else:
                 return flask.make_response('Not found', 404)
