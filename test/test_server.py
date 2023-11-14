@@ -19,6 +19,7 @@ def generate_tool():
     db = 'build/data/diagrams.sqlite3'
     if os.path.exists(db):
         os.remove(db)
+        pass
 
 def run_server():
     """ Start the server in a seperate process. Return the URL to access it.
@@ -122,6 +123,51 @@ def test_server():
         assert r.status_code == 204
         r = requests.get(nurl+f'/{nid}')
         assert r.status_code == 404
+
+    @test
+    def test_styling_formatting():
+        """ Styling is stored in the database as a string, but outside it as a dict.
+            The conversions are done by the server. Test them.
+        """
+        # We test with a Note, so first create the base Note
+        r = requests.post(
+            f'{base_url}/data/Note',
+            data=json.dumps(dict(
+                __classname__= 'Note',
+                description  = 'Dit is een test'
+            )),
+            headers={'Content-Type': 'application/json'}
+        )
+        nid = json.loads(r.content)['Id']
+        r = requests.post(
+            f'{base_url}/data/BlockDefinitionDiagram',
+            data=json.dumps(dict(
+                __classname__= 'BlockDefinitionDiagram',
+                name  = 'testdiagram'
+            )),
+            headers={'Content-Type': 'application/json'}
+        )
+        did = json.loads(r.content)['Id']
+
+        # Try to create a representation of this Note.
+        rurl = f'{base_url}/data/_BlockRepresentation'
+        r = requests.post(
+            rurl,
+            data=json.dumps(dict(
+                __classname__= '_BlockRepresentation',
+                diagram  = did,
+                block = nid,
+                styling = {'color':'aabbcc', 'text_offset': 12}
+            )),
+            headers={'Content-Type': 'application/json'}
+        )
+        assert r.status_code == 201
+        rid = json.loads(r.content)['Id']
+        r = requests.get(rurl+f'/{rid}')
+        assert r.status_code == 200
+        record = json.loads(r.content)
+        assert record['styling'] == {'color':'aabbcc', 'text_offset': 12}
+
 
 if __name__ == '__main__':
     run_tests()

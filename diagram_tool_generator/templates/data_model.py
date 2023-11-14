@@ -32,7 +32,7 @@ import logging
 from dataclasses import dataclass, fields, asdict, field, is_dataclass
 from sqlalchemy import (create_engine, Column, Integer, String, DateTime,
      ForeignKey, event, Time, Float, LargeBinary, Enum)
-from sqlalchemy.orm import scoped_session, sessionmaker, backref, relationship
+from sqlalchemy.orm import scoped_session, sessionmaker, backref, relationship, reconstructor
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 
 
@@ -47,7 +47,16 @@ class MyBase:
         return cls.__name__.lower()
 
     def asdict(self):
-        return {k:v for k,v in self.__dict__.items() if not k.startswith('_')}
+        """ Extract a dictionary from this data, e.g. to convert to JSON.
+            Direction: Database -> Python code.
+        """
+        return {k:getattr(self, k) for k in self.__annotations__.keys()}
+
+    def post_init(self):
+        """ Do necessary modifications before storing data in a database.
+            Direction: Python code -> Database.
+        """
+        pass
 
 
 Base = declarative_base(cls=MyBase)
@@ -78,9 +87,9 @@ def session_context():
 
 
 class Version(Base):
-    Id = Column(Integer, primary_key = True)
-    category =  Column(String)
-    versionnr = Column(String)
+    Id: int = Column(Integer, primary_key = True)
+    category: str =  Column(String)
+    versionnr: str = Column(String)
 
 
 def init_db():
@@ -115,39 +124,63 @@ class EntityType(IntEnum):
     Port = auto()
 
 class _Entity(Base):
-    Id = Column(Integer, primary_key=True)
-    type = Column(Enum(EntityType))
-    subtype = Column(String)
-    parent = Column(Integer, ForeignKey("_entity.Id"))  # For subblocks and ports
-    order = Column(Integer)
-    details = Column("details", LargeBinary)
+    Id: int = Column(Integer, primary_key=True)
+    type: int = Column(Enum(EntityType))
+    subtype: str = Column(String)
+    parent: str = Column(Integer, ForeignKey("_entity.Id"))  # For subblocks and ports
+    order: str = Column(Integer)
+    details: str = Column("details", LargeBinary)
 
 class _Relationship(Base):
-    Id = Column(Integer, primary_key=True)
-    subtype = Column(String)
-    source_id  = Column(Integer, ForeignKey("_entity.Id"))
-    target_id  = Column(Integer, ForeignKey("_entity.Id"))
-    associate_id = Column(Integer, ForeignKey("_entity.Id"))
-    details = Column("details", LargeBinary)
+    Id: int = Column(Integer, primary_key=True)
+    subtype: str = Column(String)
+    source_id: int  = Column(Integer, ForeignKey("_entity.Id"))
+    target_id: int  = Column(Integer, ForeignKey("_entity.Id"))
+    associate_id: int = Column(Integer, ForeignKey("_entity.Id"))
+    details: bytes = Column("details", LargeBinary)
 
 class _BlockRepresentation(Base):
-    Id = Column(Integer, primary_key=True)
-    diagram = Column(Integer, ForeignKey("_entity.Id"))
-    block = Column(Integer, ForeignKey("_entity.Id"))
-    x = Column(Float)
-    y = Column(Float)
-    z = Column(Float)   # For placing blocks etc on top of each other
-    width = Column(Float)
-    height = Column(Float)
-    styling = Column(String)
+    Id: int = Column(Integer, primary_key=True)
+    diagram: int = Column(Integer, ForeignKey("_entity.Id"))
+    block: int = Column(Integer, ForeignKey("_entity.Id"))
+    x: float = Column(Float)
+    y: float = Column(Float)
+    z: float = Column(Float)   # For placing blocks etc on top of each other
+    width: float = Column(Float)
+    height: float = Column(Float)
+    styling: str = Column(String)
+
+    def post_init(self):
+        """ In the database, styling is stored as a string. """
+        if isinstance(self.styling, dict):
+            # Using `eval` is insecure, parse the string directly.
+            self.styling = json.dumps(self.styling)
+
+    def asdict(self):
+        """ When converting to json, format the styling as a string """
+        result = Base.asdict(self)
+        result['styling'] = json.loads(self.styling)
+        return result
+
 
 class _RelationshipRepresentation(Base):
-    Id = Column(Integer, primary_key=True)
-    diagram = Column(Integer, ForeignKey("_entity.Id"))
-    relationship = Column(Integer, ForeignKey("_relationship.Id"))
-    routing = Column(LargeBinary)       # JSON list of Co-ordinates of nodes
-    z = Column(Float)                   # For ensuring the line goes over the right blocks.
-    styling = Column(String)
+    Id: int = Column(Integer, primary_key=True)
+    diagram: int = Column(Integer, ForeignKey("_entity.Id"))
+    relationship: int = Column(Integer, ForeignKey("_relationship.Id"))
+    routing: bytes = Column(LargeBinary)       # JSON list of Co-ordinates of nodes
+    z: float = Column(Float)                   # For ensuring the line goes over the right blocks.
+    styling: str = Column(String)
+
+    def post_init(self):
+        """ In the database, styling is stored as a string. """
+        if isinstance(self.styling, dict):
+            self.styling = json.dumps(self.styling)
+
+    def asdict(self):
+        """ When converting to json, format the styling as a string """
+        result = super().asdict()
+        result['styling'] = json.loads(self.styling)
+        return result
 
 
 # ##############################################################################

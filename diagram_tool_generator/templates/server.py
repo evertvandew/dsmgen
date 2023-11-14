@@ -104,6 +104,7 @@ def update_entity_data(path, index):
             for key, value in data.items():
                 if hasattr(record, key):
                     setattr(record, key, value)
+            record.post_init()
             session.commit()
             data = json.dumps(record.asdict())
             result = flask.make_response(data, 202)
@@ -127,6 +128,7 @@ def add_entity_data(path):
     if issubclass(table, dm.Base):
         with dm.session_context() as session:
             record = table(**data)
+            record.post_init()
             session.add(record)
             session.commit()
             return flask.make_response(json.dumps(record.asdict()), 201)
@@ -214,9 +216,12 @@ def send_index():
     return flask.send_from_directory("${config.client_dir}", 'index.html', mimetype='text/html')
 
 
-if __name__ == '__main__':
+def run(port):
     if not os.path.exists('data'):
         os.mkdir('data')
     dm.init_db()
-    port = sys.argv[1] if len(sys.argv) > 1 else '5100'
     app.run(threaded=True, host='0.0.0.0', port=int(port))
+
+
+if __name__ == '__main__':
+    run(sys.argv[1] if len(sys.argv) > 1 else '5100')
