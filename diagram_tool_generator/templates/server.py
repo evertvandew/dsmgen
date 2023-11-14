@@ -6,6 +6,7 @@ import logging
 import flask
 import magic
 import sys
+from dataclasses import is_dataclass
 import ${generator.module_name}_data as dm
 
 
@@ -49,48 +50,108 @@ def my_get_mime(path):
 
 # #############################################################################
 # # Serve the dynamic data: the contents of the model as created and edited by the user.
-% for entity in generator.ordered_items:
-@app.route("/data/${entity.__name__}/<int:index>", methods=['GET'])
-def get_${entity.__name__}_data(index):
-    try:
-        record = dm.${entity.__name__}.retrieve(index)
-    except (dm.WrongType, dm.NotFound):
+
+@app.route("/data/<path:path>", methods=['GET'])
+def get_entities(path):
+    """ For low-level tables, allow all of them to be obtained in one go. """
+    if not (table := dm.__dict__.get(path, '')):
         return flask.make_response('Not found', 404)
-    result = flask.make_response(record.asjson(), 200)
-    result.headers['Content-Type'] = 'application/json'
-    return result
+    if issubclass(table, dm.Base):
+        with dm.session_context() as session:
+            records = session.query(table).all()
+            data = json.dumps([r.asdict() for r in records])
+            result = flask.make_response(data, 200)
+            result.headers['Content-Type'] = 'application/json'
+            return result
+    return flask.make_response('Not allowed', 400)
 
-@app.route("/data/${entity.__name__}/<int:index>", methods=['POST', 'PUT'])
-def update_${entity.__name__}_data(index):
+
+
+@app.route("/data/<path:path>/<int:index>", methods=['GET'])
+def get_entity_data(path, index):
+    if not (table := dm.__dict__.get(path, '')):
+        return flask.make_response('Not found', 404)
+    if issubclass(table, dm.Base):
+        with dm.session_context() as session:
+            record = session.query(table).filter(table.Id==index).first()
+            data = json.dumps(record.asdict())
+            result = flask.make_response(data, 200)
+            result.headers['Content-Type'] = 'application/json'
+            return result
+    elif is_dataclass(table):
+        try:
+            record = table.retrieve(index)
+        except (dm.WrongType, dm.NotFound):
+            return flask.make_response('Not found', 404)
+        result = flask.make_response(record.asjson(), 200)
+        result.headers['Content-Type'] = 'application/json'
+        return result
+    return flask.make_response('Not found', 404)
+
+@app.route("/data/<path:path>/<int:index>", methods=['POST', 'PUT'])
+def update_entity_data(path, index):
+    if not (table := dm.__dict__.get(path, '')):
+        return flask.make_response('Not found', 404)
     data = get_request_data()
-    record = dm.${entity.__name__}.retrieve(index)
-    for key, value in data.items():
-        if hasattr(record, key):
-            setattr(record, key, value)
-    record.update()
-    result = record.asjson()
-    return flask.make_response(result, 202)
+    if issubclass(table, dm.Base):
+        with dm.session_context() as session:
+            record = session.query(table).filter(table.Id==index).all()
+            if not record:
+                return flask.make_response('Not found', 404)
+            record = record[0]
+            for key, value in data.items():
+                if hasattr(record, key):
+                    setattr(record, key, value)
+            session.commit()
+            data = json.dumps(record.asdict())
+            result = flask.make_response(data, 202)
+            result.headers['Content-Type'] = 'application/json'
+            return result
+    elif is_dataclass(table):
+        record = table.retrieve(index)
+        for key, value in data.items():
+            if hasattr(record, key):
+                setattr(record, key, value)
+        record.update()
+        result = record.asjson()
+        return flask.make_response(result, 202)
 
-@app.route("/data/${entity.__name__}", methods=['POST', 'PUT'])
-def add_${entity.__name__}_data():
+@app.route("/data/<path:path>", methods=['POST', 'PUT'])
+def add_entity_data(path):
+    if not (table := dm.__dict__.get(path, '')):
+        return flask.make_response('Not found', 404)
     data = get_request_data()
     data = {k:v for k, v in data.items() if k not in ['children', '__classname__']}
+    if issubclass(table, dm.Base):
+        with dm.session_context() as session:
+            record = table(**data)
+            session.add(record)
+            session.commit()
+            return flask.make_response(json.dumps(record.asdict()), 201)
+    else:
+        record = table(**data)
+        record.store()
+        result = record.asjson()
+        return flask.make_response(result, 201)
 
-
-    record = dm.${entity.__name__}(**data)
-    record.store()
-    result = record.asjson()
-    return flask.make_response(result, 201)
-
-@app.route("/data/${entity.__name__}/<int:index>", methods=['DELETE'])
-def delete_${entity.__name__}_data(index):
-    record = dm.${entity.__name__}.retrieve(index)
-    if type(record).__name__ != "${entity.__name__}":
-        return flask.make_response('Object not found', 405)
-    record.delete()
-    return flask.make_response('Deleted', 204)
-
-% endfor
+@app.route("/data/<path:path>/<int:index>", methods=['DELETE'])
+def delete_entity_data(path, index):
+    if not (table := dm.__dict__.get(path, '')):
+        return flask.make_response('Not found', 404)
+    if issubclass(table, dm.Base):
+        with dm.session_context() as session:
+            record = session.query(table).filter(table.Id==index).all()
+            if record:
+                record.delete()
+                return flask.make_response('Deleted', 204)
+            else:
+                return flask.make_response('Not found', 404)
+    else:
+        record = table.retrieve(index)
+        if type(record) != table:
+            return flask.make_response('Not found', 404)
+        record.delete()
+        return flask.make_response('Deleted', 204)
 
 
 

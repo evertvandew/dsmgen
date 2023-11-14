@@ -185,4 +185,4 @@ def diagramming_tests():
 
 
 if __name__ == '__main__':
-    run_tests('diagramming_tests')
+    run_tests()

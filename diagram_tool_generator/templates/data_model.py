@@ -33,14 +33,24 @@ from dataclasses import dataclass, fields, asdict, field, is_dataclass
 from sqlalchemy import (create_engine, Column, Integer, String, DateTime,
      ForeignKey, event, Time, Float, LargeBinary, Enum)
 from sqlalchemy.orm import scoped_session, sessionmaker, backref, relationship
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.declarative import declarative_base, declared_attr
 
 
 engine = create_engine("${config.dbase_url}")
 
 Session = sessionmaker(engine)
 
-Base = declarative_base()
+
+class MyBase:
+    @declared_attr
+    def __tablename__(cls):
+        return cls.__name__.lower()
+
+    def asdict(self):
+        return {k:v for k,v in self.__dict__.items() if not k.startswith('_')}
+
+
+Base = declarative_base(cls=MyBase)
 
 
 @contextmanager
@@ -68,7 +78,6 @@ def session_context():
 
 
 class Version(Base):
-    __tablename__ = 'version'
     Id = Column(Integer, primary_key = True)
     category =  Column(String)
     versionnr = Column(String)
@@ -106,8 +115,6 @@ class EntityType(IntEnum):
     Port = auto()
 
 class _Entity(Base):
-    __tablename__ = '_entity'
-
     Id = Column(Integer, primary_key=True)
     type = Column(Enum(EntityType))
     subtype = Column(String)
@@ -116,8 +123,6 @@ class _Entity(Base):
     details = Column("details", LargeBinary)
 
 class _Relationship(Base):
-    __tablename__ = '_relationship'
-
     Id = Column(Integer, primary_key=True)
     subtype = Column(String)
     source_id  = Column(Integer, ForeignKey("_entity.Id"))
@@ -126,8 +131,6 @@ class _Relationship(Base):
     details = Column("details", LargeBinary)
 
 class _BlockRepresentation(Base):
-    __tablename__ = '_block_representation'
-
     Id = Column(Integer, primary_key=True)
     diagram = Column(Integer, ForeignKey("_entity.Id"))
     block = Column(Integer, ForeignKey("_entity.Id"))
@@ -139,8 +142,6 @@ class _BlockRepresentation(Base):
     styling = Column(String)
 
 class _RelationshipRepresentation(Base):
-    __tablename__ = "_relationship_representation"
-
     Id = Column(Integer, primary_key=True)
     diagram = Column(Integer, ForeignKey("_entity.Id"))
     relationship = Column(Integer, ForeignKey("_relationship.Id"))
