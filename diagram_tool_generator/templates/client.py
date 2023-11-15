@@ -27,6 +27,7 @@ import typing
 import types
 from enum import IntEnum
 import diagrams
+import shapes
 
 class longstr(str): pass
 
@@ -44,7 +45,7 @@ class ${entity.__name__}:
     children: diagrams.HIDDEN = field(default_factory=list)
 
     def get_icon(self):
-        return "${generator.styling.get(entity.__name__, {}).get('icon') or 'folder'}"
+        return "${mdef.get_style(entity, 'icon', 'folder')}"
     % endif
 
 % endfor
@@ -56,10 +57,13 @@ class ${entity.__name__}:
 @dataclass
 class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 'Block')}):
     Id: diagrams.HIDDEN = 0
+    diagram: diagrams.HIDDEN = 0
     block: diagrams.HIDDEN = 0
     % for attr in generator.get_diagram_attributes(cls):
     ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
+
+    shape_type: shapes.BasicShape = shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
 
 % endfor
 <%
@@ -79,6 +83,7 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
 @dataclass
 class ${cls.__name__}Representation(diagrams.Relationship):
     Id: diagrams.HIDDEN = 0
+    diagram: diagrams.HIDDEN = 0
     relationship: diagrams.HIDDEN = 0
     % for attr in fields(cls):
     ${attr.name}: ${get_relationship_type(attr.type)} = ${generator.get_default(attr.type)}
@@ -109,13 +114,19 @@ diagram_definitions = {
 
 explorer_classes = {
     <%  lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.all_model_items] %>
-    ${',\n            '.join(lines)}
+    ${',\n    '.join(lines)}
 }
 
 diagram_classes = {
     <%  lines = [f'"{c.__name__}Representation": {c.__name__}Representation'
         for c in generator.md.entity + generator.md.port + generator.md.relationship] %>
-    ${',\n            '.join(lines)}
+    ${',\n    '.join(lines)}
+}
+
+representation_lookup = {
+    <%  lines = [f'"{c.__name__}": {c.__name__}Representation'
+        for c in generator.md.entity + generator.md.port + generator.md.relationship] %>
+    ${',\n    '.join(lines)}
 }
 
 def flatten(data):
@@ -149,7 +160,7 @@ def run(explorer, canvas, details):
             container <= svg
             diagram_api = DiagramApi(target_dbid, diagrams.Block, explorer_classes, diagram_classes)
             ## In future: subscribe to events in the diagram api.
-            diagrams.load_diagram(target_dbid, diagram_definitions[target_type], diagram_api, svg)
+            diagrams.load_diagram(target_dbid, diagram_definitions[target_type], diagram_api, svg, representation_lookup)
 
         if target_type in diagram_classes:
             ajax.get(f'/data/diagram_contents/{target_dbid}', oncomplete=oncomplete)

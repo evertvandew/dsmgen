@@ -50,12 +50,18 @@ model_definition = ModelDefinition()
 styling_definition = {}
 
 
+def split_styling(styling):
+    """ Split the string used to define styling into a dictionary useful for lookup"""
+    if not ':' in styling:
+        return {}
+    return {k:v for k, v in [l.split(':') for l in styling.split(';')]}
+
 def Entity(styling=''):
     """ Definition of a thing rendered as a "shape": blocks, actors, objects, actions, etc, etc, etc """
     def decorate(cls):
         cls = dataclass(cls)
         model_definition.entity.append(cls)
-        styling_definition[cls] = styling
+        styling_definition[cls.__name__] = split_styling(styling)
         return cls
     return decorate
 
@@ -64,7 +70,7 @@ def Relationship(styling=''):
     def decorate(cls):
         cls = dataclass(cls)
         model_definition.relationship.append(cls)
-        styling_definition[cls] = styling
+        styling_definition[cls.__name__] = split_styling(styling)
         return cls
     return decorate
 
@@ -73,7 +79,7 @@ def Port(styling=''):
     def decorate(cls):
         cls = dataclass(cls)
         model_definition.port.append(cls)
-        styling_definition[cls] = styling
+        styling_definition[cls.__name__] = split_styling(styling)
         return cls
     return decorate
 
@@ -82,7 +88,7 @@ def BlockDiagram(styling=''):
     def decorate(cls):
         cls = dataclass(cls)
         model_definition.block_diagram.append(cls)
-        styling_definition[cls] = styling
+        styling_definition[cls.__name__] = split_styling(styling)
         return cls
     return decorate
 
@@ -92,7 +98,7 @@ def LanedDiagram(styling=''):
     def decorate(cls):
         cls = dataclass(cls)
         model_definition.laned_diagram.append(cls)
-        styling_definition[cls] = styling
+        styling_definition[cls.__name__] = split_styling(styling)
         return cls
 
     return decorate
@@ -102,7 +108,7 @@ def LogicalModel(styling=''):
     def decorate(cls):
         cls = dataclass(cls)
         model_definition.logical_model.append(cls)
-        styling_definition[cls] = styling
+        styling_definition[cls.__name__] = split_styling(styling)
         return cls
     return decorate
 
@@ -114,7 +120,7 @@ def ModelRoot(styling=''):
         cls = dataclass(cls)
         assert model_definition.model_root is None
         model_definition.model_root = cls
-        styling_definition[cls] = styling
+        styling_definition[cls.__name__] = split_styling(styling)
         return cls
     return decorate
 
