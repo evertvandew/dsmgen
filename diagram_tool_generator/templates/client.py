@@ -125,7 +125,7 @@ explorer_classes = {
     ${',\n    '.join(lines)}
 }
 
-diagram_classes = {
+representation_classes = {
     <%  lines = [f'"{c.__name__}Representation": {c.__name__}Representation'
         for c in generator.md.entity + generator.md.port + generator.md.relationship] %>
     ${',\n    '.join(lines)}
@@ -166,7 +166,7 @@ def run(explorer, canvas, details):
             svg = html.SVG()
             svg.classList.add('diagram')
             container <= svg
-            diagram_api = DiagramApi(target_dbid, explorer_classes, diagram_classes)
+            diagram_api = DiagramApi(target_dbid, explorer_classes, representation_classes)
             ## In future: subscribe to events in the diagram api.
             diagrams.load_diagram(target_dbid, diagram_definitions[target_type], diagram_api, svg, representation_lookup)
 

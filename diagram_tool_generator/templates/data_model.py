@@ -91,8 +91,6 @@ def session_context():
   finally:
     session.close()
 
-
-
 class Version(Base):
     Id: int = Column(Integer, primary_key = True)
     category: str =  Column(String)
@@ -156,6 +154,7 @@ class _BlockRepresentation(Base):
     width: float = Column(Float)
     height: float = Column(Float)
     styling: str = Column(String)
+    block_cls: str = Column(String)
 
     def post_init(self):
         """ In the database, styling is stored as a string. """
@@ -167,6 +166,7 @@ class _BlockRepresentation(Base):
         """ When converting to json, format the styling as a string """
         result = Base.asdict(self)
         result['styling'] = json.loads(self.styling) if self.styling else {}
+        result['__classname__'] = type(self).__name__
         return result
 
 
@@ -177,6 +177,7 @@ class _RelationshipRepresentation(Base):
     routing: bytes = Column(LargeBinary)       # JSON list of Co-ordinates of nodes
     z: float = Column(Float)                   # For ensuring the line goes over the right blocks.
     styling: str = Column(String)
+    rel_cls: str = Column(String)
 
     def post_init(self):
         """ In the database, styling is stored as a string. """

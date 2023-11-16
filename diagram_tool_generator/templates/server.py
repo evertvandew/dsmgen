@@ -182,12 +182,19 @@ def get_hierarchy():
 def diagram_contents(index):
     with dm.session_context() as session:
         # Get the representations shown in the diagram.
-        block_reps = session.query(dm._BlockRepresentation).filter(dm._BlockRepresentation.diagram==index).all()
-        relat_reps = session.query(dm._RelationshipRepresentation).filter(dm._RelationshipRepresentation.diagram==index).all()
-        data = [r.asdict() for r in block_reps+relat_reps]
+        block_reps = session.query(dm._BlockRepresentation, dm._Entity).filter(dm._BlockRepresentation.diagram==index).join(dm._Entity, onclause=dm._BlockRepresentation.block==dm._Entity.Id).all()
+        relat_reps = session.query(dm._RelationshipRepresentation, dm._Relationship).filter(dm._RelationshipRepresentation.diagram==index).join(dm._Relationship).all()
+        data = [(r[0].asdict(), r[1].asdict()) for r in block_reps+relat_reps]
+
+    # Decode the details in each Entity
+    for r in data:
+        details = json.loads(r[1]['details'])
+        r[0]['_entity'] = details
+
+    data = [r[0] for r in data]
 
     response = flask.make_response(
-        json.dumps(data).encode('utf8'),
+        json.dumps(data, cls=dm.ExtendibleJsonEncoder).encode('utf8'),
         200
     )
     response.headers['Content-Type'] = 'application/json'
