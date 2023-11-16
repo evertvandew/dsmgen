@@ -63,7 +63,11 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
     ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
 
-    shape_type: shapes.BasicShape = shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
+    shape_type = shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
+
+    @classmethod
+    def repr_category(cls):
+        return 'block'
 
 % endfor
 <%
@@ -88,6 +92,10 @@ class ${cls.__name__}Representation(diagrams.Relationship):
     % for attr in fields(cls):
     ${attr.name}: ${get_relationship_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
+
+    @classmethod
+    def repr_category(cls):
+        return 'relationship'
 
 % endfor
 
@@ -158,7 +166,7 @@ def run(explorer, canvas, details):
             svg = html.SVG()
             svg.classList.add('diagram')
             container <= svg
-            diagram_api = DiagramApi(target_dbid, diagrams.Block, explorer_classes, diagram_classes)
+            diagram_api = DiagramApi(target_dbid, explorer_classes, diagram_classes)
             ## In future: subscribe to events in the diagram api.
             diagrams.load_diagram(target_dbid, diagram_definitions[target_type], diagram_api, svg, representation_lookup)
 
