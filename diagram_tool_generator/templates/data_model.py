@@ -41,6 +41,13 @@ engine = create_engine("${config.dbase_url}")
 Session = sessionmaker(engine)
 
 
+def changeDbase(url):
+    """ Used for testing against a non-standard database """
+    global engine, Session
+    engine = create_engine(url)
+    Session = sessionmaker(engine)
+
+
 class MyBase:
     @declared_attr
     def __tablename__(cls):
@@ -154,12 +161,12 @@ class _BlockRepresentation(Base):
         """ In the database, styling is stored as a string. """
         if isinstance(self.styling, dict):
             # Using `eval` is insecure, parse the string directly.
-            self.styling = json.dumps(self.styling)
+            self.styling = json.dumps(self.styling) if self.styling else ''
 
     def asdict(self):
         """ When converting to json, format the styling as a string """
         result = Base.asdict(self)
-        result['styling'] = json.loads(self.styling)
+        result['styling'] = json.loads(self.styling) if self.styling else {}
         return result
 
 

@@ -184,9 +184,10 @@ def diagram_contents(index):
         # Get the representations shown in the diagram.
         block_reps = session.query(dm._BlockRepresentation).filter(dm._BlockRepresentation.diagram==index).all()
         relat_reps = session.query(dm._RelationshipRepresentation).filter(dm._RelationshipRepresentation.diagram==index).all()
+        data = [r.asdict() for r in block_reps+relat_reps]
 
     response = flask.make_response(
-        json.dumps(block_reps + relat_reps, cls=dm.ExtendibleJsonEncoder).encode('utf8'),
+        json.dumps(data).encode('utf8'),
         200
     )
     response.headers['Content-Type'] = 'application/json'

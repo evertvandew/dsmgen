@@ -4,6 +4,7 @@ import os, os.path
 import json
 import requests
 import time
+from dataclasses import is_dataclass
 from test_frame import prepare, test, run_tests, cleanup
 
 
@@ -38,6 +39,23 @@ def run_server():
 def test_server():
     generate_tool()
     base_url = run_server()
+
+    from build import sysml_model_data as sm
+
+    def clear_db():
+        with sm.session_context() as session:
+            session.query(sm._Entity).delete()
+            session.query(sm._Relationship).delete()
+            session.query(sm._BlockRepresentation).delete()
+            session.query(sm._RelationshipRepresentation).delete()
+
+    def load_db(records):
+        with sm.session_context() as session:
+            for r in records:
+                if is_dataclass(r):
+                    r.store(session)
+                else:
+                    session.add(r)
 
     @test
     def test_version():
@@ -168,6 +186,24 @@ def test_server():
         record = json.loads(r.content)
         assert record['styling'] == {'color':'aabbcc', 'text_offset': 12}
 
+    @test
+    def test_diagram_contents():
+        sm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
+        clear_db()
+        load_db([
+            sm.Note(),
+            sm.BlockDefinitionDiagram()
+        ])
+        load_db([
+            sm._BlockRepresentation(block=1, diagram=2),
+            sm._BlockRepresentation(block=1, diagram=2)
+        ])
+
+        r = requests.get(base_url+'/data/diagram_contents/2')
+        assert r.status_code == 200
+        results = json.loads(r.content)
+        assert results[0]['diagram'] == 2
+        assert results[1]['diagram'] == 2
 
 if __name__ == '__main__':
     run_tests()
