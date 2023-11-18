@@ -28,8 +28,7 @@ import types
 from enum import IntEnum
 import diagrams
 import shapes
-
-class longstr(str): pass
+from property_editor import dataClassEditor, longstr
 
 # Modelling 'Entities:'
 % for entity in generator.ordered_items:
@@ -154,6 +153,12 @@ def on_explorer_click(target_dbid: int, target_type: str):
 
 
 def run(explorer, canvas, details):
+    def on_diagram_selection(values, update, object):
+        properties_div = document['details']
+        for e in properties_div.children:
+            e.remove()
+        properties_div <= dataClassEditor(object, update=update)
+
     def on_explorer_dblclick(target_dbid: int, target_type: str):
         """ Called when an element was left-clicked. """
         console.log(f"Double-Clicked on element {target_dbid}")
@@ -168,7 +173,8 @@ def run(explorer, canvas, details):
             container <= svg
             diagram_api = DiagramApi(target_dbid, explorer_classes, representation_classes)
             ## In future: subscribe to events in the diagram api.
-            diagrams.load_diagram(target_dbid, diagram_definitions[target_type], diagram_api, svg, representation_lookup)
+            diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], diagram_api, svg, representation_lookup)
+            diagram_api.bind('shape_selected', on_diagram_selection)
 
         if target_type in diagram_classes:
             ajax.get(f'/data/diagram_contents/{target_dbid}', oncomplete=oncomplete)
