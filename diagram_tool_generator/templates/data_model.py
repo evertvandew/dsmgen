@@ -127,6 +127,7 @@ class EntityType(IntEnum):
     Diagram = auto()
     LogicalElement = auto()
     Port = auto()
+    Message = auto()
 
 class _Entity(Base):
     Id: int = Column(Integer, primary_key=True)
@@ -174,7 +175,9 @@ class _RelationshipRepresentation(Base):
     Id: int = Column(Integer, primary_key=True)
     diagram: int = Column(Integer, ForeignKey("_entity.Id"))
     relationship: int = Column(Integer, ForeignKey("_relationship.Id"))
-    routing: bytes = Column(LargeBinary)       # JSON list of Co-ordinates of nodes
+    source_repr_id: int = Column(Integer, ForeignKey("_blockrepresentation.Id"))
+    target_repr_id: int = Column(Integer, ForeignKey("_blockrepresentation.Id"))
+    routing: bytes = Column(String)       # JSON list of Co-ordinates of nodes
     z: float = Column(Float)                   # For ensuring the line goes over the right blocks.
     styling: str = Column(String)
     rel_cls: str = Column(String)

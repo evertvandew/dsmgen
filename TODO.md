@@ -1,37 +1,41 @@
 
 # Bugs:
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
-
+* Some exceptions occur when manipulating connections.
 
 
 # TODO for the First Viable Product Release:
-* Add shape for Document
-* Support multiple document types
 * Support for container blocks
   * Limiting the position of internal waypoints to within the container
   * Dynamically create and remove ports as connections crossing the boundary are changed.
 * Allow conversion of one type element to another
 * Allow conversion of one relationship to another
-* Make auto-save work for simple file interface
 * Interact with a tree view of the model
 * Support wide open lines
 * Support curved lines
-* Support scrolling of the diagram
 * Edit the styling of lines.
 * Button for copying styling from object to object(s)
 * Support styling multiple objects at once
 * Make a collection of diagrams, supporting at least UML and SYSML.
 
 # Future enhancements
+* Add support for messages along connections.
+* Allow combinations of point-2-point routed and square routed connections.
 * Implement a proper Z-order in the diagrams.
 * The explorer should handle create and rename events from entities created while editing a diagram.
-* Port to an environment where the javascript is pre-compiled. Probably pyjamas or pyjaco?
-* Add in-diagram buttons for the different editing modes.
+* Port to an environment where the javascript is pre-compiled. Probably pyjamas or pyjaco? Or perhaps to Kotlin?
 * Automatisch uitlijnen en grootte van blokken bepalen.
+* Scrolling of the diagram viewer.
+* Resizing of the frames in the tool (explorer / diagram / details).
+* Implementation of Undo / Redo.
+* Implement the data model using Prisma (https://eash98.medium.com/why-sqlalchemy-should-no-longer-be-your-orm-of-choice-for-python-projects-b823179fd2fb)
 
 
 
 # Done:
+* Add shape for Document
+* Support multiple document types
+* Support storage in an SQLite database over a REST API.
 * Edit the styling of objects.
 * Refactor for the locations of the source files
 * Allow styling of different model elements

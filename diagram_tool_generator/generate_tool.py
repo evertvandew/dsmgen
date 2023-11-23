@@ -174,6 +174,26 @@ class Generator:
             return '0.0'
         return None
 
+    def get_connections_from(self):
+        """ Determine which connections can be started from the specific class. """
+        all_connections = []
+        for cls in mdef.model_definition.entity:
+            connections = [c for c in mdef.model_definition.relationship if cls in c.__annotations__['source'].types]
+            options = {}
+            for c in connections:
+                for t in c.__annotations__['target'].types:
+                    if isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation):
+                        continue
+                    if t is Any:
+                        l = options.setdefault('Any', [])
+                        l.append(c.__name__)
+                    else:
+                        l = options.setdefault(t.__name__+'Representation', [])
+                        l.append(c.__name__)
+            lines = [f'{k}: [{", ".join(o)}]' for k, o in options.items()]
+            all_connections.append(f"{cls.__name__}Representation: {{ {', '.join(lines)} }}")
+        return all_connections
+
 
 def generate_tool(config: Configuration):
     # Find and import the specified model

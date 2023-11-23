@@ -40,7 +40,7 @@ class Constraint:
 @Relationship(styling = "end:hat")
 class Anchor:
     source: XRef('owner', Note, Constraint, hidden)
-    target: XRef('notes', Entity, hidden)
+    target: XRef('notes', Any, hidden)
     name: str
 
 ###############################################################################

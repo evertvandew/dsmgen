@@ -64,6 +64,8 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
 
     shape_type = shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
 
+    logical_class = ${cls.__name__}
+
     @classmethod
     def repr_category(cls):
         return 'block'
@@ -91,6 +93,8 @@ class ${cls.__name__}Representation(diagrams.Relationship):
     % for attr in fields(cls):
     ${attr.name}: ${get_relationship_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
+
+    logical_class = ${cls.__name__}
 
     @classmethod
     def repr_category(cls):
@@ -136,6 +140,10 @@ representation_lookup = {
     ${',\n    '.join(lines)}
 }
 
+connections_from = {
+    ${",\n    ".join(generator.get_connections_from())}
+}
+
 def flatten(data):
     if isinstance(data, Iterable):
         for d in data:
@@ -153,6 +161,8 @@ def on_explorer_click(target_dbid: int, target_type: str):
 
 
 def run(explorer, canvas, details):
+    eapi = ExplorerApi(allowed_children, explorer_classes)
+
     def on_diagram_selection(values, update, object):
         properties_div = document['details']
         for e in properties_div.children:
@@ -171,9 +181,10 @@ def run(explorer, canvas, details):
             svg = html.SVG()
             svg.classList.add('diagram')
             container <= svg
-            diagram_api = DiagramApi(target_dbid, explorer_classes, representation_classes)
+            diagram_api = DiagramApi(target_dbid, explorer_classes, representation_classes, eapi)
             ## In future: subscribe to events in the diagram api.
-            diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], diagram_api, svg, representation_lookup)
+            diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], diagram_api, svg,
+                                            representation_lookup, connections_from)
             diagram_api.bind('shape_selected', on_diagram_selection)
 
         if target_type in diagram_classes:
@@ -181,7 +192,6 @@ def run(explorer, canvas, details):
 
     blank = document[explorer]
 
-    eapi = ExplorerApi(allowed_children, explorer_classes)
     eapi.bind('dblclick', on_explorer_dblclick)
     eapi.bind('click', on_explorer_click)
     make_explorer(blank, eapi)
