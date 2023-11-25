@@ -8,6 +8,7 @@
 * Support for container blocks
   * Limiting the position of internal waypoints to within the container
   * Dynamically create and remove ports as connections crossing the boundary are changed.
+* Refactor the client-side serialization to put more logic in the data classes, not the RestApi.
 * Allow conversion of one type element to another
 * Allow conversion of one relationship to another
 * Interact with a tree view of the model

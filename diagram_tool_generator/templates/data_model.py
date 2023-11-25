@@ -263,7 +263,8 @@ class AWrapper:
                 raise NotFound()
             if record.subtype != cls.__name__:
                 raise WrongType()
-            data_dict = json.loads(record.details.decode('utf8'))
+            details = record.details if isinstance(record.details, str) else record.details.decode('utf8')
+            data_dict = json.loads(details)
             assert data_dict['__classname__'] == cls.__name__
             del data_dict['__classname__']
             return cls(**data_dict)
@@ -282,7 +283,8 @@ class AWrapper:
     def load_from_db(record):
         typename = record.subtype
         cls = globals().get(typename)
-        data_dict = json.loads(record.details.decode('utf8'))
+        details = record.details if isinstance(record.details, str) else record.details.decode('utf8')
+        data_dict = json.loads(details)
         assert typename == data_dict['__classname__']
         data_dict = {k:v for k,v in data_dict.items() if k != '__classname__'}
         return cls(**data_dict)

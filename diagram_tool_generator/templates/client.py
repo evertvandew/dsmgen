@@ -29,6 +29,117 @@ from enum import IntEnum
 import diagrams
 import shapes
 from property_editor import dataClassEditor, longstr
+from rest_api import IRepresentationSerializer, IClean
+
+
+
+# Some mixins to add serialization features
+class CleanMonitor(IClean):
+    def __post_init__(self):
+        self.__dirty = set()
+    def is_dirty(self):
+        return bool(self.__dirty)
+    def set_clean(self):
+        self.__dirty = set()
+    def set_dirty(self, keys):
+        self.__dirty = set(keys)
+    def get_dirty(self):
+        return self.__dirty
+    def clean_keys(self, keys):
+        """ Indicate that a particular set of keys has been cleaned. """
+        self.__dirty = {k for k in self.__dirty if k not in keys}
+
+    def __setattr__(self, key, value):
+        """ Override the method to set attributes, to keep track of internal changes. """
+        if key in self.__annotations__ and getattr(self, key) != value:
+            self.__dirty.add(key)
+        object.__setattr__(self, key, value)
+
+
+class EntityReprSerializer(IRepresentationSerializer):
+    base_url = f'/data/_BlockRepresentation'
+
+    def new_model_item(self):
+        return not self.block
+
+    def extract_representation(self):
+        """ Return a dictionary that can be sent as json of only the representation details """
+        return dict(
+            diagram=self.diagram_id,
+            block=self.block,
+            x=self.x,
+            y=self.y,
+            z=self.z,
+            width=self.width,
+            height=self.height,
+            styling=self.styling,
+            block_cls=type(self).__name__
+        )
+
+    def extract_model(self):
+        """ Return an instance of the underlying model details. """
+        keys = [f.name for f in fields(self.logical_cls)]
+        item = self.logical_cls(**{k: v for k, v in asdict(self).items() if k in keys})
+        item.source = self.start.Id
+        item.target = self.finish.Id
+        # Move monitoring of the dirty keys to the model item
+        dirty_keys = [k for k in self.get_dirty() if k in item.__dict__]
+        item.set_dirty(dirty_keys)
+        self.clean_keys(dirty_keys)
+        return item
+
+    def set_model_id(self, entity):
+        self.block = entity.Id
+
+    @classmethod
+    def from_dict(cls, d):
+        ddict = {}
+        ddict.update(d['_entity'])
+        ddict.update(d)
+        cls = representation_classes[d['block_cls']]
+        field_names = [f.name for f in fields(cls)]
+        ddict = {k: v for k, v in ddict.items() if k in field_names}
+        entity = cls(**ddict)
+
+
+class RelationshipReprSerializer(IRepresentationSerializer):
+
+    base_url = f'/data/_RelationshipRepresentation'
+    def new_model_item(self):
+        return not self.relationship
+
+    def extract_representation(self):
+        """ Return a dictionary that can be sent as json of only the representation details """
+        return dict(
+                diagram = self.diagram_id,
+                relationship = self.relationship,
+                source_repr_id = self.start.Id,
+                target_repr_id = self.finish.Id,
+                routing = json.dumps(self.waypoints),
+                z = self.z,
+                styling = self.styling,
+                rel_cls = type(self).__name__
+            )
+    def extract_model(self):
+        """ Return an instance of the underlying model details. """
+        keys = [f.name for f in fields(self.logical_cls)]
+        new_rel = self.logical_cls(**{k: v for k, v in asdict(self).items() if k in keys})
+        new_rel.source = self.start.Id
+        new_rel.target = self.finish.Id
+        return new_rel
+
+    def set_model_id(self, entity):
+        self.representation = entity.Id
+
+    @classmethod
+    def from_dict(cls, d):
+        ddict = {}
+        ddict.update(d['_entity'])
+        ddict.update(d)
+        field_names = [f.name for f in fields(cls)]
+        ddict = {k: v for k, v in ddict.items() if k in field_names}
+        ddict['waypoints'] = json.loads(d['routing'])
+        return cls(**ddict)
 
 # Modelling 'Entities:'
 % for entity in generator.ordered_items:
@@ -54,7 +165,7 @@ class ${entity.__name__}:
 # Representations of the various graphical elements
 % for cls in generator.md.entity + generator.md.port:
 @dataclass
-class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 'Block')}):
+class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 'Block')}, EntityReprSerializer, CleanMonitor):
     Id: diagrams.HIDDEN = 0
     diagram: diagrams.HIDDEN = 0
     block: diagrams.HIDDEN = 0
@@ -71,6 +182,8 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
         return 'block'
 
 % endfor
+
+
 <%
     def get_relationship_type(field_type):
         if is_dataclass(field_type):
@@ -86,7 +199,7 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
 %>
 % for cls in generator.md.relationship:
 @dataclass
-class ${cls.__name__}Representation(diagrams.Relationship):
+class ${cls.__name__}Representation(diagrams.Relationship, RelationshipReprSerializer, CleanMonitor):
     Id: diagrams.HIDDEN = 0
     diagram: diagrams.HIDDEN = 0
     relationship: diagrams.HIDDEN = 0
