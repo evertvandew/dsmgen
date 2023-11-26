@@ -1,6 +1,6 @@
 """ Stub of the Brython HTML interface """
 
-from typing import Self, Iterable
+from typing import Self, Iterable, List
 from enum import Enum
 import re
 from dataclasses import dataclass
@@ -8,6 +8,7 @@ from test_frame import prepare, test, run_tests
 
 
 def flatten(data):
+    """ Flatten a tag and its descendants. """
     if isinstance(data, Iterable) and not isinstance(data, str) and not isinstance(data, bytes):
         for d in data:
             yield from flatten(d)
@@ -17,6 +18,9 @@ def flatten(data):
             yield from flatten(children)
 
 class AttributeOperator(Enum):
+    """ The various types of selections done on attributes.
+        The value of each entry is the RE pattern to match on.
+    """
     has = ""
     equals = '='
     contains_word = '~='
@@ -25,7 +29,10 @@ class AttributeOperator(Enum):
     endswith = '[$]='
     contains = '[*]='
 
-
+###############################################################################
+# Objects to store the parameters to the various selectors.
+# Core selectors have a `test` function to check a single node.
+# Combination selectors have a `filter` function to check relationships between nodes.
 class PsuedoClass:
     name: str
 class PsuedoElement:
@@ -33,71 +40,66 @@ class PsuedoElement:
 class Selector:
     pc: PsuedoClass
     pe: PsuedoElement
-class UniversalSelector(Selector):
-    pass
+
 @dataclass
-class TypeSelector(Selector):
+class BaseSelector(Selector):
     name: str
+    def filter(self, node):
+        for item in flatten(node):
+            if self.test(item):
+                yield item
+
+@dataclass
+class UniversalSelector(BaseSelector):
+    name: str = ''
+    def test(self, node):
+        return True
+
+class TypeSelector(BaseSelector):
     def test(self, node):
         return node.tagname() == self.name
 
-@dataclass
-class ClassSelector(Selector):
-    name: str
+class ClassSelector(BaseSelector):
     def test(self, node):
         return self.name in node.classList
 
-@dataclass
-class IdSelector(Selector):
-    name: str
+class IdSelector(BaseSelector):
     def test(self, node):
-        return getattr(node, 'id', '0') == self.name
+        return node.attr.get('id', '0') == self.name
 
 @dataclass
-class AttributeSelector(Selector):
-    name: str
+class AttributeSelector(BaseSelector):
     value: str|None
     operator: AttributeOperator
     flag: ''
     def __post_init__(self):
         ivalue = self.value.lower()
         if self.operator == AttributeOperator.has:
-            self.test = lambda node: hasattr(node, self.name)
-        elif self.operator == AttributeOperator.equals:
-            if self.flag == 'i':
-                self.test = lambda node: getattr(node, self.name, '').lower() == ivalue
-            else:
-                self.test = lambda node: getattr(node, self.name, '') == self.value
-        elif self.operator == AttributeOperator.contains_word:
-            if self.flag == 'i':
-                self.test = lambda node: ivalue in getattr(node, self.name, '').lower().split()
-            else:
-                self.test = lambda node: self.value in getattr(node, self.name, '').split()
-        elif self.operator == AttributeOperator.equals_upto_hyphen:
-            if self.flag == 'i':
-                def tester(node):
-                    attr = getattr(node, self.name, '').lower()
-                    return attr == ivalue or attr.startswith(ivalue + '-')
-            else:
-                def tester(node):
-                    attr = getattr(node, self.name, '')
-                    return attr == self.value or attr.startswith(self.value+'-')
-            self.test = tester
-        elif self.operator == AttributeOperator.startswith:
-            if self.flag == 'i':
-                self.test = lambda node: getattr(node, self.name, '').lower().startswith(ivalue)
-            else:
-                self.test = lambda node: getattr(node, self.name, '').startswith(self.value)
-        elif self.operator == AttributeOperator.endswith:
-            if self.flag == 'i':
-                self.test = lambda node: getattr(node, self.name, '').lower().endswith(ivalue)
-            else:
-                self.test = lambda node: getattr(node, self.name, '').endswith(self.value)
-        elif self.operator == AttributeOperator.contains:
-            if self.flag == 'i':
-                self.test = lambda node: ivalue in getattr(node, self.name, '').lower()
-            else:
-                self.test = lambda node: self.value in getattr(node, self.name, '')
+            def t(node):
+                return self.name in node.attr
+            self.test = t
+        else:
+            def t(node):
+                if self.flag == 'i':
+                    value = self.value.lower()
+                    attr = node.attr.get(self.name, '').lower()
+                else:
+                    value = self.value
+                    attr = node.attr.get(self.name, '')
+                if self.operator == AttributeOperator.equals:
+                    return attr == value
+                elif self.operator == AttributeOperator.contains_word:
+                    return value in attr.split()
+                elif self.operator == AttributeOperator.equals_upto_hyphen:
+                    return attr == value or attr.startswith(value+'-')
+                elif self.operator == AttributeOperator.startswith:
+                    return attr.startswith(value)
+                elif self.operator == AttributeOperator.endswith:
+                    return attr.endswith(value)
+                elif self.operator == AttributeOperator.contains:
+                    return value in attr
+            self.test = t
+
 class Combinator(Enum):
     NextSibling = '[+]'
     SubsequentSibling = '~'
@@ -108,13 +110,47 @@ class Combinator(Enum):
 @dataclass
 class SelectorList:
     selectors: Selector
+    def filter(self, node):
+        # Yield each element that maches a test once and only once.
+        # Collect all matches in a set to make them unique.
+        all_nodes = {n for s in self.selectors for n in s.filter(node)}
+        for item in all_nodes:
+            yield item
+
 
 @dataclass
 class SelectorCombinator:
-    a: Selector
-    b: Selector
+    a: BaseSelector
+    b: BaseSelector
     t: Combinator
 
+    def filter(self, node):
+        match self.t:
+            case Combinator.NextSibling:
+                # Find two subsequent matching children
+                for item in flatten(node):
+                    for a, b in zip(item.children[:-1], item.children[1:]):
+                        if self.a.test(a) and self.b.test(b):
+                            yield b
+            case Combinator.SubsequentSibling:
+                # Find any child matching b if there is a child matching a
+                for item in flatten(node):
+                    if any(self.a.test(child) for child in item.children):
+                        for child in item.children:
+                            if self.b.test(child):
+                                yield child
+            case Combinator.Child:
+                for item in flatten(node):
+                    if self.a.test(item):
+                        for child in item.children:
+                            if self.b.test(child):
+                                yield child
+            case Combinator.Descendant:
+                for item in flatten(node):
+                    if self.a.test(item):
+                        yield from self.b.filter(item)
+            case _:
+                RuntimeError("Combinator not (yet) supported")
 
 def parse_attribute_selector(s):
     for attr in AttributeOperator:
@@ -127,6 +163,7 @@ def parse_attribute_selector(s):
 
 
 def parse_selector(s):
+    """ Convert a selector string into a selector object of the correct type. """
     # Check for the Universal selector
     liststack = []
     selector = None
@@ -173,42 +210,36 @@ def parse_selector(s):
     return selector
 
 
-def create_filter(selector):
-    if isinstance(selector, UniversalSelector):
-        def filter(node):
-            yield from flatten(node)
-        return filter
-    if type(selector) in [TypeSelector, ClassSelector, IdSelector, AttributeSelector]:
-        def filter(node):
-            for item in flatten(node):
-                if selector.test(item):
-                    yield item
-        return filter
-    if isinstance(selector, SelectorList):
-        filters = [create_filter(s) for s in selector.selectors]
-        def filter(node):
-            all_nodes = {n for f in filters for n in f(node)}
-            for item in all_nodes:
-                yield item
-        return filter
-
 class tag:
-    def __init__(self, *args, **kwargs):
+    """ Base class for all tags.
+        Tags have a uniform interface, so no tags need custom attributes or code.
+    """
+    def __init__(self, content='', **kwargs):
         self.id = ''
         self.style = {}
         self.Class = ''
         self.text = ''
         self.children = []
-        for a in args:
-            if isinstance(a, str):
-                self.text = a
-            elif isinstance(a, list):
-                self.children.append(a)
-        self.__dict__.update(kwargs)
-        self.classList = self.Class.split()
+        if content:
+            if isinstance(content, str):
+                raise RuntimeError("HTML content is not (yet) supported by this mockup")
+            elif isinstance(content, tag):
+                self.children = [content]
+            elif isinstance(content, Iterable):
+                self.children = list(content)
+            else:
+                raise RuntimeError("Unrecognized content")
+        self.attr = kwargs
+        self.classList = self.attr.get('Class', '').split()
 
-    def __le__(self, other: Self|str):
-        self.children.append(other)
+    def __le__(self, other: Self|str|Iterable):
+        if isinstance(other, tag):
+            self.children.append(other)
+        elif isinstance(other, str):
+            raise RuntimeError("HTML content is not (yet) supported by this mockup")
+        elif isinstance(other, Iterable):
+            for item in other:
+                self.__le__(item)
 
     def __getitem__(self, key):
         return self.get(id=key)
@@ -216,8 +247,7 @@ class tag:
     def get(self, **kwargs):
         if 'selector' in kwargs:
             selector = parse_selector(kwargs['selector'])
-            filter = create_filter(selector)
-            return list(filter(self))
+            return list(selector.filter(self))
         items = list(flatten(self.children))
         for key, value in kwargs.items():
             items = [c for c in items if getattr(c, key, '') == value]
@@ -229,7 +259,10 @@ class tag:
     def tagname(self):
         return type(self).__name__
 
-
+###############################################################################
+# Definition of all the tags supported by Brython.
+# These could be generated more efficiently than typing all the classes out like this,
+# but now editors and e.g. mypy can check on their correct usage.
 class A(tag): pass
 
 class ABBR(tag): pass
@@ -491,7 +524,8 @@ class MENUITEM(tag): pass
 class PICTURE(tag): pass
 
 
-
+###############################################################################
+# Unit tests for this file, focussing on the selector parsing and filtering.
 @prepare
 def selector_parsing_tests():
     @test
@@ -533,20 +567,25 @@ def selector_filter_tests():
     test_set = BODY(
         [
             DIV([
-                SPAN("Dit is een test", Class="chapter text"),
+                SPAN(text="Dit is een test", Class="chapter text"),
                 INPUT(id='myvalue', name="value1", Class='edit'),
-                A("Klik mij", href="http://pietje.puk")
+                A(text="Klik mij", href="http://pietje.puk"),
+                FORM([
+                    BUTTON(),
+                    INPUT()
+                ])
             ], id="1", Class='pietje puk'),
             DIV([
                 INPUT(name="value2", Class='edit', flag='btn-primary'),
-                BUTTON("Click Me", onclick="onBtnClick()", Class='edit btn')
-            ], id="2", Class="olivier bommel")
+                BUTTON(text="Click Me", onclick="onBtnClick()", Class='edit btn')
+            ], id="2", Class="olivier bommel"),
+            INPUT(name="value3", Class='outside')
         ]
     )
     @test
     def core_selectors():
-        assert len(test_set.select('*')) == 8
-        assert len(test_set.select('INPUT')) == 2
+        assert len(test_set.select('*')) == 12
+        assert len(test_set.select('INPUT')) == 4
         assert len(test_set.select('.edit')) == 3
         assert len(test_set.select('#myvalue')) == 1
         assert len(test_set.select('[onclick]')) == 1
@@ -556,6 +595,14 @@ def selector_filter_tests():
         assert len(test_set.select('[Class~="btn"]')) == 1
         assert len(test_set.select('[text^="click" i]')) == 1
         assert len(test_set.select('[text$="me" i]')) == 1
+    @test
+    def combination_selectors():
+        assert len(test_set.select('INPUT, BUTTON')) == 6
+        assert len(test_set.select('.edit, .btn')) == 3
+        assert len(test_set.select('INPUT + BUTTON')) == 1
+        assert len(test_set.select('INPUT ~ BUTTON')) == 2
+        assert len(test_set.select('DIV INPUT')) == 3
+        assert len(test_set.select('DIV > INPUT')) == 2
 
 
 if __name__ == '__main__':
