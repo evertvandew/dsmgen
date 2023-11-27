@@ -1,6 +1,6 @@
 """ Stub of the Brython HTML interface """
 
-from typing import Self, Iterable, List
+from typing import Self, Iterable, List, Dict, Callable
 from enum import Enum
 import re
 from dataclasses import dataclass
@@ -210,16 +210,36 @@ def parse_selector(s):
     return selector
 
 
+
+@dataclass
+class Event:
+    target: 'tag'
+    srcElement: 'tag'
+
+    @property
+    def type(self):
+        return type(self).__name__
+
+    def __post_init__(self):
+        self.bubbles: bool = True
+        self.cancelBubble: bool = False
+
+    def preventDefault(self):
+        # Default actions for each element are not supported by this simulator.
+        # If you do want such detailed simulations, just run the actual client and control it through Selenium
+        pass
+    def stopPropagation(self):
+        self.cancelBubble = True
+
 class tag:
     """ Base class for all tags.
         Tags have a uniform interface, so no tags need custom attributes or code.
     """
     def __init__(self, content='', **kwargs):
-        self.id = ''
-        self.style = {}
-        self.Class = ''
         self.text = ''
         self.children = []
+        self.parent = None
+        self.subscribers: Dict[str, List[Callable]] = {}
         if content:
             if isinstance(content, str):
                 raise RuntimeError("HTML content is not (yet) supported by this mockup")
@@ -235,6 +255,7 @@ class tag:
     def __le__(self, other: Self|str|Iterable):
         if isinstance(other, tag):
             self.children.append(other)
+            other.parent = self
         elif isinstance(other, str):
             raise RuntimeError("HTML content is not (yet) supported by this mockup")
         elif isinstance(other, Iterable):
@@ -258,6 +279,24 @@ class tag:
 
     def tagname(self):
         return type(self).__name__
+
+    def bind(self, event, cb):
+        self.subscribers.setdefault(event, []).append(cb)
+    def unbind(self, event, cb=None):
+        if cb is None:
+            self.subscribers[event] = []
+        else:
+            handlers = self.events(event)
+            if cb in handlers:
+                i = handlers.index(cb)
+                handlers.remove(i)
+    def events(self, event: str):
+        return self.subscribers.get(event, [])
+    def dispatchEvent(self, event: Event):
+        for h in self.subscribers[event.type]:
+            h(event)
+        if event.bubbles and not event.cancelBubble and self.parent:
+            self.parent.dispatchEvent(event)
 
 ###############################################################################
 # Definition of all the tags supported by Brython.

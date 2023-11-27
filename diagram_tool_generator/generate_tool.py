@@ -197,7 +197,7 @@ class Generator:
 
 def generate_tool(config: Configuration):
     # Find and import the specified model
-    module_name = os.path.splitext(os.path.basename(config.model_def))[0]
+    module_name = os.path.splitext(os.path.basename(config.model_def))[0].replace('spec', '')
     spec = importlib.util.spec_from_file_location(module_name, config.model_def)
     new_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(new_mod)
@@ -228,10 +228,10 @@ def generate_tool(config: Configuration):
     #        print(f'{cls.__name__}.{f.name}: {get_type(f.type)} = {get_default(f.type)}')
 
     for tmpl, target in [
-        ('templates/client.html', f'{config.client_dir}/{module_name}.html'),
-        ('templates/client.py', f'{config.client_dir}/{module_name}.py'),
-        ('templates/data_model.py', f'{config.server_dir}/{module_name}_data.py'),
-        ('templates/server.py', f'{config.server_dir}/{module_name}_run.py'),
+        ('templates/client.html', f'{config.client_dir}/{module_name}client.html'),
+        ('templates/client.py', f'{config.client_dir}/{module_name}client.py'),
+        ('templates/data_model.py', f'{config.server_dir}/{module_name}data.py'),
+        ('templates/server.py', f'{config.server_dir}/{module_name}run.py'),
     ]:
         print(f'Rendering {tmpl} to {target}')
         template = Template(open(hdir(tooldir, tmpl)).read())
@@ -245,4 +245,4 @@ def generate_tool(config: Configuration):
 
 
 if __name__ == '__main__':
-    generate_tool(Configuration('sysml_model.py'))
+    generate_tool(Configuration('sysml_spec.py'))

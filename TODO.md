@@ -2,6 +2,7 @@
 # Bugs:
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
 * Some exceptions occur when manipulating connections.
+* Use `get_type_hints` instead of raw `__annotations__`.
 
 
 # TODO for the First Viable Product Release:

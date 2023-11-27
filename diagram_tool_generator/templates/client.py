@@ -20,7 +20,7 @@ from browser import document, console, html, window, bind, ajax
 import json
 from explorer import Element, make_explorer, ExplorerDataApi, context_menu_name
 from rest_api import RestApi, ExplorerApi, DiagramApi
-from dataclasses import dataclass, field, is_dataclass, asdict
+from dataclasses import dataclass, field, is_dataclass, asdict, fields
 from typing import Self, List, Dict, Any
 from collections.abc import Iterable
 import typing
@@ -35,24 +35,26 @@ from rest_api import IRepresentationSerializer, IClean
 
 # Some mixins to add serialization features
 class CleanMonitor(IClean):
-    def __post_init__(self):
-        self.__dirty = set()
+    def __init__(self):
+        self._dirty = set()
+        self.__setattr__ = setattr
     def is_dirty(self):
-        return bool(self.__dirty)
+        return bool(self._dirty)
     def set_clean(self):
-        self.__dirty = set()
+        self._dirty = set()
     def set_dirty(self, keys):
-        self.__dirty = set(keys)
+        self._dirty = set(keys)
     def get_dirty(self):
-        return self.__dirty
+        return self._dirty
     def clean_keys(self, keys):
         """ Indicate that a particular set of keys has been cleaned. """
-        self.__dirty = {k for k in self.__dirty if k not in keys}
+        self._dirty = {k for k in self._dirty if k not in keys}
 
-    def __setattr__(self, key, value):
-        """ Override the method to set attributes, to keep track of internal changes. """
+    def setattr(self, key, value):
+        """ Override the method to set attributes, to keep track of internal changes.
+        """
         if key in self.__annotations__ and getattr(self, key) != value:
-            self.__dirty.add(key)
+            self._dirty.add(key)
         object.__setattr__(self, key, value)
 
 
@@ -62,10 +64,10 @@ class EntityReprSerializer(IRepresentationSerializer):
     def new_model_item(self):
         return not self.block
 
-    def extract_representation(self):
+    def extract_representation(self, diagram_id: int):
         """ Return a dictionary that can be sent as json of only the representation details """
         return dict(
-            diagram=self.diagram_id,
+            diagram=diagram_id,
             block=self.block,
             x=self.x,
             y=self.y,
@@ -78,10 +80,9 @@ class EntityReprSerializer(IRepresentationSerializer):
 
     def extract_model(self):
         """ Return an instance of the underlying model details. """
-        keys = [f.name for f in fields(self.logical_cls)]
-        item = self.logical_cls(**{k: v for k, v in asdict(self).items() if k in keys})
-        item.source = self.start.Id
-        item.target = self.finish.Id
+        keys = [f.name for f in fields(self.logical_class)]
+        item = self.logical_class(**{k: v for k, v in asdict(self).items() if k in keys})
+        item.Id = self.block
         # Move monitoring of the dirty keys to the model item
         dirty_keys = [k for k in self.get_dirty() if k in item.__dict__]
         item.set_dirty(dirty_keys)
@@ -108,10 +109,10 @@ class RelationshipReprSerializer(IRepresentationSerializer):
     def new_model_item(self):
         return not self.relationship
 
-    def extract_representation(self):
+    def extract_representation(self, diagram_id: int):
         """ Return a dictionary that can be sent as json of only the representation details """
         return dict(
-                diagram = self.diagram_id,
+                diagram = diagram_id,
                 relationship = self.relationship,
                 source_repr_id = self.start.Id,
                 target_repr_id = self.finish.Id,
@@ -122,14 +123,19 @@ class RelationshipReprSerializer(IRepresentationSerializer):
             )
     def extract_model(self):
         """ Return an instance of the underlying model details. """
-        keys = [f.name for f in fields(self.logical_cls)]
-        new_rel = self.logical_cls(**{k: v for k, v in asdict(self).items() if k in keys})
+        keys = [f.name for f in fields(self.logical_class)]
+        new_rel = self.logical_class(**{k: v for k, v in asdict(self).items() if k in keys})
+        new_rel.Id = self.relationship
         new_rel.source = self.start.Id
         new_rel.target = self.finish.Id
+        # Move monitoring of the dirty keys to the model item
+        dirty_keys = [k for k in self.get_dirty() if k in new_rel.__dict__]
+        new_rel.set_dirty(dirty_keys)
+        self.clean_keys(dirty_keys)
         return new_rel
 
     def set_model_id(self, entity):
-        self.representation = entity.Id
+        self.relationship = entity.Id
 
     @classmethod
     def from_dict(cls, d):
@@ -144,7 +150,7 @@ class RelationshipReprSerializer(IRepresentationSerializer):
 # Modelling 'Entities:'
 % for entity in generator.ordered_items:
 @dataclass
-class ${entity.__name__}:
+class ${entity.__name__}(CleanMonitor):
     Id: diagrams.HIDDEN = 0
     % for f in fields(entity):
     ## All elements must have a default value so they can be created from scratch
@@ -157,6 +163,10 @@ class ${entity.__name__}:
     def get_icon(self):
         return "${mdef.get_style(entity, 'icon', 'folder')}"
     % endif
+
+    def __post_init__(self):
+        # Prepare and arm the dirty monitor functionality
+        CleanMonitor.__init__(self)
 
 % endfor
 
@@ -176,6 +186,10 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
     shape_type = shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
 
     logical_class = ${cls.__name__}
+
+    def __post_init__(self):
+        # Prepare and arm the dirty monitor functionality
+        CleanMonitor.__init__(self)
 
     @classmethod
     def repr_category(cls):
@@ -200,6 +214,7 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
 % for cls in generator.md.relationship:
 @dataclass
 class ${cls.__name__}Representation(diagrams.Relationship, RelationshipReprSerializer, CleanMonitor):
+    _dirty: diagrams.HIDDEN = field(default_factory=set)
     Id: diagrams.HIDDEN = 0
     diagram: diagrams.HIDDEN = 0
     relationship: diagrams.HIDDEN = 0
@@ -208,6 +223,10 @@ class ${cls.__name__}Representation(diagrams.Relationship, RelationshipReprSeria
     % endfor
 
     logical_class = ${cls.__name__}
+
+    def __post_init__(self):
+        # Prepare and arm the dirty monitor functionality
+        CleanMonitor.__init__(self)
 
     @classmethod
     def repr_category(cls):
