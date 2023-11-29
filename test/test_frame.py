@@ -5,14 +5,25 @@ Inspired by some testing frameworks in Javascript. Very simple and extendible.
 
 import logging
 import sys
+from contextlib import contextmanager
 
 all_tests = []
+executed_tests = []
 preparations = []
 cleanups = []
 
 def test(func):
     all_tests.append(func)
     return func
+
+@contextmanager
+def expect_exception(e):
+    success = False
+    try:
+        yield None
+    except e:
+        success = True
+    assert success, f"Code did not raise an exception of type {e.__name__}"
 
 def prepare(func):
     preparations.append(func)
@@ -36,13 +47,15 @@ def run_tests():
                 t()
                 successes.append(t)
             except Exception as e:
-                logging.exception(f'Error failed: {str(e)}')
+                logging.exception('Test failed:')
                 failures.append(t)
+
+        executed_tests.extend(all_tests)
 
         # Cleanup is in reversed order, hopefully keeping dependencies alive while needed.
         for p in reversed(cleanups):
             p()
 
-    logging.info(f"Failures: {len(failures)} / {len(all_tests)}")
+    logging.error(f"Failures: {len(failures)} / {len(executed_tests)}")
     if failures:
         sys.exit(1)

@@ -19,13 +19,14 @@ import model_definition as mdef
 from browser import document, console, html, window, bind, ajax
 import json
 from explorer import Element, make_explorer, ExplorerDataApi, context_menu_name
-from rest_api import RestApi, ExplorerApi, DiagramApi
+from rest_api import ExplorerApi, DiagramApi, ExtendibleJsonEncoder
 from dataclasses import dataclass, field, is_dataclass, asdict, fields
 from typing import Self, List, Dict, Any
 from collections.abc import Iterable
 import typing
 import types
 from enum import IntEnum
+from inspect import getmro
 import diagrams
 import shapes
 from property_editor import dataClassEditor, longstr
@@ -37,7 +38,6 @@ from rest_api import IRepresentationSerializer, IClean
 class CleanMonitor(IClean):
     def __init__(self):
         self._dirty = set()
-        self.__setattr__ = setattr
     def is_dirty(self):
         return bool(self._dirty)
     def set_clean(self):
@@ -50,21 +50,27 @@ class CleanMonitor(IClean):
         """ Indicate that a particular set of keys has been cleaned. """
         self._dirty = {k for k in self._dirty if k not in keys}
 
-    def setattr(self, key, value):
+    @classmethod
+    def all_annotations(cls):
+        for b in getmro(cls):
+            if a := getattr(b, '__annotations__', False):
+                yield a
+
+    def __setattr__(self, key, value):
         """ Override the method to set attributes, to keep track of internal changes.
         """
-        if key in self.__annotations__ and getattr(self, key) != value:
+        if hasattr(self, '_dirty') and any(key in a for a in self.all_annotations()) and getattr(self, key) != value:
             self._dirty.add(key)
         object.__setattr__(self, key, value)
 
 
-class EntityReprSerializer(IRepresentationSerializer):
+class EntityReprSerializer[T: diagrams.Shape](IRepresentationSerializer):
     base_url = f'/data/_BlockRepresentation'
 
-    def new_model_item(self):
+    def new_model_item(self: T):
         return not self.block
 
-    def extract_representation(self, diagram_id: int):
+    def extract_representation(self: T, diagram_id: int):
         """ Return a dictionary that can be sent as json of only the representation details """
         return dict(
             diagram=diagram_id,
@@ -78,7 +84,7 @@ class EntityReprSerializer(IRepresentationSerializer):
             block_cls=type(self).__name__
         )
 
-    def extract_model(self):
+    def extract_model(self: T):
         """ Return an instance of the underlying model details. """
         keys = [f.name for f in fields(self.logical_class)]
         item = self.logical_class(**{k: v for k, v in asdict(self).items() if k in keys})
@@ -89,39 +95,38 @@ class EntityReprSerializer(IRepresentationSerializer):
         self.clean_keys(dirty_keys)
         return item
 
-    def set_model_id(self, entity):
+    def set_model_id(self: T, entity):
         self.block = entity.Id
 
     @classmethod
-    def from_dict(cls, d):
+    def from_dict(cls, d: Dict[str, Any]):
         ddict = {}
         ddict.update(d['_entity'])
         ddict.update(d)
-        cls = representation_classes[d['block_cls']]
         field_names = [f.name for f in fields(cls)]
         ddict = {k: v for k, v in ddict.items() if k in field_names}
         entity = cls(**ddict)
 
 
-class RelationshipReprSerializer(IRepresentationSerializer):
+class RelationshipReprSerializer[T: diagrams.Relationship](IRepresentationSerializer):
 
     base_url = f'/data/_RelationshipRepresentation'
     def new_model_item(self):
         return not self.relationship
 
-    def extract_representation(self, diagram_id: int):
+    def extract_representation(self: T, diagram_id: int):
         """ Return a dictionary that can be sent as json of only the representation details """
         return dict(
                 diagram = diagram_id,
                 relationship = self.relationship,
                 source_repr_id = self.start.Id,
                 target_repr_id = self.finish.Id,
-                routing = json.dumps(self.waypoints),
+                routing = json.dumps(self.waypoints, cls=ExtendibleJsonEncoder),
                 z = self.z,
                 styling = self.styling,
                 rel_cls = type(self).__name__
             )
-    def extract_model(self):
+    def extract_model(self: T):
         """ Return an instance of the underlying model details. """
         keys = [f.name for f in fields(self.logical_class)]
         new_rel = self.logical_class(**{k: v for k, v in asdict(self).items() if k in keys})
@@ -134,11 +139,11 @@ class RelationshipReprSerializer(IRepresentationSerializer):
         self.clean_keys(dirty_keys)
         return new_rel
 
-    def set_model_id(self, entity):
+    def set_model_id(self: T, entity):
         self.relationship = entity.Id
 
     @classmethod
-    def from_dict(cls, d):
+    def from_dict(cls, d: Dict[str, Any]):
         ddict = {}
         ddict.update(d['_entity'])
         ddict.update(d)

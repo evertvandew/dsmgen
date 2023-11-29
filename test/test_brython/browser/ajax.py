@@ -26,8 +26,10 @@ class ExpectedResponse:
     reuse: bool                 # If True, the response will always be the same.
 
 expected_responses: List[ExpectedResponse] = []
+unexpected_requests: int = 0
 
 def determine_response(url, method, kwargs):
+    global unexpected_requests
     index = None
     for i, r in enumerate(expected_responses):
         if r.url == url and r.method == method:
@@ -35,6 +37,7 @@ def determine_response(url, method, kwargs):
             break
     if index is None:
         response = Response(408)  # Timeout return code
+        unexpected_requests += 1
     else:
         expected = expected_responses[index]
         if not expected.reuse:
@@ -55,7 +58,7 @@ def put(url, **kwargs):
     return determine_response(url, 'put', kwargs)
 
 def delete(url, **kwargs):
-    return determine_response(url, 'delete')
+    return determine_response(url, 'delete', kwargs)
 
 
 def add_expected_response(url, method, response: Optional[Response]=None, get_response: Optional[Callable]=None,

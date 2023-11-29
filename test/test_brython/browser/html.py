@@ -25,7 +25,7 @@ class AttributeOperator(Enum):
     equals = '='
     contains_word = '~='
     equals_upto_hyphen = r'[|]='
-    startswith = '\^='
+    startswith = r'\^='
     endswith = '[$]='
     contains = '[*]='
 
@@ -104,7 +104,7 @@ class Combinator(Enum):
     NextSibling = '[+]'
     SubsequentSibling = '~'
     Child = '>'
-    Column = '\|\|'
+    Column = r'\|\|'
     Descendant = ' '
 
 @dataclass
