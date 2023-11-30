@@ -77,7 +77,6 @@ class BlockReference:
     target: XRef('associations', Block, hidden)
     source_multiplicity: selection("0-1 1 + *")
     target_multiplicity: selection("0-1 1 + *")
-    association: XRef('associations', Block, hidden)
 
     def end(self):
         return {

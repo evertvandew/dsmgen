@@ -21,7 +21,7 @@ import json
 from explorer import Element, make_explorer, ExplorerDataApi, context_menu_name
 from rest_api import ExplorerApi, DiagramApi, ExtendibleJsonEncoder
 from dataclasses import dataclass, field, is_dataclass, asdict, fields
-from typing import Self, List, Dict, Any
+from typing import Self, List, Dict, Any, Callable
 from collections.abc import Iterable
 import typing
 import types
@@ -38,6 +38,8 @@ from rest_api import IRepresentationSerializer, IClean
 class CleanMonitor(IClean):
     def __init__(self):
         self._dirty = set()
+    def mk_dirty_setter(self, k):
+        return lambda: self._dirty.add(k)
     def is_dirty(self):
         return bool(self._dirty)
     def set_clean(self):
@@ -156,14 +158,14 @@ class RelationshipReprSerializer[T: diagrams.Relationship](IRepresentationSerial
 % for entity in generator.ordered_items:
 @dataclass
 class ${entity.__name__}(CleanMonitor):
-    Id: diagrams.HIDDEN = 0
+    Id: shapes.HIDDEN = 0
     % for f in fields(entity):
     ## All elements must have a default value so they can be created from scratch
     ${f.name}: ${generator.get_html_type(f.type)} = ${generator.get_default(f.type)}
     % endfor
     % if not entity in generator.md.relationship:
-    order: diagrams.HIDDEN = 0
-    children: diagrams.HIDDEN = field(default_factory=list)
+    order: shapes.HIDDEN = 0
+    children: shapes.HIDDEN = field(default_factory=list)
 
     def get_icon(self):
         return "${mdef.get_style(entity, 'icon', 'folder')}"
@@ -181,9 +183,9 @@ class ${entity.__name__}(CleanMonitor):
 % for cls in generator.md.entity + generator.md.port:
 @dataclass
 class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 'Block')}, EntityReprSerializer, CleanMonitor):
-    Id: diagrams.HIDDEN = 0
-    diagram: diagrams.HIDDEN = 0
-    block: diagrams.HIDDEN = 0
+    Id: shapes.HIDDEN = 0
+    diagram: shapes.HIDDEN = 0
+    block: shapes.HIDDEN = 0
     % for attr in generator.get_diagram_attributes(cls):
     ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
@@ -219,10 +221,9 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
 % for cls in generator.md.relationship:
 @dataclass
 class ${cls.__name__}Representation(diagrams.Relationship, RelationshipReprSerializer, CleanMonitor):
-    _dirty: diagrams.HIDDEN = field(default_factory=set)
-    Id: diagrams.HIDDEN = 0
-    diagram: diagrams.HIDDEN = 0
-    relationship: diagrams.HIDDEN = 0
+    Id: shapes.HIDDEN = 0
+    diagram: shapes.HIDDEN = 0
+    relationship: shapes.HIDDEN = 0
     % for attr in fields(cls):
     ${attr.name}: ${get_relationship_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor

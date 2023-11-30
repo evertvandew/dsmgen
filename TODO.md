@@ -21,6 +21,7 @@
 * Make a collection of diagrams, supporting at least UML and SYSML.
 
 # Future enhancements
+* Add support for association classes (a third association with a relationship)
 * Add support for messages along connections.
 * Allow combinations of point-2-point routed and square routed connections.
 * Implement a proper Z-order in the diagrams.

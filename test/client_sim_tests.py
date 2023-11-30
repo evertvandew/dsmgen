@@ -1,8 +1,7 @@
 """
 Tests where the Brython client is run against a simulated Brython - browser.
 """
-
-
+import enum
 import os
 import subprocess
 from test_frame import prepare, test, run_tests
@@ -10,7 +9,7 @@ from dataclasses import fields, asdict
 from property_editor import longstr
 from inspect import signature
 from typing import get_type_hints, List
-from shapes import Shape, Relationship, Point
+from shapes import Shape, Relationship, Point, HIDDEN
 
 def generate_tool():
     # Generate the tool, create directories, clean up etc.
@@ -82,8 +81,6 @@ def test_diagram_api():
         item.set_clean()
         assert not item.is_dirty()
 
-
-
     @test
     def create_totally_new():
         for element_nr, (name, cls) in enumerate(client.explorer_classes.items()):
@@ -111,7 +108,7 @@ def test_diagram_api():
         # Create new representations referring to existing blocks and relationships.
         # They won't actually exist, just that their reference is valid.
         for element_nr, repr_cls in enumerate(client.RelationshipReprSerializer.__subclasses__() + client.EntityReprSerializer.__subclasses__()):
-            name = type(repr_cls).__name__
+            name = repr_cls.__name__
             print(f"Testing class {element_nr}: {name}")
             new_item = representation_factor(repr_cls, model_id=123+element_nr)
             # Expect one REST calls: one for the model item, one for the representation.
@@ -132,7 +129,6 @@ def test_diagram_api():
     def update_representation():
         for element_nr, repr_cls in enumerate(client.RelationshipReprSerializer.__subclasses__() + client.EntityReprSerializer.__subclasses__()):
             name = repr_cls.__name__
-            print(f"Test updating class {element_nr}: {name}")
             new_item = representation_factor(repr_cls, model_id=123+element_nr, repr_id=5)
             # Check that changes in the representation bit produce a single REST call
             keys = Shape.__annotations__ \
@@ -157,6 +153,55 @@ def test_diagram_api():
 
 
                 add_expected_response(get_specific_url(new_item), 'post', Response(202))
+                api.update_element(new_item)
+                assert len(expected_responses) == 0
+                assert unexpected_requests == 0
+
+    @test
+    def update_model():
+        for element_nr, repr_cls in enumerate(client.RelationshipReprSerializer.__subclasses__() + client.EntityReprSerializer.__subclasses__()):
+            name = repr_cls.__name__
+            new_item = representation_factor(repr_cls, model_id=123+element_nr, repr_id=5)
+            # Check that changes in the representation bit produce a single REST call
+            keys = repr_cls.__annotations__   # Does not include the inherited fields.
+
+            # We check if an update to each attribute leads to an update to the REST interface
+            for key, update_type in keys.items():
+                if key in ['Id', 'diagram', 'relationship', 'block', 'source', 'target']:
+                    continue
+                print('Updating', key)
+                assert not new_item.is_dirty()
+                if update_type == float:
+                    setattr(new_item, key, getattr(new_item, key) + 1.0)
+                if update_type == int:
+                    setattr(new_item, key, getattr(new_item, key) + 1)
+                elif update_type == Shape:
+                    continue
+                elif key == 'styling':
+                    style = list(new_item.getDefaultStyle().keys())[0]
+                    new_item.styling = {style: '12342'}
+                elif update_type == List[Point]:
+                    setattr(new_item, key, [Point(100, 100)])
+                elif update_type == HIDDEN:
+                    setattr(new_item, key, getattr(new_item, key) + 10)
+                elif update_type == str or update_type == client.longstr:
+                    setattr(new_item, key, getattr(new_item, key) + 'ha')
+                elif isinstance(update_type, enum.EnumType):
+                    options = list(update_type)
+                    setattr(new_item, key, options[getattr(new_item, key) + 1])
+                elif isinstance(update_type, list):
+                    if all(issubclass(c, client.CleanMonitor) for c in update_type):
+                        # This is to hold a reference to another object.
+                        setattr(new_item, key, 111)
+                else:
+                    raise RuntimeError(f"Forgot to add support for element {key}: {update_type}")
+
+                if issubclass(repr_cls, client.RelationshipReprSerializer):
+                    url = f'/data/{repr_cls.logical_class.__name__}/{new_item.relationship}'
+                else:
+                    url = f'/data/{repr_cls.logical_class.__name__}/{new_item.block}'
+
+                add_expected_response(url, 'post', Response(202))
                 api.update_element(new_item)
                 assert len(expected_responses) == 0
                 assert unexpected_requests == 0

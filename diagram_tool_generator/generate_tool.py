@@ -150,7 +150,7 @@ class Generator:
 
     def get_html_type(self, field_type):
         if mdef.hidden in self.get_type_options(field_type):
-            return 'diagrams.HIDDEN'
+            return 'shapes.HIDDEN'
         return self.get_type(field_type)
 
     def get_default(self, field_type):
