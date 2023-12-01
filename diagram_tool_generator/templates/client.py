@@ -108,6 +108,7 @@ class EntityReprSerializer[T: diagrams.Shape](IRepresentationSerializer):
         field_names = [f.name for f in fields(cls)]
         ddict = {k: v for k, v in ddict.items() if k in field_names}
         entity = cls(**ddict)
+        return entity
 
 
 class RelationshipReprSerializer[T: diagrams.Relationship](IRepresentationSerializer):
