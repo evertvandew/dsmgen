@@ -113,6 +113,8 @@ class EntityReprSerializer[T: diagrams.Shape](IRepresentationSerializer):
 class RelationshipReprSerializer[T: diagrams.Relationship](IRepresentationSerializer):
 
     base_url = f'/data/_RelationshipRepresentation'
+    logical_class = None
+
     def new_model_item(self):
         return not self.relationship
 

@@ -1,9 +1,30 @@
 
+from dataclasses import dataclass
 
 from .html import tag
 
+@dataclass
+class DOMMatrix:
+    a: float = 1.0   # m11
+    b: float = 0.0   # m12
+    c: float = 0.0   # m21
+    d: float = 1.0   # m22
+    e: float = 0.0   # m41
+    f: float = 0.0   # m42
+
+    def is2D(self) -> bool:
+        return True
+
 class svg_tag(tag):
-    pass
+    def getScreenCTM(self) -> DOMMatrix:
+        # Return the default transformation matrix
+        # No offset, rotation, scaling or skewing
+        return DOMMatrix()
+
+    def __setitem__(self, key, value):
+        self.attr[key] = value
+    def __getitem__(self, key):
+        return self.attr[key]
 
 class drawn_tag(svg_tag):
     stroke: str

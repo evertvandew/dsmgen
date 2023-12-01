@@ -5,6 +5,7 @@ from enum import Enum
 import re
 from dataclasses import dataclass
 from test_frame import prepare, test, run_tests
+from .events import Event
 
 
 def flatten(data):
@@ -210,27 +211,6 @@ def parse_selector(s):
     return selector
 
 
-
-@dataclass
-class Event:
-    target: 'tag'
-    srcElement: 'tag'
-
-    @property
-    def type(self):
-        return type(self).__name__
-
-    def __post_init__(self):
-        self.bubbles: bool = True
-        self.cancelBubble: bool = False
-
-    def preventDefault(self):
-        # Default actions for each element are not supported by this simulator.
-        # If you do want such detailed simulations, just run the actual client and control it through Selenium
-        pass
-    def stopPropagation(self):
-        self.cancelBubble = True
-
 class tag:
     """ Base class for all tags.
         Tags have a uniform interface, so no tags need custom attributes or code.
@@ -242,7 +222,9 @@ class tag:
         self.subscribers: Dict[str, List[Callable]] = {}
         if content:
             if isinstance(content, str):
-                raise RuntimeError("HTML content is not (yet) supported by this mockup")
+                if '<' in content:
+                    raise RuntimeError("HTML content is not (yet) supported by this mockup")
+                self.text = content
             elif isinstance(content, tag):
                 self.children = [content]
             elif isinstance(content, Iterable):
@@ -250,7 +232,7 @@ class tag:
             else:
                 raise RuntimeError("Unrecognized content")
         self.attr = kwargs
-        self.classList = self.attr.get('Class', '').split()
+        self.classList = set(self.attr.get('Class', '').split())
 
     def __le__(self, other: Self|str|Iterable):
         if isinstance(other, tag):
@@ -263,7 +245,22 @@ class tag:
                 self.__le__(item)
 
     def __getitem__(self, key):
-        return self.get(id=key)
+        for item in flatten(self):
+            if item.attr.get('id', '') == key:
+                return item
+
+    @property
+    def html(self):
+        return self.render(self.children)
+
+    @html.setter
+    def html(self, s):
+        if not s:
+            # Clear all children
+            self.children = []
+        else:
+            # In future, we could implement parsing with e.g. the builtin HTMLParser.
+            raise NotImplementedError("Parsing HTML is not (yet) supported by this mockup")
 
     def get(self, **kwargs):
         if 'selector' in kwargs:
@@ -293,7 +290,9 @@ class tag:
     def events(self, event: str):
         return self.subscribers.get(event, [])
     def dispatchEvent(self, event: Event):
-        for h in self.subscribers[event.type]:
+        if not event.target:
+            event.target = self
+        for h in self.subscribers.get(event.type, []):
             h(event)
         if event.bubbles and not event.cancelBubble and self.parent:
             self.parent.dispatchEvent(event)
