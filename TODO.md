@@ -20,6 +20,10 @@
 * Support styling multiple objects at once
 * Make a collection of diagrams, supporting at least UML and SYSML.
 
+# Refactoring
+* Replace the REST "API" stuff with simple forwarding scheme. Letting objects maintain their own dirty state is a bad idea.
+  Use a more centralized approach where actions are detected and lead to centralized sequences being run to handle the change.
+
 # Future enhancements
 * Add support for association classes (a third association with a relationship)
 * Add support for messages along connections.

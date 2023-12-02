@@ -3,8 +3,8 @@ A helper file for the Brython mockup, for inserting the JavaScript events.
 """
 import enum
 
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, Dict
 
 @dataclass
 class Event:
@@ -72,3 +72,26 @@ class MouseMove(MouseEvent): pass
 class MouseOut(MouseEvent): pass
 class MouseOver(MouseEvent): pass
 class MouseUp(MouseEvent): pass
+
+@dataclass
+class DragDataTransfer:
+    effectAllowed: str = ''
+    dropEffect: str = ''
+    data: Dict[str, str] = field(default_factory=dict)
+
+    def setData(self, key: str, value: str):
+        self.data[key] = value
+    def getData(self, key: str) -> str:
+        return self.data[key]
+
+@dataclass
+class DragDropEvent(MouseEvent):
+    dataTransfer: DragDataTransfer = field(default_factory=DragDataTransfer)
+
+class Drag(DragDropEvent): pass
+class DragEnd(DragDropEvent): pass
+class DragEnter(DragDropEvent): pass
+class DragLeave(DragDropEvent): pass
+class DragOver(DragDropEvent): pass
+class DragStart(DragDropEvent): pass
+class Drop(DragDropEvent): pass

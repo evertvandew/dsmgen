@@ -457,7 +457,24 @@ class SUB(tag): pass
 
 class SUP(tag): pass
 
-class SVG(tag): pass
+
+@dataclass
+class DOMMatrix:
+    a: float = 1.0   # m11
+    b: float = 0.0   # m12
+    c: float = 0.0   # m21
+    d: float = 1.0   # m22
+    e: float = 0.0   # m41
+    f: float = 0.0   # m42
+
+    def is2D(self) -> bool:
+        return True
+
+class SVG(tag):
+    def getScreenCTM(self) -> DOMMatrix:
+        # Return the default transformation matrix
+        # No offset, rotation, scaling or skewing
+        return DOMMatrix()
 
 class TABLE(tag): pass
 

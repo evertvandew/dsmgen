@@ -66,13 +66,13 @@ class CleanMonitor(IClean):
         object.__setattr__(self, key, value)
 
 
-class EntityReprSerializer[T: diagrams.Shape](IRepresentationSerializer):
+class EntityReprSerializer(IRepresentationSerializer):
     base_url = f'/data/_BlockRepresentation'
 
-    def new_model_item(self: T):
+    def new_model_item(self):
         return not self.block
 
-    def extract_representation(self: T, diagram_id: int):
+    def extract_representation(self, diagram_id: int):
         """ Return a dictionary that can be sent as json of only the representation details """
         return dict(
             diagram=diagram_id,
@@ -86,19 +86,22 @@ class EntityReprSerializer[T: diagrams.Shape](IRepresentationSerializer):
             block_cls=type(self).__name__
         )
 
-    def extract_model(self: T):
-        """ Return an instance of the underlying model details. """
-        keys = [f.name for f in fields(self.logical_class)]
-        item = self.logical_class(**{k: v for k, v in asdict(self).items() if k in keys})
-        item.Id = self.block
-        # Move monitoring of the dirty keys to the model item
-        dirty_keys = [k for k in self.get_dirty() if k in item.__dict__]
-        item.set_dirty(dirty_keys)
-        self.clean_keys(dirty_keys)
-        return item
+    def extract_model(self, original):
+        """ Update the underlying model details. """
+        # Determine which fields can be updated by the representation.
+        keys = {f.name for f in fields(self.logical_class) if hasattr(self, f.name) and f.name != 'Id'}
+        for k in keys:
+            if (v:=getattr(self, k)) != getattr(original, k):
+                setattr(original, k, v)
 
-    def set_model_id(self: T, entity):
+        # The representation no longer needs to track the values transferred to the model.
+        self._dirty -= keys
+        return original
+
+    def set_model_id(self, entity):
         self.block = entity.Id
+    def get_model_id(self) -> int:
+        return self.block
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]):
@@ -111,7 +114,7 @@ class EntityReprSerializer[T: diagrams.Shape](IRepresentationSerializer):
         return entity
 
 
-class RelationshipReprSerializer[T: diagrams.Relationship](IRepresentationSerializer):
+class RelationshipReprSerializer(IRepresentationSerializer):
 
     base_url = f'/data/_RelationshipRepresentation'
     logical_class = None
@@ -119,7 +122,7 @@ class RelationshipReprSerializer[T: diagrams.Relationship](IRepresentationSerial
     def new_model_item(self):
         return not self.relationship
 
-    def extract_representation(self: T, diagram_id: int):
+    def extract_representation(self, diagram_id: int):
         """ Return a dictionary that can be sent as json of only the representation details """
         return dict(
                 diagram = diagram_id,
@@ -131,21 +134,22 @@ class RelationshipReprSerializer[T: diagrams.Relationship](IRepresentationSerial
                 styling = self.styling,
                 rel_cls = type(self).__name__
             )
-    def extract_model(self: T):
-        """ Return an instance of the underlying model details. """
-        keys = [f.name for f in fields(self.logical_class)]
-        new_rel = self.logical_class(**{k: v for k, v in asdict(self).items() if k in keys})
-        new_rel.Id = self.relationship
-        new_rel.source = self.start.Id
-        new_rel.target = self.finish.Id
-        # Move monitoring of the dirty keys to the model item
-        dirty_keys = [k for k in self.get_dirty() if k in new_rel.__dict__]
-        new_rel.set_dirty(dirty_keys)
-        self.clean_keys(dirty_keys)
-        return new_rel
+    def extract_model(self, original):
+        """ Update the underlying model details. """
+        # Determine which fields can be updated by the representation.
+        keys = {f.name for f in fields(self.logical_class) if hasattr(self, f.name) and f.name != 'Id'}
+        for k in keys:
+            if (v:=getattr(self, k)) != getattr(original, k):
+                setattr(original, k, v)
 
-    def set_model_id(self: T, entity):
+        # The representation no longer needs to track the values transferred to the model.
+        self._dirty -= keys
+        return original
+
+    def set_model_id(self, entity):
         self.relationship = entity.Id
+    def get_model_id(self):
+        return self.relationship
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]):

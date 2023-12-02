@@ -1,6 +1,7 @@
 import enum
 import os
 import subprocess
+import json
 from test_frame import prepare, test, run_tests
 from dataclasses import fields
 from property_editor import longstr
@@ -128,6 +129,8 @@ def test_diagram_api():
         for element_nr, repr_cls in enumerate(client.RelationshipReprSerializer.__subclasses__() +
                                               client.EntityReprSerializer.__subclasses__()):
             new_item = representation_factor(repr_cls, model_id=123+element_nr, repr_id=5)
+            # Insert a dummy model element in the explorer rest buffer
+            expo_api.records[123+element_nr] = repr_cls.logical_class()
             # Check that changes in the representation bit produce a single REST call
             keys = Shape.__annotations__ \
                 if repr_cls.repr_category() == 'block' else Relationship.__annotations__
@@ -161,6 +164,8 @@ def test_diagram_api():
                                               client.EntityReprSerializer.__subclasses__()):
             name = repr_cls.__name__
             new_item = representation_factor(repr_cls, model_id=123+element_nr, repr_id=5)
+            # Insert a dummy model element in the explorer rest buffer
+            expo_api.records[123+element_nr] = repr_cls.logical_class(Id=123+element_nr)
             # Check that changes in the representation bit produce a single REST call
             keys = repr_cls.__annotations__   # Does not include the inherited fields.
 
@@ -206,9 +211,65 @@ def test_diagram_api():
                 assert unexpected_requests == 0
 
     @test
+    def extract_model_entity():
+        # Check that when a model item is extracted from a representation, it doesn't overwrite
+        # details that are not stored in the representation.
+        repr = client.BlockRepresentation(
+            x=100, y=100, width=64, height=40,
+            diagram=9, block=5, Id=3, styling={},
+            name="Legolas", description="Elf that shoots well"
+        )
+        model_details = dict(
+            Id=5, name="Legolas", description="Elf that shoots well", parent=1
+        )
+        model = client.Block(**model_details)
+        updated = repr.extract_model(model)
+        assert not updated.is_dirty()
+        for k, v in model_details.items():
+            assert getattr(updated, k) == v, f"A value was wrongly updated: {k}"
+
+        # Now update a single element: the name
+        repr.name = "Duilin"
+        model_details['name'] = "Duilin"
+        updated = repr.extract_model(model)
+        assert updated.is_dirty()
+        assert updated._dirty == {'name'}
+        for k, v in model_details.items():
+            assert getattr(updated, k) == v, f"A value was wrongly updated: {k}"
+
+    @test
+    def extract_model_relationship():
+        # Check that when a model item is extracted from a representation, it doesn't overwrite
+        # details that are not stored in the representation.
+        model_details = dict(
+            Id=5, stereotype=3, source=222, target=333, source_multiplicity=2, target_multiplicity=3
+        )
+        repr_details = dict(
+            Id=6, id=923, z=0.0, styling={'color': 'yellow'}, waypoints=[(100,100), (200,100)], start=444, finish=555
+        )
+        ddict = model_details.copy()
+        ddict.update(repr_details)
+        repr = client.BlockReferenceRepresentation(**ddict)
+        model = client.BlockReference(**model_details)
+        updated = repr.extract_model(model)
+        assert not updated.is_dirty()
+        for k, v in model_details.items():
+            assert getattr(updated, k) == v, f"A value was wrongly updated: {k}"
+
+        # Now update a single model element: the stereotype
+        repr.stereotype = 2
+        model_details['stereotype'] = 2
+        updated = repr.extract_model(model)
+        assert updated.is_dirty()
+        assert updated._dirty == set(['stereotype'])
+        for k, v in model_details.items():
+            assert getattr(updated, k) == v, f"A value was wrongly updated: {k}"
+
+    @test
     def update_both_model_and_representation():
         # Run the test with a Block Representation
         repr = client.BlockRepresentation(x=100, y=100, width=120, height=64, name='Aristotle', block=123, Id=5)
+        expo_api.records[123] = client.Block(Id=123, name='Aristotle')
         assert not repr.is_dirty()
         # Make two changes, one to the representation, one to the model itself.
         repr.x = 200
@@ -228,5 +289,34 @@ def test_diagram_api():
         add_expected_response('/data/_BlockRepresentation/1234', 'delete', Response(204))
         api.delete_element(example)
         assert len(expected_responses) == 0
+
+    @test
+    def load_data():
+        js = [{"Id": 1, "diagram": 3, "block": 4, "x": 300.0, "y": 300.0, "z": 0.0, "width": 64.0, "height": 40.0, "styling": {}, "block_cls": "BlockRepresentation", "__classname__": "_BlockRepresentation", "_entity": {"order": 0, "Id": 4, "parent": 3, "name": "Test1", "description": "A test object", "__classname__": "Block"}}
+             ]
+        api = DiagramApi(3, client.explorer_classes, client.representation_classes, expo_api)
+        response = None
+        def callback(data):
+            nonlocal response
+            response = data
+
+        add_expected_response('/data/diagram_contents/3', 'get', Response(200, json=js))
+
+        api.get_elements_async(callback)
+        assert response
+        for k, v in dict(
+            Id=1,
+            diagram=3,
+            block=4,
+            x=300.0,
+            y=300.0,
+            z=0.0,
+            width=64.0,
+            height=40.0,
+            styling= {},
+            name="Test1",
+            description="A test object"
+        ).items():
+            assert getattr(response[0], k) == v
 
 run_tests()
