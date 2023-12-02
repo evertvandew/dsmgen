@@ -9,15 +9,10 @@
 * Support for container blocks
   * Limiting the position of internal waypoints to within the container
   * Dynamically create and remove ports as connections crossing the boundary are changed.
-* Refactor the client-side serialization to put more logic in the data classes, not the RestApi.
 * Allow conversion of one type element to another
 * Allow conversion of one relationship to another
 * Interact with a tree view of the model
-* Support wide open lines
-* Support curved lines
 * Edit the styling of lines.
-* Button for copying styling from object to object(s)
-* Support styling multiple objects at once
 * Make a collection of diagrams, supporting at least UML and SYSML.
 
 # Refactoring
@@ -25,6 +20,10 @@
   Use a more centralized approach where actions are detected and lead to centralized sequences being run to handle the change.
 
 # Future enhancements
+* Support styling multiple objects at once
+* Button for copying styling from object to object(s)
+* Support wide open lines
+* Support curved lines
 * Add support for association classes (a third association with a relationship)
 * Add support for messages along connections.
 * Allow combinations of point-2-point routed and square routed connections.
@@ -40,6 +39,7 @@
 
 
 # Done:
+* Refactor the client-side serialization to put more logic in the data classes, not the RestApi.
 * Add shape for Document
 * Support multiple document types
 * Support storage in an SQLite database over a REST API.
