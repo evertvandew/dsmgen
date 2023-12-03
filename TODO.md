@@ -14,6 +14,7 @@
 * Interact with a tree view of the model
 * Edit the styling of lines.
 * Make a collection of diagrams, supporting at least UML and SYSML.
+* When a user adds a connection that already exists, that should be reused.
 
 # Refactoring
 * Replace the REST "API" stuff with simple forwarding scheme. Letting objects maintain their own dirty state is a bad idea.

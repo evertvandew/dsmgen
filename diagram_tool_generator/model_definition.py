@@ -42,6 +42,10 @@ class ModelDefinition:
         return self.logical_model + [self.model_root]
 
     @property
+    def hierarchy(self) -> List[Any]:
+        return self.entity + self.port + self.diagrams + self.models
+
+    @property
     def all_model_items(self) -> List[Any]:
         return self.diagrams + self.models + self.entity + self.relationship + self.port
 

@@ -100,8 +100,6 @@ class EntityReprSerializer(IRepresentationSerializer):
 
     def set_model_id(self, entity):
         self.block = entity.Id
-    def get_model_id(self) -> int:
-        return self.block
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]):
@@ -148,8 +146,6 @@ class RelationshipReprSerializer(IRepresentationSerializer):
 
     def set_model_id(self, entity):
         self.relationship = entity.Id
-    def get_model_id(self):
-        return self.relationship
 
     @classmethod
     def from_dict(cls, d: Dict[str, Any]):
@@ -269,7 +265,26 @@ diagram_definitions = {
 }
 
 explorer_classes = {
-    <%  lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.all_model_items] %>
+    <%  lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.hierarchy] %>
+    ${',\n    '.join(lines)}
+}
+
+block_entities = {
+    <%  lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.entity] %>
+    ${',\n    '.join(lines)}
+}
+
+relation_classes = {
+    <% lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.relationship] %>
+    ${',\n    '.join(lines)}
+}
+
+block_representations = {
+    <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.entity] %>
+    ${',\n    '.join(lines)}
+}
+relation_representations = {
+    <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.relationship] %>
     ${',\n    '.join(lines)}
 }
 

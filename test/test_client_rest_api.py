@@ -130,10 +130,12 @@ def test_diagram_api():
                                               client.EntityReprSerializer.__subclasses__()):
             new_item = representation_factor(repr_cls, model_id=123+element_nr, repr_id=5)
             # Insert a dummy model element in the explorer rest buffer
-            expo_api.records[123+element_nr] = repr_cls.logical_class()
-            # Check that changes in the representation bit produce a single REST call
-            keys = Shape.__annotations__ \
-                if repr_cls.repr_category() == 'block' else Relationship.__annotations__
+            if repr_cls.repr_category == 'block':
+                api.blocks[123+element_nr] = repr_cls.logical_class()
+                keys = Shape.__annotations__
+            else:
+                api.relations[123+element_nr] = repr_cls.logical_class()
+                keys = Relationship.__annotations__
 
             # We check if an update to each attribute leads to an update to the REST interface
             for key, update_type in keys.items():
@@ -294,7 +296,7 @@ def test_diagram_api():
     def load_data():
         js = [{"Id": 1, "diagram": 3, "block": 4, "x": 300.0, "y": 300.0, "z": 0.0, "width": 64.0, "height": 40.0, "styling": {}, "block_cls": "BlockRepresentation", "__classname__": "_BlockRepresentation", "_entity": {"order": 0, "Id": 4, "parent": 3, "name": "Test1", "description": "A test object", "__classname__": "Block"}}
              ]
-        api = DiagramApi(3, client.explorer_classes, client.representation_classes, expo_api)
+        api = DiagramApi(3, client.explorer_classes, client.representation_classes)
         response = None
         def callback(data):
             nonlocal response
