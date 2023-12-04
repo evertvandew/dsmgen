@@ -64,6 +64,44 @@ def data_store_tests():
         ds.get_hierarchy(ondata)
 
     @test
+    def test_get_diagram():
+        add_expected_response('/data/diagram_contents/3', 'get', Response(
+            200,
+            json=[{"Id": 1, "diagram": 3, "block": 4, "x": 167.0, "y": 140.0, "z": 0.0, "width": 64.0, "height": 40.0,
+                   "styling": {"color": "yellow"}, "block_cls": "BlockRepresentation",
+                   "__classname__": "_BlockRepresentation",
+                   "_entity": {"order": 0, "Id": 4, "parent": None, "name": "Test1", "description": "This is a test block",
+                               "__classname__": "Block"}},
+                  {"Id": 2, "diagram": 3, "block": 5, "x": 369.0, "y": 382.0, "z": 0.0, "width": 64.0, "height": 40.0,
+                   "styling": {}, "block_cls": "BlockRepresentation", "__classname__": "_BlockRepresentation",
+                   "_entity": {"order": 0, "Id": 5, "parent": 2, "name": "Test2", "description": "",
+                               "__classname__": "Block"}}]
+        ))
+
+        ds = DataStore(config)
+        ok = False
+        def ondata(result):
+            nonlocal ok
+            # Check the overall structure, and some elements
+            assert len(result) == 2
+            for i, name in enumerate(['Test1', 'Test2']):
+                assert result[i].name == name
+            for i, cls in enumerate([client.BlockRepresentation, client.BlockRepresentation]):
+                assert isinstance(result[i], cls)
+            b1 = result[0]
+            assert b1.name == 'Test1'
+            assert b1.description == 'This is a test block'
+            assert b1.x == 167.0
+            assert b1.y == 140.0
+            assert b1.width == 64.0
+            assert b1.height == 40.0
+            assert b1.styling == {"color": "yellow"}
+            ok=True
+
+        ds.get_diagram_data(3, ondata)
+        assert ok
+
+    @test
     def add_modelitem():
         ds = DataStore(config)
         item = client.Block(name='Test1', description='This is a test block')
