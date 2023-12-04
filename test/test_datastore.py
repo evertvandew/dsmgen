@@ -1,5 +1,6 @@
 
 import os, subprocess
+from copy import copy
 from test_frame import prepare, test, run_tests
 from data_store import DataConfiguration, DataStore, Collection
 
@@ -140,7 +141,7 @@ def data_store_tests():
         assert not ds.cache[Collection.block]
 
     @test
-    def delete_block():
+    def delete_relationship():
         ds = DataStore(config)
         model = client.BlockReference(Id=123)
         ds.cache[Collection.relation][123] = model
@@ -152,6 +153,55 @@ def data_store_tests():
         add_expected_response('/data/BlockReference/123', 'delete', Response(204))
         ds.delete(model)
         assert not ds.cache[Collection.relation]
+
+    @test
+    def update_repr():
+        ds = DataStore(config)
+        model = client.Block(Id=123, name='Test1', description='This is a test block')
+        item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
+              name='Test1', description='This is a test block', Id=121)
+        ds.cache[Collection.block][123] = copy(model)
+        ds.cache[Collection.block_repr][121] = copy(item)
+
+        # Check the update is filtered out
+        ds.update(item)
+        assert len(expected_responses) == 0
+        assert unexpected_requests == 0
+
+        # Update the representation and check there is one and only one msg sent
+        item.x = 250
+        add_expected_response('/data/_BlockRepresentation/121', 'post', Response(201))
+        ds.update(item)
+        ds.update(item)
+        assert len(expected_responses) == 0
+        assert unexpected_requests == 0
+        # Check the cache is also updated.
+        assert ds.cache[Collection.block_repr][121] == item
+        assert id(ds.cache[Collection.block_repr][121]) != id(item), "The cache must store a copy of the submitted object"
+
+        # Update the model
+        item.name = 'Test123'
+        add_expected_response('/data/Block/123', 'post', Response(201))
+        ds.update(item)
+        ds.update(item)
+        assert len(expected_responses) == 0
+        assert unexpected_requests == 0
+        # Check the cache is also updated.
+        assert ds.cache[Collection.block][123].name == item.name
+        assert isinstance(ds.cache[Collection.block][123], client.Block)
+
+        # Update both representation and model
+        item.name = 'More Testing'
+        item.y = 399
+        add_expected_response('/data/Block/123', 'post', Response(201))
+        add_expected_response('/data/_BlockRepresentation/121', 'post', Response(201))
+        ds.update(item)
+        assert len(expected_responses) == 0
+        ds.update(item)
+        assert len(expected_responses) == 0
+        assert unexpected_requests == 0
+
+
 
 if __name__ == '__main__':
     run_tests()
