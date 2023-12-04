@@ -4,6 +4,7 @@ from copy import copy
 from test_frame import prepare, test, run_tests
 from data_store import DataConfiguration, DataStore, Collection
 import generate_project     # Ensures the client is built up to date
+from unittest.mock import Mock
 
 
 @prepare
@@ -117,7 +118,7 @@ def data_store_tests():
             return Response(201, json={'Id': 123})
 
         def check_request_repr(url, method, kwargs):
-            assert kwargs['data'] == '''{"diagram": 456, "block": 0, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
+            assert kwargs['data'] == '''{"diagram": 456, "block": 123, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/Block', 'post', get_response=check_request_model)
@@ -129,6 +130,30 @@ def data_store_tests():
         assert 121 in ds.cache[Collection.block_repr]
         assert ds.cache[Collection.block_repr][121] == item
         assert ds.cache[Collection.block][123].parent == 456
+        assert len(expected_responses) == 0
+        assert unexpected_requests == 0
+
+    @test
+    def add_repr_new_repr():
+        ds = DataStore(config)
+        item = client.BlockReferenceRepresentation(diagram=456, stereotype=2, start=Mock(Id=1, block=101), finish=Mock(Id=2, block=102), waypoints=[])
+
+        def check_request_model(url, method, kwargs):
+            assert kwargs['data'] == '{"Id": 0, "stereotype": 2, "source": 101, "target": 102, "source_multiplicity": 1, "target_multiplicity": 1, "__classname__": "BlockReference"}'
+            return Response(201, json={'Id': 123})
+
+        def check_request_repr(url, method, kwargs):
+            assert kwargs['data'] == '{"diagram": 456, "relationship": 123, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]", "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation"}'
+            return Response(201, json={'Id': 121})
+
+        add_expected_response('/data/BlockReference', 'post', get_response=check_request_model)
+        add_expected_response('/data/_RelationshipRepresentation', 'post', get_response=check_request_repr)
+        ds.add(item)
+        assert item.relationship == 123
+        assert item.Id == 121
+        assert 123 in ds.cache[Collection.relation]
+        assert 121 in ds.cache[Collection.relation_repr]
+        assert ds.cache[Collection.relation_repr][121] == item
         assert len(expected_responses) == 0
         assert unexpected_requests == 0
 
