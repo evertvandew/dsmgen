@@ -3,16 +3,13 @@ import subprocess
 import os
 from dataclasses import fields
 from test_frame import prepare, test, run_tests
+import generate_project     # Ensures the client is built up to date
 
 ###############################################################################
 ## The actual tests.
 
 @prepare
 def init():
-    for d in ['public', 'data', 'build']:
-        if not os.path.exists(d):
-            os.mkdir(d)
-    subprocess.run("../diagram_tool_generator/generate_tool.py sysml_model.py", shell=True)
     import build.sysml_model_data as dm
 
     @test

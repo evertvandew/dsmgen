@@ -3,19 +3,8 @@ import os, subprocess
 from copy import copy
 from test_frame import prepare, test, run_tests
 from data_store import DataConfiguration, DataStore, Collection
+import generate_project     # Ensures the client is built up to date
 
-def generate_tool():
-    # Generate the tool, create directories, clean up etc.
-    for d in ['public', 'build', 'build/data']:
-        if not os.path.exists(d):
-            os.mkdir(d)
-    subprocess.run("../diagram_tool_generator/generate_tool.py sysml_spec.py", shell=True)
-    if not os.path.exists('public/src'):
-        os.symlink(os.path.abspath('../public/src'), 'public/src')
-
-
-# Generate all the components of the tool.
-generate_tool()
 
 @prepare
 def data_store_tests():

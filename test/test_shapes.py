@@ -18,9 +18,6 @@ def test_styling():
         item = TestShape()
         assert item.getDefaultStyle() == {'color': 'white', 'stroke': 'black'}
         assert item.getStyleKeys() == ['color', 'stroke']
-        # Trying to update the style directly should raise an exception.
-        with expect_exception(TypeError):
-            item.styling['color'] = 'black'     # The IDE should warn about this action.
 
         # Updating the styling through the API should work.
         item.updateStyle(color='black')

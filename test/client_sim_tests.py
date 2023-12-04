@@ -16,19 +16,7 @@ from unittest.mock import Mock, MagicMock
 import diagrams
 import explorer
 from rest_api import ExtendibleJsonEncoder
-
-def generate_tool():
-    # Generate the tool, create directories, clean up etc.
-    for d in ['public', 'build', 'build/data']:
-        if not os.path.exists(d):
-            os.mkdir(d)
-    subprocess.run("../diagram_tool_generator/generate_tool.py sysml_spec.py", shell=True)
-    if not os.path.exists('public/src'):
-        os.symlink(os.path.abspath('../public/src'), 'public/src')
-
-
-# Generate all the components of the tool.
-generate_tool()
+import generate_project     # Ensures the client is built up to date
 
 
 @prepare
@@ -81,7 +69,7 @@ def simulated_client_tests():
         diagram.diagram_id = 5
         instance = client.Block(name='One', parent=3, Id=123)
         restif = Mock()
-        restif.get_elements_async = Mock(side_effect=lambda cb: cb([instance]))
+        restif.get_hierarchy = Mock(side_effect=lambda cb: cb([instance]))
         explorer.make_explorer(d['explorer'], restif)
         ev = events.DragStart()
         d['explorer'].select(f'.{explorer.name_cls}')[0].dispatchEvent(ev)

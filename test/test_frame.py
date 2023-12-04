@@ -38,11 +38,13 @@ def run_tests():
     failures = []
 
     for p in preparations:
+        print(f"Preparing: {p.__name__} in {p.__module__}")
         all_tests = []
         cleanups = []
         p()
 
         for t in all_tests:
+            print(f"Running test {t.__name__}")
             try:
                 t()
                 successes.append(t)
