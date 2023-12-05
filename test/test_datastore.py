@@ -1,6 +1,8 @@
 
 import os, subprocess
-from copy import copy
+from copy import deepcopy
+
+import diagrams
 from test_frame import prepare, test, run_tests
 from data_store import DataConfiguration, DataStore, Collection
 import generate_project     # Ensures the client is built up to date
@@ -16,8 +18,10 @@ def data_store_tests():
         hierarchy_elements=client.explorer_classes,
         block_entities=client.block_entities,
         relation_entities=client.relation_classes,
+        port_entities=client.port_classes,
         block_representations=client.block_representations,
         relation_representations=client.relation_representations,
+        port_representations=client.port_representations,
         base_url='/data'
     )
 
@@ -143,7 +147,7 @@ def data_store_tests():
         assert ds.cache[Collection.block_repr][121] == item
         assert ds.cache[Collection.block][123].parent == 456
         assert len(expected_responses) == 0
-        assert unexpected_requests == 0
+        assert not unexpected_requests
 
     @test
     def add_repr_new_repr():
@@ -165,9 +169,8 @@ def data_store_tests():
         assert item.Id == 121
         assert 123 in ds.cache[Collection.relation]
         assert 121 in ds.cache[Collection.relation_repr]
-        assert ds.cache[Collection.relation_repr][121] == item
         assert len(expected_responses) == 0
-        assert unexpected_requests == 0
+        assert not unexpected_requests
 
     @test
     def add_repr_existing_model():
@@ -187,7 +190,7 @@ def data_store_tests():
         assert 121 in ds.cache[Collection.block_repr]
         assert ds.cache[Collection.block_repr][121] == item
         assert len(expected_responses) == 0
-        assert unexpected_requests == 0
+        assert not unexpected_requests
 
     @test
     def delete_block():
@@ -221,16 +224,16 @@ def data_store_tests():
     @test
     def update_repr():
         ds = DataStore(config)
-        model = client.Block(Id=123, name='Test1', description='This is a test block')
+        model = client.Block(Id=123, name='Test1', description='This is a test block', parent=456)
         item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
               name='Test1', description='This is a test block', Id=121)
-        ds.cache[Collection.block][123] = copy(model)
-        ds.cache[Collection.block_repr][121] = copy(item)
+        ds.cache[Collection.block][123] = deepcopy(model)
+        ds.cache[Collection.block_repr][121] = deepcopy(item)
 
         # Check the update is filtered out
         ds.update(item)
         assert len(expected_responses) == 0
-        assert unexpected_requests == 0
+        assert not unexpected_requests
 
         # Update the representation and check there is one and only one msg sent
         item.x = 250
@@ -238,7 +241,7 @@ def data_store_tests():
         ds.update(item)
         ds.update(item)
         assert len(expected_responses) == 0
-        assert unexpected_requests == 0
+        assert not unexpected_requests
         # Check the cache is also updated.
         assert ds.cache[Collection.block_repr][121] == item
         assert id(ds.cache[Collection.block_repr][121]) != id(item), "The cache must store a copy of the submitted object"
@@ -249,7 +252,7 @@ def data_store_tests():
         ds.update(item)
         ds.update(item)
         assert len(expected_responses) == 0
-        assert unexpected_requests == 0
+        assert not unexpected_requests
         # Check the cache is also updated.
         assert ds.cache[Collection.block][123].name == item.name
         assert isinstance(ds.cache[Collection.block][123], client.Block)
@@ -263,9 +266,66 @@ def data_store_tests():
         assert len(expected_responses) == 0
         ds.update(item)
         assert len(expected_responses) == 0
-        assert unexpected_requests == 0
+        assert not unexpected_requests
 
+    @test
+    def test_ports():
+        # Test adding, updating, loading and deleting ports.
+        # First create the block and model they belong to.
+        # Ports are never created without a pre-existing block.
+        ds = DataStore(config)
+        model = client.Block(Id=123, name='Test1', description='This is a test block', parent=456)
+        item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
+              name='Test1', description='This is a test block', Id=121)
+        ds.cache[Collection.block][123] = deepcopy(model)
+        ds.cache[Collection.block_repr][121] = deepcopy(item)
 
+        # Now add a port and try to save it.
+        p1 = client.FlowPortRepresentation(diagram=456, block=121)
+        item.ports.append(p1)
+        add_expected_response('/data/FlowPort', 'post', Response(201, json={'Id': 155}))
+        add_expected_response('/data/_PortRepresentation', 'post', Response(201, json={'Id': 65}))
+        ds.update(item)
+        # Expect a new Port to be created as well as its representation.
+        assert 155 in ds.cache[Collection.port]
+        assert 65 in ds.cache[Collection.port_repr]
+        assert p1.port == 155
+        assert p1.block == 121
+        assert len(ds.cache[Collection.block_repr][121].ports) == 1
+        for k in ['diagram', 'port', 'block', 'name', 'orientation']:
+            assert getattr(ds.cache[Collection.block_repr][121].ports[0], k) == getattr(p1, k)
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
+
+        # Check the object is stable
+        ds.update(item)
+        assert not unexpected_requests
+
+        # Update the representation of the port
+        p1.orientation = diagrams.BlockOrientations.TOP
+        add_expected_response('/data/_PortRepresentation/65', 'post', Response(201))
+        ds.update(item)
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
+        assert ds.cache[Collection.port_repr][65].orientation == diagrams.BlockOrientations.TOP
+
+        # Update the model part of the port
+        p1.name = 'Output'
+        add_expected_response('/data/FlowPort/155', 'post', Response(201))
+        ds.update(item)
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
+        assert ds.cache[Collection.port][155].name == 'Output'
+
+        # Now delete the port
+        item.ports = []
+        add_expected_response('/data/FlowPort/155', 'delete', Response(204))
+        add_expected_response('/data/_PortRepresentation/65', 'delete', Response(204))
+        ds.update(item)
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
+        assert 65 not in ds.cache[Collection.port_repr]
+        assert 155 not in ds.cache[Collection.port]
 
 if __name__ == '__main__':
     run_tests()

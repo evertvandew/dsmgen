@@ -17,7 +17,7 @@ import os, os.path
 import sys
 import importlib
 from dataclasses import fields
-from typing import Self, Any
+from typing import Self, Any, List, Dict
 from itertools import chain
 
 from mako.template import Template
@@ -97,6 +97,21 @@ class Generator:
         children = [n for n in self.children[name] if n not in relationships]
 
         return children
+
+    def get_allowed_ports(self) -> Dict[str, List[str]]:
+        """ Determine which blocks can have which ports.
+            Returns a dictionary of the names of blocks and a list of port types
+        """
+        result = {}
+        for p in mdef.model_definition.port:
+            # Assume the parent property is an XRef.
+            for b in p.__annotations__['parent'].types:
+                if isinstance(b, mdef.OptionalAnnotation):
+                    continue
+                l = result.setdefault(b.__name__, [])
+                l.append(p.__name__)
+        return result
+
 
     def get_diagram_attributes(self, cls):
         """ Retrieve the attributes of a class that a intended for editing by a user. """

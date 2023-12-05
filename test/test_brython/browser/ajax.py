@@ -21,15 +21,14 @@ class Response:
 class ExpectedResponse:
     url: str
     method: str
-    get_response: Optional[Callable] # A function to be called to check the request & determine the response
-    response: Optional[Response]
-    reuse: bool                 # If True, the response will always be the same.
+    get_response: Optional[Callable] = None # A function to be called to check the request & determine the response
+    response: Optional[Response] = None
+    reuse: bool = False                # If True, the response will always be the same.
 
 expected_responses: List[ExpectedResponse] = []
-unexpected_requests: int = 0
+unexpected_requests: List[ExpectedResponse] = []
 
 def determine_response(url, method, kwargs):
-    global unexpected_requests
     index = None
     for i, r in enumerate(expected_responses):
         if r.url == url and r.method == method:
@@ -37,7 +36,7 @@ def determine_response(url, method, kwargs):
             break
     if index is None:
         response = Response(408)  # Timeout return code
-        unexpected_requests += 1
+        unexpected_requests.append(ExpectedResponse(url=url, method=method, response=Response(408, kwargs)))
     else:
         expected = expected_responses[index]
         if not expected.reuse:

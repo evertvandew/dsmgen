@@ -55,12 +55,15 @@ class ${entity.__name__}:
 
 ## Create the representations of the various blocks and relationships
 # Representations of the various graphical elements
-% for cls in generator.md.entity + generator.md.port:
+% for cls in generator.md.entity:
 @dataclass
 class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 'Block')}):
     Id: shapes.HIDDEN = 0
     diagram: shapes.HIDDEN = 0
     block: shapes.HIDDEN = 0
+    % if cls.__name__ in generator.get_allowed_ports():
+    ports: diagrams.CP = field(default_factory=list)
+    % endif
     % for attr in generator.get_diagram_attributes(cls):
     ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
@@ -75,6 +78,27 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
 
 % endfor
 
+
+% for cls in generator.md.port:
+@dataclass
+class ${cls.__name__}Representation(diagrams.CP):
+    Id: shapes.HIDDEN = 0
+    diagram: shapes.HIDDEN = 0
+    port: shapes.HIDDEN = 0
+    block: shapes.HIDDEN = 0
+    % for attr in generator.get_diagram_attributes(cls):
+    ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
+    % endfor
+
+    shape_type = shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
+
+    logical_class = ${cls.__name__}
+
+    @classmethod
+    def repr_category(cls):
+        return 'port'
+
+% endfor
 
 <%
     def get_relationship_type(field_type):
@@ -122,6 +146,8 @@ allowed_children = {
     % endfor
 }
 
+allowed_ports = ${repr(generator.get_allowed_ports())}
+
 diagram_definitions = {
     % for cls in generator.md.diagrams:
     "${cls.__name__}": ${cls.__name__}Representation,
@@ -142,13 +168,20 @@ relation_classes = {
     <% lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.relationship] %>
     ${',\n    '.join(lines)}
 }
-
+port_classes = {
+    <% lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.port] %>
+    ${',\n    '.join(lines)}
+}
 block_representations = {
     <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.entity] %>
     ${',\n    '.join(lines)}
 }
 relation_representations = {
     <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.relationship] %>
+    ${',\n    '.join(lines)}
+}
+port_representations = {
+    <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.port] %>
     ${',\n    '.join(lines)}
 }
 
@@ -189,8 +222,10 @@ def run(explorer, canvas, details):
         hierarchy_elements=explorer_classes,
         block_entities=block_entities,
         relation_entities=relation_classes,
+        port_entities=port_classes,
         block_representations=block_representations,
         relation_representations=relation_representations,
+        port_representations=port_representations,
         base_url='/data'
     )
 

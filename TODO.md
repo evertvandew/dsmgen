@@ -1,4 +1,15 @@
 
+
+# Feature support for ports:
+* When loading a diagram, also load the associated ports
+* When dropping a block with ports, also drop representations for the ports
+- Generate Port representations
+- Generate a list of allowed ports for each block
+- Generate blocks with ports a special variable to contain them
+- Add a PortRepresentation to the database model
+- In the client, treat ports as sub-blocks when persisting new or updated blocks
+
+
 # Bugs:
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
 * Some exceptions occur when manipulating connections.
