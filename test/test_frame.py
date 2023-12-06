@@ -6,6 +6,7 @@ Inspired by some testing frameworks in Javascript. Very simple and extendible.
 import logging
 import sys
 from contextlib import contextmanager
+from fnmatch import fnmatch
 
 all_tests = []
 executed_tests = []
@@ -32,18 +33,29 @@ def prepare(func):
 def cleanup(func):
     cleanups.append(func)
 
-def run_tests():
+def run_tests(*filters):
     global all_tests, cleanups
     successes = []
     failures = []
 
+    filters = [f.split('.') for f in filters]
+
     for p in preparations:
+        path = p.__name__
+
+        if filters:
+            if not any(fnmatch(path, f[0]) for f in filters):
+                continue
+
         print(f"Preparing: {p.__name__} in {p.__module__}")
         all_tests = []
         cleanups = []
         p()
 
         for t in all_tests:
+            if filters:
+                if not any(fnmatch(t.__name__, f[1]) for f in filters):
+                    continue
             print(f"Running test {t.__name__}")
             try:
                 t()
@@ -52,7 +64,7 @@ def run_tests():
                 logging.exception('Test failed:')
                 failures.append(t)
 
-        executed_tests.extend(all_tests)
+            executed_tests.append(t)
 
         # Cleanup is in reversed order, hopefully keeping dependencies alive while needed.
         for p in reversed(cleanups):

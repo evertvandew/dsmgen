@@ -31,15 +31,14 @@ def simulated_client_tests():
     d <= html.DIV(id='canvas')
     d <= html.DIV(id='details')
 
-    def empty_diagram():
+    def new_diagram(diagram_id, diagram_api):
         container = d['canvas']
         container.html = ''
         svg = html.SVG()
         svg.classList.add('diagram')
         container <= svg
-        diagram_api = MagicMock()
         diagram = diagrams.load_diagram(
-            1,
+            diagram_id,
             client.diagram_definitions['BlockDefinitionDiagram'],
             diagram_api,
             svg,
@@ -50,7 +49,7 @@ def simulated_client_tests():
 
     @test
     def create_and_move_block():
-        diagram, rest = empty_diagram()
+        diagram, rest = new_diagram(1, MagicMock())
         instance = client.BlockRepresentation(name='', x=300, y=300, height=64, width=100, block=1, Id=1)
         diagram.addBlock(instance)
         assert len(diagram.children) == 1
@@ -65,7 +64,7 @@ def simulated_client_tests():
 
     @test
     def drag_and_drop():
-        diagram, rest = empty_diagram()
+        diagram, rest = new_diagram(1, MagicMock())
         diagram.diagram_id = 5
         instance = client.Block(name='One', parent=3, Id=123)
         restif = Mock()
@@ -85,4 +84,55 @@ def simulated_client_tests():
         assert repr.diagram == 5
         assert repr.block == 123
 
-run_tests()
+    @test
+    def load_diagram():
+        from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses
+        from data_store import DataConfiguration, DataStore, Collection
+        import public.sysml_client as client
+
+        config = DataConfiguration(
+            hierarchy_elements=client.explorer_classes,
+            block_entities=client.block_entities,
+            relation_entities=client.relation_classes,
+            port_entities=client.port_classes,
+            block_representations=client.block_representations,
+            relation_representations=client.relation_representations,
+            port_representations=client.port_representations,
+            base_url='/data'
+        )
+
+        ds = DataStore(config)
+
+        add_expected_response('/data/diagram_contents/3', 'get', Response(
+            200,
+            json=[{"Id": 1, "diagram": 3, "block": 4, "x": 401.0, "y": 104.0, "z": 0.0, "width": 64.0, "height": 40.0,
+                   "styling": {"color": "yellow"}, "block_cls": "BlockRepresentation",
+                   "__classname__": "_BlockRepresentation",
+                   "_entity": {"order": 0, "Id": 4, "parent": None, "name": "Test1",
+                               "description": "This is a test block",
+                               "__classname__": "Block"}},
+                  {"Id": 2, "diagram": 3, "block": 5, "x": 369.0, "y": 345.0, "z": 0.0, "width": 64.0, "height": 40.0,
+                   "styling": {}, "block_cls": "BlockRepresentation", "__classname__": "_BlockRepresentation",
+                   "_entity": {"order": 0, "Id": 5, "parent": 2, "name": "Test2", "description": "",
+                               "__classname__": "Block"}},
+                  {"Id": 3, "diagram": 3, "block": 7, "x": 101.0, "y": 360.0, "z": 0.0, "width": 110.0, "height": 65.0,
+                   "styling": {"bordercolor": "#000000", "bordersize": "2", "blockcolor": "#fffbd6", "fold_size": "10",
+                               "font": "Arial", "fontsize": "16", "textcolor": "#000000", "xmargin": 2, "ymargin": 2,
+                               "halign": 11, "valign": 2}, "block_cls": "NoteRepresentation",
+                   "__classname__": "_BlockRepresentation",
+                   "_entity": {"order": 0, "Id": 7, "description": "Dit is een commentaar", "parent": 3,
+                               "__classname__": "Note"}},
+                  {"Id": 1, "diagram": 3, "relationship": 1, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]",
+                   "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation",
+                   "_entity": {"Id": 1, "stereotype": 1, "source": 4, "target": 5, "source_multiplicity": 1,
+                               "target_multiplicity": 1, "__classname__": "BlockReference"}},
+                  {"Id": 5, "diagram": 3, "port": 10, "block": 2, "__classname__": "_PortRepresentation",
+                   "port_cls": "FlowPortRepresentation",
+                   "_entity": {"Id": 10, "parent": 5, "__classname__": "FlowPort"}}
+                  ]))
+        diagram, rest = new_diagram(3, ds)
+        assert len(expected_responses) == 0
+        assert not unexpected_requests
+
+if __name__ == '__main__':
+    run_tests("simulated_client_tests.load_diagram")

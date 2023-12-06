@@ -32,6 +32,8 @@
   Use a more centralized approach where actions are detected and lead to centralized sequences being run to handle the change.
 
 # Future enhancements
+* Allow styling of ports
+* Let e.g. directionality of a port affect its rendering
 * Support styling multiple objects at once
 * Button for copying styling from object to object(s)
 * Support wide open lines

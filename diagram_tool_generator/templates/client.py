@@ -62,7 +62,7 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
     diagram: shapes.HIDDEN = 0
     block: shapes.HIDDEN = 0
     % if cls.__name__ in generator.get_allowed_ports():
-    ports: diagrams.CP = field(default_factory=list)
+    ports: [diagrams.CP] = field(default_factory=list)
     % endif
     % for attr in generator.get_diagram_attributes(cls):
     ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
@@ -76,12 +76,18 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
     def repr_category(cls):
         return 'block'
 
+    % if cls.__name__ in generator.get_allowed_ports():
+    @classmethod
+    def get_allowed_ports(cls):
+        return [${", ".join(f'{c}Representation' for c in generator.get_allowed_ports()[cls.__name__])}]
+    % endif
+
 % endfor
 
 
 % for cls in generator.md.port:
 @dataclass
-class ${cls.__name__}Representation(diagrams.CP):
+class ${cls.__name__}Representation(diagrams.FlowPort):
     Id: shapes.HIDDEN = 0
     diagram: shapes.HIDDEN = 0
     port: shapes.HIDDEN = 0

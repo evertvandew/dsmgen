@@ -4,7 +4,10 @@ from dataclasses import dataclass
 from .html import SVG
 
 class svg_tag(SVG):
+    int_values = 'x y x1 x2 y1 y2 cx cy r rx ry width height'.split()
     def __setitem__(self, key, value):
+        if key in self.int_values:
+            assert type(value) in [int, str], f"Attribute {key} of {self.svg_values} must be either an int or a str"
         self.attr[key] = value
     def __getitem__(self, key):
         return self.attr[key]

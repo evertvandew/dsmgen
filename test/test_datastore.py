@@ -80,19 +80,21 @@ def data_store_tests():
                   {"Id": 1, "diagram": 3, "relationship": 1, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]",
                    "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation",
                    "_entity": {"Id": 1, "stereotype": 1, "source": 4, "target": 5, "source_multiplicity": 1,
-                               "target_multiplicity": 1, "__classname__": "BlockReference"}}]
-        ))
+                               "target_multiplicity": 1, "__classname__": "BlockReference"}},
+                  {"Id": 5, "diagram": 3, "port": 10, "block": 2, "__classname__": "_PortRepresentation", "block_cls": "FlowPortRepresentation",
+                   "_entity": {"Id": 10, "parent": 5, "__classname__": "FlowPort"}}
+                  ]))
 
         ds = DataStore(config)
         ok = False
         def ondata(result):
             nonlocal ok
             # Check the overall structure, and some elements
-            assert len(result) == 4
+            assert len(result) == 5
             for i, name in enumerate(['Test1', 'Test2']):
                 assert result[i].name == name
             for i, cls in enumerate([client.BlockRepresentation, client.BlockRepresentation, client.NoteRepresentation,
-                                     client.BlockReferenceRepresentation]):
+                                     client.FlowPortRepresentation, client.BlockReferenceRepresentation]):
                 assert isinstance(result[i], cls)
             b1 = result[0]
             assert b1.name == 'Test1'
@@ -281,11 +283,14 @@ def data_store_tests():
         ds.cache[Collection.block_repr][121] = deepcopy(item)
 
         # Now add a port and try to save it.
-        p1 = client.FlowPortRepresentation(diagram=456, block=121)
+        p1 = client.FlowPortRepresentation()
         item.ports.append(p1)
         add_expected_response('/data/FlowPort', 'post', Response(201, json={'Id': 155}))
         add_expected_response('/data/_PortRepresentation', 'post', Response(201, json={'Id': 65}))
         ds.update(item)
+        # Expect the most important fields to be set by the datastore
+        assert p1.block == 121
+        assert p1.diagram == 456
         # Expect a new Port to be created as well as its representation.
         assert 155 in ds.cache[Collection.port]
         assert 65 in ds.cache[Collection.port_repr]

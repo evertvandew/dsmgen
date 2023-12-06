@@ -184,7 +184,8 @@ def diagram_contents(index):
         # Get the representations shown in the diagram.
         block_reps = session.query(dm._BlockRepresentation, dm._Entity).filter(dm._BlockRepresentation.diagram==index).join(dm._Entity, onclause=dm._BlockRepresentation.block==dm._Entity.Id).all()
         relat_reps = session.query(dm._RelationshipRepresentation, dm._Relationship).filter(dm._RelationshipRepresentation.diagram==index).join(dm._Relationship).all()
-        data = [(r[0].asdict(), r[1].asdict()) for r in block_reps+relat_reps]
+        port_reps = session.query(dm._PortRepresentation, dm._Entity).filter(dm._PortRepresentation.diagram==index).join(dm._Entity, onclause=dm._PortRepresentation.port==dm._Entity.Id).all()
+        data = [(r[0].asdict(), r[1].asdict()) for r in block_reps+relat_reps+port_reps]
 
     # Decode the details in each Entity
     for r in data:
