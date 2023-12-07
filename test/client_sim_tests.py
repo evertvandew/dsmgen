@@ -20,7 +20,7 @@ import generate_project     # Ensures the client is built up to date
 
 
 @prepare
-def simulated_client_tests():
+def simulated_diagram_tests():
 
     import public.sysml_client as client
 
@@ -134,5 +134,55 @@ def simulated_client_tests():
         assert len(expected_responses) == 0
         assert not unexpected_requests
 
+@prepare
+def simulated_explorer_tests():
+    from data_store import DataConfiguration, DataStore, Collection
+    from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses
+    from browser import events
+    import public.sysml_client as client
+    from explorer import make_explorer
+
+    # Set the context for the diagram editor. Normally this is in the HTML file.
+    from browser import document as d
+    from browser import html
+    d <= html.DIV(id='explorer')
+    d <= html.DIV(id='canvas')
+    d <= html.DIV(id='details')
+
+    config = DataConfiguration(
+        hierarchy_elements=client.explorer_classes,
+        block_entities=client.block_entities,
+        relation_entities=client.relation_classes,
+        port_entities=client.port_classes,
+        block_representations=client.block_representations,
+        relation_representations=client.relation_representations,
+        port_representations=client.port_representations,
+        base_url='/data'
+    )
+
+    @test
+    def right_click_menu():
+        ds = DataStore(config)
+        add_expected_response('/data/hierarchy', 'get', Response(
+            200,
+            json=[
+                {"order": 0, "Id": 1, "name": "Functional Model", "description": "", "parent": None,
+              "__classname__": "FunctionalModel"},
+                {"order": 0, "Id": 2, "name": "Structural Model", "description": "", "parent": None,
+              "__classname__": "StructuralModel"},
+                {"order": 0, "Id": 3, "entities": [], "parent": 2, "name": "test",
+                                                    "__classname__": "BlockDefinitionDiagram"},
+
+            ]))
+        make_explorer(d['explorer'], ds, client.allowed_children)
+        # Get the second line in the explorer and right-click it.
+        lines = d.get(selector='.eline [draggable="true"]')
+        assert len(lines) == 3
+        l = lines[1]
+        l.dispatchEvent(events.ContextMenu())
+        options = d.select('UL [text="Create"] LI')
+        pass
+
+
 if __name__ == '__main__':
-    run_tests("simulated_client_tests.load_diagram")
+    run_tests("simulated_explorer_tests.*")

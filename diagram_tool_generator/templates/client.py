@@ -29,7 +29,7 @@ from enum import IntEnum
 from inspect import getmro
 import diagrams
 import shapes
-from property_editor import dataClassEditor, longstr
+from property_editor import dataClassEditor, longstr, OptionalRef
 from data_store import DataStore, DataConfiguration
 
 
@@ -152,7 +152,11 @@ allowed_children = {
     % endfor
 }
 
-allowed_ports = ${repr(generator.get_allowed_ports())}
+allowed_ports = {
+    % for name, clss in generator.get_allowed_ports().items():
+    "${name}": [${', '.join(f'{c}Representation' for c in clss)}],
+    % endfor
+}
 
 diagram_definitions = {
     % for cls in generator.md.diagrams:
@@ -267,7 +271,7 @@ def run(explorer, canvas, details):
 
     data_store.bind('dblclick', on_explorer_dblclick)
     data_store.bind('click', on_explorer_click)
-    make_explorer(blank, data_store)
+    make_explorer(blank, data_store, allowed_children)
 
     @bind(blank, 'click')
     def close_contextmenu(ev):

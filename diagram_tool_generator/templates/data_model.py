@@ -153,7 +153,7 @@ class _PortRepresentation(Base):
     orientation: int = Column(Integer)
     order: int = Column(Integer)
     styling: str = Column(String)
-    block_cls: str = Column(String)
+    port_cls: str = Column(String)
 
     def post_init(self):
         """ In the database, styling is stored as a string. """

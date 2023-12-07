@@ -106,7 +106,7 @@ class Generator:
         for p in mdef.model_definition.port:
             # Assume the parent property is an XRef.
             for b in p.__annotations__['parent'].types:
-                if isinstance(b, mdef.OptionalAnnotation):
+                if issubclass(b, mdef.OptionalAnnotation):
                     continue
                 l = result.setdefault(b.__name__, [])
                 l.append(p.__name__)
@@ -152,6 +152,8 @@ class Generator:
         if isinstance(field_type, mdef.selection):
             return f'IntEnum("InstantEnum", "{" ".join(field_type.options)}")'
         if isinstance(field_type, mdef.XRef):
+            if mdef.optional in field_type.types:
+                return 'OptionalRef(int)'
             return 'int'
         return field_type.__name__
 

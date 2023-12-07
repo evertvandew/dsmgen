@@ -3,6 +3,7 @@
 from typing import Self, Iterable, List, Dict, Callable
 from enum import Enum
 import re
+from copy import copy
 from dataclasses import dataclass
 from test_frame import prepare, test, run_tests
 from .events import Event
@@ -58,7 +59,7 @@ class UniversalSelector(BaseSelector):
 
 class TypeSelector(BaseSelector):
     def test(self, node):
-        return node.tagname() == self.name
+        return node.tagname().lower() == self.name.lower()
 
 class ClassSelector(BaseSelector):
     def test(self, node):
@@ -149,7 +150,7 @@ class SelectorCombinator:
             case Combinator.Descendant:
                 for item in flatten(node):
                     if self.a.test(item):
-                        yield from self.b.filter(item)
+                        yield from self.b.filter(item.children)
             case _:
                 RuntimeError("Combinator not (yet) supported")
 
@@ -169,23 +170,24 @@ def parse_selector(s):
     liststack = []
     selector = None
     while s:
+        start_s = copy(s)
         # Parse the various selectors
         if s[0] == '*':
             selector = UniversalSelector()
             s = s[1:]
-        elif m := re.match(r'::(\w+)', s):
+        elif m := re.match(r'::([\w-]+)', s):
             selector.pe = m.group(1)
             s = s[m.span()[1]:]
-        elif m := re.match(r':(\w+)', s):
+        elif m := re.match(r':([\w-]+)', s):
             selector.pc = m.group(1)
             s = s[m.span()[1]:]
-        elif m := re.match(r'(\w+)', s):
+        elif m := re.match(r'([\w-]+)', s):
             selector = TypeSelector(m.group(1))
             s = s[m.span()[1]:]
-        elif m := re.match(r'[.](\w+)', s):
+        elif m := re.match(r'[.]([\w-]+)', s):
             selector = ClassSelector(m.group(1))
             s = s[m.span()[1]:]
-        elif m := re.match(r'#(\w+)', s):
+        elif m := re.match(r'#([\w-]+)', s):
             selector = IdSelector(m.group(1))
             s = s[m.span()[1]:]
         elif m := re.match(r'\[(.+?)\]', s):
@@ -199,12 +201,14 @@ def parse_selector(s):
             s = s[m.span()[1]:]
         else:
             for comb in Combinator:
-                if m := re.match(r'\s*'+comb.value+r'\s*', s):
+                if m := re.match(r'\s*?'+comb.value+r'\s*', s):
                     s = s[m.span()[1]:]
                     part2 = parse_selector(s)
                     s = ''
                     selector = SelectorCombinator(selector, part2, comb)
                     break
+        if s == start_s:
+            raise RuntimeError("Unable to parse selector")
     if liststack:
         liststack.append(selector)
         return SelectorList(liststack)
@@ -220,6 +224,7 @@ class tag:
         self.children = []
         self.parent = None
         self.subscribers: Dict[str, List[Callable]] = {}
+        self.style = {}
         if content:
             if isinstance(content, str):
                 if '<' in content:
@@ -231,11 +236,23 @@ class tag:
                 self.children = list(content)
             else:
                 raise RuntimeError("Unrecognized content")
+        if 'className' in kwargs:
+            kwargs['Class'] = kwargs['className']
         self.attr = kwargs
         self.classList = set(self.attr.get('Class', '').split())
+        if 'style' in kwargs:
+            if isinstance(kwargs['style'], str):
+                self.style = {k:v for k, v in [l.strip().split(':', maxsplit=1) for l in kwargs['style'].split(';')]}
+            else:
+                assert isinstance(kwargs['style'], dict)
+                self.style = kwargs['style']
 
     def __le__(self, other: Self|str|Iterable):
         if isinstance(other, tag):
+            # Check if the element is moved to another place.
+            if other.parent:
+                other.parent.children.remove(other)
+                other.parent = None
             self.children.append(other)
             other.parent = self
         elif isinstance(other, str):
@@ -248,6 +265,35 @@ class tag:
         for item in flatten(self):
             if item.attr.get('id', '') == key:
                 return item
+        # Raise an IndexError so that the "in" operator will work.
+        # The KeyError is not handled by the "in" operator.
+        raise IndexError(f'Id {key} not found')
+
+    def __delitem__(self, key):
+        try:
+            item = self[key]
+            parent = item.parent
+            parent.children.remove(item)
+        except IndexError:
+            return
+
+    def __add__(self, other):
+        if isinstance(other, tag):
+            self <= other
+        elif isinstance(other, str):
+            assert '<' not in other, "HTML is not (yet) supported"
+            self.text += other
+        else:
+            raise RuntimeError(f'Cannot add object of type {type(other).__name__} to tag')
+        return self
+
+    @property
+    def className(self):
+        return self.attr.get('Class', '')
+    @className.setter
+    def className(self, name):
+        self.attr['Class'] = name
+        self.classList = set(self.attr.get('Class', '').split())
 
     @property
     def html(self):
@@ -265,14 +311,26 @@ class tag:
     def get(self, **kwargs):
         if 'selector' in kwargs:
             selector = parse_selector(kwargs['selector'])
-            return list(selector.filter(self))
+            return list(set(selector.filter(self)))
         items = list(flatten(self.children))
         for key, value in kwargs.items():
             items = [c for c in items if getattr(c, key, '') == value]
         return items
 
+    def clear(self):
+        self.children = []
+
+    def remove(self):
+        # Unlink this element from the document DOM.
+        if self.parent:
+            self.parent.children.remove(self)
+
     def select(self, key):
         return self.get(selector=key)
+
+    def select_one(self, key):
+        result = self.select(key)
+        return result[0] if result else None
 
     def tagname(self):
         return type(self).__name__
@@ -325,7 +383,15 @@ class BIG(tag): pass
 
 class BLOCKQUOTE(tag): pass
 
-class BODY(tag): pass
+class BODY(tag):
+    def getElementById(self, id: str):
+        return self[id]
+
+    def createElement(self, tagName: str):
+        cls = globals()[tagName.upper()]
+        return cls()
+    def appendChild(self, element):
+        self.children.append(element)
 
 class BR(tag): pass
 
@@ -393,7 +459,10 @@ class IFRAME(tag): pass
 
 class IMG(tag): pass
 
-class INPUT(tag): pass
+class INPUT(tag):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.value = 0 if self.attr.get('type', 'text') == 'number' else ''
 
 class INS(tag): pass
 
@@ -441,7 +510,10 @@ class SAMP(tag): pass
 
 class SCRIPT(tag): pass
 
-class SELECT(tag): pass
+class SELECT(tag):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.value = 0
 
 class SMALL(tag): pass
 
@@ -572,7 +644,13 @@ class WBR(tag): pass
 
 class DETAILS(tag): pass
 
-class DIALOG(tag): pass
+class DIALOG(tag):
+    def showModal(self):
+        if not self.parent:
+            document <= self
+
+    def close(self):
+        pass
 
 class MENUITEM(tag): pass
 
