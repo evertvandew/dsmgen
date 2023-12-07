@@ -194,7 +194,7 @@ class Generator:
     def get_connections_from(self):
         """ Determine which connections can be started from the specific class. """
         all_connections = []
-        for cls in mdef.model_definition.entity:
+        for cls in mdef.model_definition.entity + mdef.model_definition.port:
             connections = [c for c in mdef.model_definition.relationship if cls in c.__annotations__['source'].types]
             options = {}
             for c in connections:
