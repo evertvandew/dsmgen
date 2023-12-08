@@ -247,6 +247,10 @@ class tag:
                 assert isinstance(kwargs['style'], dict)
                 self.style = kwargs['style']
 
+    def __repr__(self):
+        children = ''.join(str(c) for c in self.children)
+        return f"{self.tagname()}({self.text} {children})"
+
     def __le__(self, other: Self|str|Iterable):
         if isinstance(other, tag):
             # Check if the element is moved to another place.

@@ -27,6 +27,7 @@ def simulated_diagram_tests():
     # Set the context for the diagram editor. Normally this is in the HTML file.
     from browser import document as d
     from browser import html
+    d.clear()
     d <= html.DIV(id='explorer')
     d <= html.DIV(id='canvas')
     d <= html.DIV(id='details')
@@ -69,7 +70,7 @@ def simulated_diagram_tests():
         instance = client.Block(name='One', parent=3, Id=123)
         restif = Mock()
         restif.get_hierarchy = Mock(side_effect=lambda cb: cb([instance]))
-        explorer.make_explorer(d['explorer'], restif)
+        explorer.make_explorer(d['explorer'], restif, client.allowed_children)
         ev = events.DragStart()
         d['explorer'].select(f'.{explorer.name_cls}')[0].dispatchEvent(ev)
         assert ev.dataTransfer.data
@@ -126,8 +127,8 @@ def simulated_diagram_tests():
                    "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation",
                    "_entity": {"Id": 1, "stereotype": 1, "source": 4, "target": 5, "source_multiplicity": 1,
                                "target_multiplicity": 1, "__classname__": "BlockReference"}},
-                  {"Id": 5, "diagram": 3, "port": 10, "block": 2, "__classname__": "_PortRepresentation",
-                   "port_cls": "FlowPortRepresentation",
+                  {"Id": 51, "diagram": 3, "block": 10, "parent": 2, "__classname__": "_BlockRepresentation",
+                   "block_cls": "FlowPortRepresentation",
                    "_entity": {"Id": 10, "parent": 5, "__classname__": "FlowPort"}}
                   ]))
         diagram, rest = new_diagram(3, ds)
@@ -137,7 +138,7 @@ def simulated_diagram_tests():
 @prepare
 def simulated_explorer_tests():
     from data_store import DataConfiguration, DataStore, Collection
-    from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses
+    from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses, clear_expected_response
     from browser import events
     import public.sysml_client as client
     from explorer import make_explorer
@@ -145,6 +146,7 @@ def simulated_explorer_tests():
     # Set the context for the diagram editor. Normally this is in the HTML file.
     from browser import document as d
     from browser import html
+    d.clear()
     d <= html.DIV(id='explorer')
     d <= html.DIV(id='canvas')
     d <= html.DIV(id='details')
@@ -163,6 +165,8 @@ def simulated_explorer_tests():
     @test
     def right_click_menu():
         ds = DataStore(config)
+
+        clear_expected_response()
         add_expected_response('/data/hierarchy', 'get', Response(
             200,
             json=[

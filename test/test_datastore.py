@@ -81,7 +81,7 @@ def data_store_tests():
                    "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation",
                    "_entity": {"Id": 1, "stereotype": 1, "source": 4, "target": 5, "source_multiplicity": 1,
                                "target_multiplicity": 1, "__classname__": "BlockReference"}},
-                  {"Id": 5, "diagram": 3, "port": 10, "block": 2, "__classname__": "_PortRepresentation", "block_cls": "FlowPortRepresentation",
+                  {"Id": 51, "diagram": 3, "block": 10, "parent": 2, "__classname__": "_BlockRepresentation", "block_cls": "FlowPortRepresentation",
                    "_entity": {"Id": 10, "parent": 5, "__classname__": "FlowPort"}}
                   ]))
 
@@ -90,12 +90,12 @@ def data_store_tests():
         def ondata(result):
             nonlocal ok
             # Check the overall structure, and some elements
-            assert len(result) == 5
+            assert len(result) == 4
             for i, name in enumerate(['Test1', 'Test2']):
                 assert result[i].name == name
             for i, cls in enumerate([client.BlockRepresentation, client.BlockRepresentation, client.NoteRepresentation,
-                                     client.FlowPortRepresentation, client.BlockReferenceRepresentation]):
-                assert isinstance(result[i], cls)
+                                     client.BlockReferenceRepresentation]):
+                assert isinstance(result[i], cls), f"i={i}, expected={cls.__name__} -- actual={result[i]}"
             b1 = result[0]
             assert b1.name == 'Test1'
             assert b1.description == 'This is a test block'
@@ -136,7 +136,7 @@ def data_store_tests():
             return Response(201, json={'Id': 123})
 
         def check_request_repr(url, method, kwargs):
-            assert kwargs['data'] == '''{"diagram": 456, "block": 123, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
+            assert kwargs['data'] == '''{"diagram": 456, "block": 123, "parent": 0, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/Block', 'post', get_response=check_request_model)
@@ -182,7 +182,7 @@ def data_store_tests():
         item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
               name='Test1', description='This is a test block')
         def check_request_repr(url, method, kwargs):
-            assert kwargs['data'] == '''{"diagram": 456, "block": 123, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
+            assert kwargs['data'] == '''{"diagram": 456, "block": 123, "parent": 0, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/_BlockRepresentation', 'post', get_response=check_request_repr)
@@ -286,18 +286,19 @@ def data_store_tests():
         p1 = client.FlowPortRepresentation()
         item.ports.append(p1)
         add_expected_response('/data/FlowPort', 'post', Response(201, json={'Id': 155}))
-        add_expected_response('/data/_PortRepresentation', 'post', Response(201, json={'Id': 65}))
+        add_expected_response('/data/_BlockRepresentation', 'post', Response(201, json={'Id': 65}))
         ds.update(item)
         # Expect the most important fields to be set by the datastore
-        assert p1.block == 121
+        assert p1.block == 155
+        assert p1.parent == 121
         assert p1.diagram == 456
         # Expect a new Port to be created as well as its representation.
-        assert 155 in ds.cache[Collection.port]
-        assert 65 in ds.cache[Collection.port_repr]
-        assert p1.port == 155
-        assert p1.block == 121
+        assert 155 in ds.cache[Collection.block]
+        assert 65 in ds.cache[Collection.block_repr]
+        assert p1.block == 155
+        assert p1.parent == 121
         assert len(ds.cache[Collection.block_repr][121].ports) == 1
-        for k in ['diagram', 'port', 'block', 'name', 'orientation']:
+        for k in ['diagram', 'parent', 'block', 'name', 'orientation']:
             assert getattr(ds.cache[Collection.block_repr][121].ports[0], k) == getattr(p1, k)
         assert not unexpected_requests
         assert len(expected_responses) == 0
@@ -308,11 +309,11 @@ def data_store_tests():
 
         # Update the representation of the port
         p1.orientation = diagrams.BlockOrientations.TOP
-        add_expected_response('/data/_PortRepresentation/65', 'post', Response(201))
+        add_expected_response('/data/_BlockRepresentation/65', 'post', Response(201))
         ds.update(item)
         assert not unexpected_requests
         assert len(expected_responses) == 0
-        assert ds.cache[Collection.port_repr][65].orientation == diagrams.BlockOrientations.TOP
+        assert ds.cache[Collection.block_repr][65].orientation == diagrams.BlockOrientations.TOP
 
         # Update the model part of the port
         p1.name = 'Output'
@@ -320,17 +321,17 @@ def data_store_tests():
         ds.update(item)
         assert not unexpected_requests
         assert len(expected_responses) == 0
-        assert ds.cache[Collection.port][155].name == 'Output'
+        assert ds.cache[Collection.block][155].name == 'Output'
 
         # Now delete the port
         item.ports = []
         add_expected_response('/data/FlowPort/155', 'delete', Response(204))
-        add_expected_response('/data/_PortRepresentation/65', 'delete', Response(204))
+        add_expected_response('/data/_BlockRepresentation/65', 'delete', Response(204))
         ds.update(item)
         assert not unexpected_requests
         assert len(expected_responses) == 0
-        assert 65 not in ds.cache[Collection.port_repr]
-        assert 155 not in ds.cache[Collection.port]
+        assert 65 not in ds.cache[Collection.block_repr]
+        assert 155 not in ds.cache[Collection.block]
 
 if __name__ == '__main__':
     run_tests()

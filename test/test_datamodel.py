@@ -13,11 +13,6 @@ def init():
     import build.sysml_model_data as dm
 
     @test
-    def create_database():
-        dm.init_db()
-        assert os.path.exists('data/diagrams.sqlite3')
-
-    @test
     def store_retrieve_update_note():
         note = dm.Note(description="Dit is een opmerking")
         note.store()

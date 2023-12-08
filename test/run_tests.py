@@ -5,6 +5,6 @@ import test_server
 import test_shapes
 import test_datamodel
 import test_datastore
-
+import test_property_editor
 
 test_frame.run_tests()

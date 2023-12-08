@@ -40,6 +40,17 @@ engine = create_engine("${config.dbase_url}")
 
 Session = sessionmaker(engine)
 
+class OptionalRef:
+    def __init__(self, t):
+        self.type = t
+    def __execute__(self, value):
+        if value is None:
+            return value
+        if isinstance(value, str):
+            if value in ['None', 'null']:
+                return None
+        return self.t(value)
+
 
 def changeDbase(url):
     """ Used for testing against a non-standard database """
@@ -145,33 +156,11 @@ class _Relationship(Base):
     associate_id: int = Column(Integer, ForeignKey("_entity.Id"))
     details: bytes = Column("details", LargeBinary)
 
-class _PortRepresentation(Base):
-    Id: int = Column(Integer, primary_key=True)
-    diagram: int = Column(Integer, ForeignKey("_entity.Id"))
-    block: int = Column(Integer, ForeignKey("_blockrepresentation.Id"))
-    port: int = Column(Integer, ForeignKey("_entity.Id"))
-    orientation: int = Column(Integer)
-    order: int = Column(Integer)
-    styling: str = Column(String)
-    port_cls: str = Column(String)
-
-    def post_init(self):
-        """ In the database, styling is stored as a string. """
-        if isinstance(self.styling, dict):
-            # Using `eval` is insecure, parse the string directly.
-            self.styling = json.dumps(self.styling) if self.styling else ''
-
-    def asdict(self):
-        """ When converting to json, format the styling as a string """
-        result = Base.asdict(self)
-        result['styling'] = json.loads(self.styling) if self.styling else {}
-        result['__classname__'] = type(self).__name__
-        return result
-
 class _BlockRepresentation(Base):
     Id: int = Column(Integer, primary_key=True)
     diagram: int = Column(Integer, ForeignKey("_entity.Id"))
     block: int = Column(Integer, ForeignKey("_entity.Id"))
+    parent: int = Column(Integer, ForeignKey("_blockrepresentation.Id"))
     x: float = Column(Float)
     y: float = Column(Float)
     z: float = Column(Float)  # For placing blocks etc on top of each other

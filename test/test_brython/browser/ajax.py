@@ -28,6 +28,12 @@ class ExpectedResponse:
 expected_responses: List[ExpectedResponse] = []
 unexpected_requests: List[ExpectedResponse] = []
 
+
+def clear_expected_response():
+    global expected_responses, unexpected_requests
+    expected_responses = []
+    unexpected_requests = []
+
 def determine_response(url, method, kwargs):
     index = None
     for i, r in enumerate(expected_responses):
