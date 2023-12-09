@@ -6,5 +6,6 @@ import test_shapes
 import test_datamodel
 import test_datastore
 import test_property_editor
+import test_dispatcher
 
 test_frame.run_tests()
