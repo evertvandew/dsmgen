@@ -185,7 +185,7 @@ def simulated_explorer_tests():
         l = lines[1]
         l.dispatchEvent(events.ContextMenu())
         options = d.select('UL [text="Create"] LI')
-        pass
+        # TODO: This test is not complete.
 
 
 if __name__ == '__main__':

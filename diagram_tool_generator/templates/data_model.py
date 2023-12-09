@@ -238,12 +238,18 @@ class NotFound(RuntimeError): pass
 class longstr(str): pass
 
 class AWrapper:
-    def store(self, session=None):
+    def store(self, session=None, accept_id=False):
+        """
+
+        :param session:
+        :param accept_id: If true, add records that have the Id set. This is used in testing only.
+        :return:
+        """
         if session is None:
             with session_context() as session:
                 self.store(session)
         else:
-            if self.Id and int(self.Id):
+            if (not accept_id) and self.Id and int(self.Id):
                 self.update()
 
             data_bytes = self.asjson()
@@ -326,32 +332,13 @@ class ARelationship(AWrapper):
             'associate_id':  getattr(self, 'association', None)
         }
 
+@dataclass
 class APort(ABlock):
-    def extract_record_values(self):
-        return {
-            'type': EntityType.Port,
-            'subtype': self.__class__.__name__,
-            'parent': self.parent if hasattr(self, 'parent') else None,
-            'order': self.order
-        }
+    orientation: int = 0
 
-class ADiagram(ABlock):
-    def extract_record_values(self):
-        return {
-            'type': EntityType.Diagram,
-            'subtype': self.__class__.__name__,
-            'parent': self.parent if hasattr(self, 'parent') else None,
-            'order': self.order
-        }
+class ADiagram(ABlock): pass
 
-class ALogicalElement(ABlock):
-    def extract_record_values(self):
-        return {
-            'type': EntityType.LogicalElement,
-            'subtype': self.__class__.__name__,
-            'parent': self.parent if hasattr(self, 'parent') else None,
-            'order': self.order
-        }
+class ALogicalElement(ABlock): pass
 
 # Generated dataclasses
 

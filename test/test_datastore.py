@@ -1,13 +1,14 @@
 
 import os, subprocess
 from copy import deepcopy
+import json
 
 import diagrams
 from test_frame import prepare, test, run_tests
 from data_store import DataConfiguration, DataStore, Collection
 import generate_project     # Ensures the client is built up to date
 from unittest.mock import Mock
-
+from build import sysml_data as sm
 
 @prepare
 def data_store_tests():
@@ -24,6 +25,20 @@ def data_store_tests():
         port_representations=client.port_representations,
         base_url='/data'
     )
+
+
+    def check_request_data(url, method, kwargs):
+        if method.lower() not in ['post', 'put']:
+            # Don't know how to check 'get' or 'delete'.
+            return
+        # Check the request data can be parsed into the right class
+        entity_name = url.split('/')[2]
+        # This is a dataclass
+        cls = sm.__dict__[entity_name]
+        jdata = json.loads(kwargs['data'])
+        jdata = {k: v for k, v in jdata.items() if k not in ['children', '__classname__']}
+        _instance = cls(**jdata)
+        # If the thing can be instantiated, all is well.
 
     @test
     def test_get_hierarchy():
@@ -285,8 +300,10 @@ def data_store_tests():
         # Now add a port and try to save it.
         p1 = client.FlowPortRepresentation()
         item.ports.append(p1)
-        add_expected_response('/data/FlowPort', 'post', Response(201, json={'Id': 155}))
-        add_expected_response('/data/_BlockRepresentation', 'post', Response(201, json={'Id': 65}))
+        add_expected_response('/data/FlowPort', 'post', Response(201, json={'Id': 155}),
+                              check_request=check_request_data)
+        add_expected_response('/data/_BlockRepresentation', 'post', Response(201, json={'Id': 65}),
+                              check_request=check_request_data)
         ds.update(item)
         # Expect the most important fields to be set by the datastore
         assert p1.block == 155
@@ -308,12 +325,12 @@ def data_store_tests():
         assert not unexpected_requests
 
         # Update the representation of the port
-        p1.orientation = diagrams.BlockOrientations.TOP
+        p1.styling = {'color': 'yellow'}
         add_expected_response('/data/_BlockRepresentation/65', 'post', Response(201))
         ds.update(item)
         assert not unexpected_requests
         assert len(expected_responses) == 0
-        assert ds.cache[Collection.block_repr][65].orientation == diagrams.BlockOrientations.TOP
+        assert ds.cache[Collection.block_repr][65].styling == {'color': 'yellow'}
 
         # Update the model part of the port
         p1.name = 'Output'

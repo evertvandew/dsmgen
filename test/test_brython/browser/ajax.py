@@ -22,6 +22,7 @@ class ExpectedResponse:
     url: str
     method: str
     get_response: Optional[Callable] = None # A function to be called to check the request & determine the response
+    check_request: Optional[Callable] = None # A function that is called to check the request. No return value expected.
     response: Optional[Response] = None
     reuse: bool = False                # If True, the response will always be the same.
 
@@ -45,6 +46,8 @@ def determine_response(url, method, kwargs):
         unexpected_requests.append(ExpectedResponse(url=url, method=method, response=Response(408, kwargs)))
     else:
         expected = expected_responses[index]
+        if expected.check_request:
+            expected.check_request(url, method, kwargs)
         if not expected.reuse:
             expected_responses.pop(index)
         if expected.get_response:
@@ -67,8 +70,8 @@ def delete(url, **kwargs):
 
 
 def add_expected_response(url, method, response: Optional[Response]=None, get_response: Optional[Callable]=None,
-                          reuse=False):
-    expected_responses.append(ExpectedResponse(url, method, get_response, response, reuse))
+                          reuse=False, check_request: Optional[Callable]=None):
+    expected_responses.append(ExpectedResponse(url, method, get_response, check_request, response, reuse))
 
 
 def remove_expected_reponse(url: str, method: str):

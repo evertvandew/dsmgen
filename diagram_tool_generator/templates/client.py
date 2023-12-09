@@ -42,6 +42,9 @@ class ${entity.__name__}:
     ## All elements must have a default value so they can be created from scratch
     ${f.name}: ${generator.get_html_type(f.type)} = ${generator.get_default(f.type)}
     % endfor
+    %if entity in generator.md.port:
+    orientation: shapes.BlockOrientations = shapes.BlockOrientations.RIGHT
+    %endif
     % if not entity in generator.md.relationship:
     order: shapes.HIDDEN = 0
     children: shapes.HIDDEN = field(default_factory=list)

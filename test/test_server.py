@@ -19,14 +19,14 @@ def run_server():
     def stop_server():
         server.terminate()
         server.wait()
-    return  'http://localhost:5200'
+    return 'http://localhost:5200'
 
 
 @prepare
 def test_server():
     base_url = run_server()
 
-    from build import sysml_model_data as sm
+    from build import sysml_data as sm
 
     def clear_db():
         with sm.session_context() as session:
@@ -39,7 +39,7 @@ def test_server():
         with sm.session_context() as session:
             for r in records:
                 if is_dataclass(r):
-                    r.store(session)
+                    r.store(session, accept_id=True)
                 else:
                     session.add(r)
 
@@ -177,19 +177,22 @@ def test_server():
         sm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
         clear_db()
         load_db([
-            sm.Note(),
-            sm.BlockDefinitionDiagram()
-        ])
-        load_db([
-            sm._BlockRepresentation(block=1, diagram=2),
-            sm._BlockRepresentation(block=1, diagram=2)
+            sm.Note(Id=1, description="Don't mind me"),
+            sm.BlockDefinitionDiagram(Id=2, name="Test diagram"),
+            sm.Block(Id=3, name="Block 1", description="Dit is een test", parent=2, order=1),
+            sm.FlowPort(Id=4, name='out', orientation=4, parent=3),
+            sm._BlockRepresentation(Id=1, block=1, diagram=2),
+            sm._BlockRepresentation(Id=2, block=3, diagram=2),
+            sm._BlockRepresentation(Id=3, block=4, parent=2, diagram=2)
         ])
 
         r = requests.get(base_url+'/data/diagram_contents/2')
         assert r.status_code == 200
         results = json.loads(r.content)
+        assert len(results) == 3
         assert results[0]['diagram'] == 2
         assert results[1]['diagram'] == 2
+
 
 if __name__ == '__main__':
     run_tests()
