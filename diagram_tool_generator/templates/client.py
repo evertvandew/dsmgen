@@ -225,9 +225,42 @@ def flatten(data):
             yield from flatten(data.children)
 diagram_classes = [${', '.join(f'"{c.__name__}"' for c in generator.md.diagrams)}]
 
-def on_explorer_click(target_dbid: int, target_type: str):
+def on_diagram_selection(_e_name, _e_source, ds, details):
+    values = details['values']
+    update = details['update']
+    object = details['object']
+    properties_div = document['details']
+    for e in properties_div.children:
+        e.remove()
+    properties_div <= dataClassEditor(object, ds, update=update)
+def on_explorer_click(_event_name, _event_source, data_store, details):
     """ Called when an element was left-clicked. """
+    target_dbid = details['target_dbid']
     console.log(f"Clicked on element {target_dbid}")
+
+
+def on_explorer_dblclick(_event_name, _event_source, data_store, details):
+    """ Called when an element was left-clicked. """
+    canvas = details['context']['canvas']
+    target_dbid: int = details['target_dbid']
+    target_type: str = details['target_type']
+    console.log(f"Double-Clicked on element {target_dbid}")
+
+    # If a diagram is double-clicked, open it.
+    def oncomplete(response):
+        # Clear any existing diagrams
+        container = document[canvas]
+        container.html = ''
+        svg = html.SVG()
+        svg.classList.add('diagram')
+        container <= svg
+        ## In future: subscribe to events in the diagram api.
+        diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], data_store, svg,
+                                        representation_lookup, connections_from)
+        data_store.subscribe('shape_selected', svg, on_diagram_selection)
+
+    if target_type in diagram_classes:
+        ajax.get(f'/data/diagram_contents/{target_dbid}', oncomplete=oncomplete)
 
 
 
@@ -245,36 +278,11 @@ def run(explorer, canvas, details):
 
     data_store = DataStore(config)
 
-    def on_diagram_selection(values, update, object):
-        properties_div = document['details']
-        for e in properties_div.children:
-            e.remove()
-        properties_div <= dataClassEditor(object, update=update)
-
-    def on_explorer_dblclick(target_dbid: int, target_type: str):
-        """ Called when an element was left-clicked. """
-        console.log(f"Double-Clicked on element {target_dbid}")
-
-        # If a diagram is double-clicked, open it.
-        def oncomplete(response):
-            # Clear any existing diagrams
-            container = document[canvas]
-            container.html = ''
-            svg = html.SVG()
-            svg.classList.add('diagram')
-            container <= svg
-            ## In future: subscribe to events in the diagram api.
-            diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], data_store, svg,
-                                            representation_lookup, connections_from)
-            data_store.bind('shape_selected', on_diagram_selection)
-
-        if target_type in diagram_classes:
-            ajax.get(f'/data/diagram_contents/{target_dbid}', oncomplete=oncomplete)
 
     blank = document[explorer]
 
-    data_store.bind('dblclick', on_explorer_dblclick)
-    data_store.bind('click', on_explorer_click)
+    data_store.subscribe('dblclick', blank, on_explorer_dblclick, context={'canvas': canvas})
+    data_store.subscribe('click', blank, on_explorer_click)
     make_explorer(blank, data_store, allowed_children)
 
     @bind(blank, 'click')

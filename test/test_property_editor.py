@@ -21,6 +21,7 @@ import generate_project     # Ensures the client is built up to date
 def test_port_editor():
     from property_editor import createPortEditor
     import public.sysml_client as client
+    ds = Mock()
     @test
     def create():
         block_repr = client.BlockRepresentation(
@@ -30,7 +31,7 @@ def test_port_editor():
         f = [f for f in fields(block_repr) if f.name=='ports'][0]
 
         # Create the port editor
-        element = createPortEditor(block_repr, f, block_repr.get_allowed_ports())
+        element = createPortEditor(block_repr, f, block_repr.get_allowed_ports(), ds)
 
         # Edit the values of the existing port
         line = element.select(".porttable tr")[0]
