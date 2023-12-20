@@ -1,6 +1,7 @@
 """
 Visual Modelling client.
 """
+import svg_shapes
 
 <%
 """
@@ -16,7 +17,7 @@ import model_definition as mdef
 
 %>
 
-from browser import document, console, html, window, bind, ajax
+from browser import document, console, html, svg, bind, ajax
 import json
 from explorer import Element, make_explorer, context_menu_name
 from rest_api import ExplorerApi, DiagramApi, ExtendibleJsonEncoder
@@ -31,6 +32,7 @@ import diagrams
 import shapes
 from property_editor import dataClassEditor, longstr, OptionalRef
 from data_store import DataStore, DataConfiguration
+from svg_shapes import getMarkerDefinitions
 
 
 # Modelling 'Entities:'
@@ -251,13 +253,14 @@ def on_explorer_dblclick(_event_name, _event_source, data_store, details):
         # Clear any existing diagrams
         container = document[canvas]
         container.html = ''
-        svg = html.SVG()
-        svg.classList.add('diagram')
-        container <= svg
+        svg_tag = html.SVG()
+        svg_tag <= getMarkerDefinitions()
+        svg_tag.classList.add('diagram')
+        container <= svg_tag
         ## In future: subscribe to events in the diagram api.
-        diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], data_store, svg,
+        diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], data_store, svg_tag,
                                         representation_lookup, connections_from)
-        data_store.subscribe('shape_selected', svg, on_diagram_selection)
+        data_store.subscribe('shape_selected', svg_tag, on_diagram_selection)
 
     if target_type in diagram_classes:
         ajax.get(f'/data/diagram_contents/{target_dbid}', oncomplete=oncomplete)
