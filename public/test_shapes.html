@@ -25,7 +25,6 @@
         all_shapes = shapes.BasicShape.getShapeTypes()
         # Can't display the various textwidgets
         all_shapes = [s for s in all_shapes if s.getType() != 'textwidget']
-        console.log(all_shapes)
         #all_shapes = [s for s in all_shapes if s.getType() == 'bar']
         for i, b in enumerate(all_shapes):
             x, y = 100 + 200 * (i%5), 100 + 100 * (i // 5)
