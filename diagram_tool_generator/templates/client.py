@@ -228,6 +228,7 @@ def flatten(data):
 diagram_classes = [${', '.join(f'"{c.__name__}"' for c in generator.md.diagrams)}]
 
 def on_diagram_selection(_e_name, _e_source, ds, details):
+    """ An item in a diagram has been selected: create a detail-editor for it. """
     values = details['values']
     update = details['update']
     object = details['object']
@@ -235,10 +236,19 @@ def on_diagram_selection(_e_name, _e_source, ds, details):
     for e in properties_div.children:
         e.remove()
     properties_div <= dataClassEditor(object, ds, update=update)
+
 def on_explorer_click(_event_name, _event_source, data_store, details):
     """ Called when an element was left-clicked. """
     target_dbid = details['target_dbid']
+    target_type: str = details['target_type']
+    data_element = details['data_element']
     console.log(f"Clicked on element {target_dbid}")
+    properties_div = document['details']
+    for e in properties_div.children:
+        e.remove()
+    properties_div <= dataClassEditor(object, ds, update=update)
+
+
 
 
 def on_explorer_dblclick(_event_name, _event_source, data_store, details):
