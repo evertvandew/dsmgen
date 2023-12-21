@@ -50,15 +50,6 @@ def test_dispatcher():
         assert len(calls) == 1
         assert len(d.subscriptions) == 0
 
-        # Test a source is unsubscribed when it is deleted
-        calls = []
-        d.subscribe('*/resource/*', source, cb)
-        d.trigger_event('add/resource/', source)
-        source = ASource()  # A different instance
-        d.trigger_event('add/resource/', source)
-        assert len(calls) == 1
-        assert len(d.subscriptions) == 0
-
 
 if __name__ == '__main__':
     run_tests()

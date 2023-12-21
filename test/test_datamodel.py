@@ -12,6 +12,8 @@ import generate_project     # Ensures the client is built up to date
 def init():
     import build.sysml_model_data as dm
 
+    dm.init_db()
+
     @test
     def store_retrieve_update_note():
         note = dm.Note(description="Dit is een opmerking")

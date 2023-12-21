@@ -1,9 +1,9 @@
 
 
 # Feature support for ports:
-* Store the Orientation in the styling for a port. Also useful for dedicated input & output ports.
-* When loading a diagram, also load the associated ports
 * When dropping a block with ports, also drop representations for the ports
+* When loading a diagram, also load the associated ports
+- Store the Orientation in the styling for a port. Also useful for dedicated input & output ports.
 - Generate Port representations
 - Generate a list of allowed ports for each block
 - Generate blocks with ports a special variable to contain them

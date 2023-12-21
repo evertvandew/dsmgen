@@ -56,20 +56,23 @@ def run_tests(*filters):
             if filters:
                 if not any(fnmatch(t.__name__, f[1]) for f in filters):
                     continue
-            print(f"Running test {t.__name__}")
+            name = p.__module__ + '.' + p.__name__ + '.' + t.__name__
+            print(f"Running test {name}")
             try:
                 t()
                 successes.append(t)
             except Exception as e:
-                logging.exception('Test failed:')
-                failures.append(t)
+                logging.exception(f'Test failed: {name}')
+                failures.append(name)
 
-            executed_tests.append(t)
+            executed_tests.append(name)
 
         # Cleanup is in reversed order, hopefully keeping dependencies alive while needed.
-        for p in reversed(cleanups):
-            p()
+        for c in reversed(cleanups):
+            c()
 
     logging.error(f"Failures: {len(failures)} / {len(executed_tests)}")
     if failures:
+        for failure in failures:
+            logging.error(f"Test {failure} FAILED")
         sys.exit(1)
