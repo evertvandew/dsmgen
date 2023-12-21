@@ -67,7 +67,7 @@ class ClassSelector(BaseSelector):
 
 class IdSelector(BaseSelector):
     def test(self, node):
-        return node.attr.get('id', '0') == self.name
+        return node.attrs.get('id', '0') == self.name
 
 @dataclass
 class AttributeSelector(BaseSelector):
@@ -78,16 +78,16 @@ class AttributeSelector(BaseSelector):
         ivalue = self.value.lower()
         if self.operator == AttributeOperator.has:
             def t(node):
-                return self.name in node.attr
+                return self.name in node.attrs
             self.test = t
         else:
             def t(node):
                 if self.flag == 'i':
                     value = self.value.lower()
-                    attr = node.attr.get(self.name, '').lower()
+                    attr = node.attrs.get(self.name, '').lower()
                 else:
                     value = self.value
-                    attr = node.attr.get(self.name, '')
+                    attr = node.attrs.get(self.name, '')
                 if self.operator == AttributeOperator.equals:
                     return attr == value
                 elif self.operator == AttributeOperator.contains_word:
@@ -157,9 +157,9 @@ class SelectorCombinator:
 def parse_attribute_selector(s):
     for attr in AttributeOperator:
         if attr.value == '':
-            if m := re.fullmatch(r'(\w*)(\s*([iIsS]))?', s):
+            if m := re.fullmatch(r'([a-zA-Z0-9_-]*)(\s*([iIsS]))?', s):
                 return AttributeSelector(m.group(1), '', attr, (m.group(3) or 's').lower())
-        elif m := re.fullmatch(r'(\w*)'+attr.value+r'"([^"]*)"(\s*([iIsS]))?', s):
+        elif m := re.fullmatch(r'([a-zA-Z0-9_-]*)'+attr.value+r'"([^"]*)"(\s*([iIsS]))?', s):
             return AttributeSelector(m.group(1), m.group(2), attr, (m.group(4) or 's').lower())
     raise RuntimeError(f'Could not parse attribute selector {s}')
 
@@ -238,8 +238,8 @@ class tag:
                 raise RuntimeError("Unrecognized content")
         if 'className' in kwargs:
             kwargs['Class'] = kwargs['className']
-        self.attr = kwargs
-        self.classList = set(self.attr.get('Class', '').split())
+        self.attrs = kwargs
+        self.classList = set(self.attrs.get('Class', '').split())
         if 'style' in kwargs:
             if isinstance(kwargs['style'], str):
                 self.style = {k:v for k, v in [l.strip().split(':', maxsplit=1) for l in kwargs['style'].split(';')]}
@@ -267,7 +267,7 @@ class tag:
 
     def __getitem__(self, key):
         for item in flatten(self):
-            if item.attr.get('id', '') == key:
+            if item.attrs.get('id', '') == key:
                 return item
         # Raise an IndexError so that the "in" operator will work.
         # The KeyError is not handled by the "in" operator.
@@ -293,11 +293,11 @@ class tag:
 
     @property
     def className(self):
-        return self.attr.get('Class', '')
+        return self.attrs.get('Class', '')
     @className.setter
     def className(self, name):
-        self.attr['Class'] = name
-        self.classList = set(self.attr.get('Class', '').split())
+        self.attrs['Class'] = name
+        self.classList = set(self.attrs.get('Class', '').split())
 
     @property
     def html(self):
@@ -466,7 +466,7 @@ class IMG(tag): pass
 class INPUT(tag):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.value = 0 if self.attr.get('type', 'text') == 'number' else ''
+        self.value = 0 if self.attrs.get('type', 'text') == 'number' else ''
 
 class INS(tag): pass
 

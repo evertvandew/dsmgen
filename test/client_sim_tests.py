@@ -135,6 +135,12 @@ def simulated_diagram_tests():
         assert len(expected_responses) == 0
         assert not unexpected_requests
 
+        # Check the various elemenets were rendered to the DOM
+        nonlocal d
+        assert len(d['canvas'].select('[data-class="NoteRepresentation"]')) == 1
+        assert len(d['canvas'].select('[data-class="BlockRepresentation"]')) == 2
+        assert len(d['canvas'].select('[data-class="FlowPortRepresentation"]')) == 1
+
 @prepare
 def simulated_explorer_tests():
     from data_store import DataConfiguration, DataStore, Collection
@@ -189,4 +195,4 @@ def simulated_explorer_tests():
 
 
 if __name__ == '__main__':
-    run_tests("simulated_explorer_tests.*")
+    run_tests()

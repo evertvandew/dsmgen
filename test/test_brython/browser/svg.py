@@ -8,9 +8,9 @@ class svg_tag(SVG):
     def __setitem__(self, key, value):
         if key in self.int_values:
             assert type(value) in [int, str], f"Attribute {key} of {self.svg_values} must be either an int or a str"
-        self.attr[key] = value
+        self.attrs[key] = value
     def __getitem__(self, key):
-        return self.attr[key]
+        return self.attrs[key]
 
 class drawn_tag(svg_tag):
     stroke: str
