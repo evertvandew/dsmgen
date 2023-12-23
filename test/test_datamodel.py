@@ -10,7 +10,7 @@ import generate_project     # Ensures the client is built up to date
 
 @prepare
 def init():
-    import build.sysml_model_data as dm
+    import build.sysml_data as dm
 
     dm.init_db()
 

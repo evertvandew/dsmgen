@@ -193,6 +193,31 @@ def test_server():
         assert results[0]['diagram'] == 2
         assert results[1]['diagram'] == 2
 
+    @test
+    def test_create_representation():
+        # Load the DB with a block and two ports, then make a representation of it.
+        sm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
+        clear_db()
+        load_db([
+            sm.BlockDefinitionDiagram(Id=1, name="Test diagram"),
+            sm.Block(Id=2, name="Block 1", description="Dit is een test", parent=1, order=1),
+            sm.FlowPort(Id=3, name='out', orientation=4, parent=2),
+            sm.FlowPort(Id=4, name='in', orientation=1, parent=2),
+        ])
+        r = requests.post(
+            base_url+'/data/Block/2/create_representation',
+            data=json.dumps({'diagram': 2, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40}),
+            headers={'Content-Type': 'application/json'}
+        )
+        assert r.status_code == 201
+        results = json.loads(r.content)
+        for i, p in enumerate(results['children']):
+            assert p['block_cls'] == 'FlowPortRepresentation'
+            assert p['block'] == 3 + i
+            assert p['diagram'] == 2
+            assert p['parent'] == 1
+
+
 
 if __name__ == '__main__':
     run_tests()

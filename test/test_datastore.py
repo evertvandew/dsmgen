@@ -5,7 +5,7 @@ import json
 
 import diagrams
 from test_frame import prepare, test, run_tests
-from data_store import DataConfiguration, DataStore, Collection
+from data_store import DataConfiguration, DataStore, Collection, ExtendibleJsonEncoder
 import generate_project     # Ensures the client is built up to date
 from unittest.mock import Mock
 from build import sysml_data as sm
@@ -350,5 +350,18 @@ def data_store_tests():
         assert 65 not in ds.cache[Collection.block_repr]
         assert 155 not in ds.cache[Collection.block]
 
+@prepare
+def json_encoder_tests():
+    @test
+    def nested_dataclasses():
+        import public.sysml_client as client
+        e = client.Block()
+        e.children = [client.FlowPort()]
+        s = json.dumps(e, cls=ExtendibleJsonEncoder)
+        assert '"__classname__": "Block"' in s
+        assert '"__classname__": "FlowPort"' in s
+
+
+
 if __name__ == '__main__':
-    run_tests()
+    run_tests('json_encoder_tests.*')

@@ -68,7 +68,9 @@ class MyBase:
         """ Extract a dictionary from this data, e.g. to convert to JSON.
             Direction: Database -> Python code.
         """
-        return {k:getattr(self, k) for k in self.__annotations__.keys()}
+        d = {k:getattr(self, k) for k in self.__annotations__.keys()}
+        d['__classname__'] = type(self).__name__
+        return d
 
     def post_init(self):
         """ Do necessary modifications before storing data in a database.
@@ -144,23 +146,23 @@ class _Entity(Base):
     Id: int = Column(Integer, primary_key=True)
     type: int = Column(Enum(EntityType))
     subtype: str = Column(String)
-    parent: str = Column(Integer, ForeignKey("_entity.Id"))  # For subblocks and ports
+    parent: str = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))  # For subblocks and ports
     order: str = Column(Integer)
     details: str = Column("details", LargeBinary)
 
 class _Relationship(Base):
     Id: int = Column(Integer, primary_key=True)
     subtype: str = Column(String)
-    source_id: int  = Column(Integer, ForeignKey("_entity.Id"))
-    target_id: int  = Column(Integer, ForeignKey("_entity.Id"))
+    source_id: int  = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
+    target_id: int  = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
     associate_id: int = Column(Integer, ForeignKey("_entity.Id"))
     details: bytes = Column("details", LargeBinary)
 
 class _BlockRepresentation(Base):
     Id: int = Column(Integer, primary_key=True)
-    diagram: int = Column(Integer, ForeignKey("_entity.Id"))
-    block: int = Column(Integer, ForeignKey("_entity.Id"))
-    parent: int = Column(Integer, ForeignKey("_blockrepresentation.Id"))
+    diagram: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
+    block: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
+    parent: int = Column(Integer, ForeignKey("_blockrepresentation.Id", ondelete='CASCADE'))
     x: float = Column(Float)
     y: float = Column(Float)
     z: float = Column(Float)  # For placing blocks etc on top of each other
@@ -184,10 +186,10 @@ class _BlockRepresentation(Base):
 
 class _RelationshipRepresentation(Base):
     Id: int = Column(Integer, primary_key=True)
-    diagram: int = Column(Integer, ForeignKey("_entity.Id"))
-    relationship: int = Column(Integer, ForeignKey("_relationship.Id"))
-    source_repr_id: int = Column(Integer, ForeignKey("_blockrepresentation.Id"))
-    target_repr_id: int = Column(Integer, ForeignKey("_blockrepresentation.Id"))
+    diagram: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
+    relationship: int = Column(Integer, ForeignKey("_relationship.Id", ondelete='CASCADE'))
+    source_repr_id: int = Column(Integer, ForeignKey("_blockrepresentation.Id", ondelete='CASCADE'))
+    target_repr_id: int = Column(Integer, ForeignKey("_blockrepresentation.Id", ondelete='CASCADE'))
     routing: bytes = Column(String)       # JSON list of Co-ordinates of nodes
     z: float = Column(Float)                   # For ensuring the line goes over the right blocks.
     styling: str = Column(String)
@@ -210,6 +212,9 @@ class _RelationshipRepresentation(Base):
 # # For deserializing, all elements must consume the json in the constructor.
 
 class ExtendibleJsonEncoder(json.JSONEncoder):
+    """ A JSON encoder that supports dataclasses and implements a protocol for customizing
+        the generation process.
+    """
     def default(self, o):
         """ We have three tricks to jsonify objects that are not normally supported by JSON.
             * Dataclass instances are serialised as dicts.
@@ -219,11 +224,13 @@ class ExtendibleJsonEncoder(json.JSONEncoder):
         if hasattr(o, '__json__'):
             return o.__json__()
         if is_dataclass(o):
-            result = asdict(o)
+            result = {k.name: o.__dict__[k.name] for k in fields(o)}
             result['__classname__'] = type(o).__name__
-            if hasattr(o, 'children'):
-                result['children'] = o.children
             return result
+        if isinstance(o, Enum):
+            return int(o)
+        if isinstance(o, bytes):
+            return o.decode('utf8')
         return str(o)
 
 
@@ -264,6 +271,14 @@ class AWrapper:
             record.details = data_bytes
             session.commit()
 
+    def extract_record_values(self):
+        """ Children of AWrapper are stored in two parts: a standard part that is stored in fields the relational
+            database can work with, and a flexible part where additional data is stored in a JSON string.
+            This function retrieves the standard part to be stored in separate record fields. This depends on the
+            table in which the records are stored, thus this is a "virtual" function.
+        """
+        raise NotImplementedError()
+
     def delete(self):
         with session_context() as session:
             table = self.get_db_table()
@@ -271,6 +286,11 @@ class AWrapper:
 
     def asjson(self):
         return json.dumps(self, cls=ExtendibleJsonEncoder).encode('utf8')
+
+    def asdict(self):
+        d = asdict(self)
+        d['__classname__'] = type(self).__name__
+        return d
 
     @classmethod
     def retrieve(cls, Id):
@@ -312,9 +332,12 @@ class ABlock(AWrapper):
     @staticmethod
     def get_db_table():
         return _Entity
+    @classmethod
+    def get_entity_type(cls):
+        return EntityType.Block
     def extract_record_values(self):
         return {
-            'type': EntityType.Block,
+            'type': self.get_entity_type(),
             'subtype': self.__class__.__name__,
             'parent': self.parent if hasattr(self, 'parent') else None,
             'order': self.order
@@ -335,13 +358,27 @@ class ARelationship(AWrapper):
 @dataclass
 class APort(ABlock):
     orientation: int = 0
+    @classmethod
+    def get_entity_type(cls):
+        return EntityType.Port
 
-class ADiagram(ABlock): pass
 
-class ALogicalElement(ABlock): pass
+class ADiagram(ABlock):
+    @classmethod
+    def get_entity_type(cls):
+        return EntityType.Diagram
 
-# Generated dataclasses
+class ALogicalElement(ABlock):
+    @classmethod
+    def get_entity_type(cls):
+        return EntityType.LogicalElement
 
+class AMessage(ABlock):
+    @classmethod
+    def get_entity_type(cls):
+        return EntityType.Message
+
+    # Generated dataclasses
 % for entity in generator.ordered_items:
 <%
     stereotype = 'ABlock' if entity in generator.md.entity else \

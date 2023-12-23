@@ -12,7 +12,7 @@ from browser import events, document
 from unittest.mock import Mock, MagicMock
 import diagrams
 import explorer
-from rest_api import ExtendibleJsonEncoder
+from data_store import ExtendibleJsonEncoder
 import generate_project     # Ensures the client is built up to date
 
 

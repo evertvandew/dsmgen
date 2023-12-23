@@ -12,18 +12,40 @@ from inspect import signature
 from typing import List, Dict, Any
 from shapes import Shape, Relationship, Point, HIDDEN
 from browser import events
+from browser.ajax import add_expected_response, unexpected_requests, Response
 from unittest.mock import Mock, MagicMock
 import diagrams
 import explorer
-from rest_api import ExtendibleJsonEncoder
+from data_store import ExtendibleJsonEncoder, DataStore, DataConfiguration, Collection
+from copy import deepcopy
 import generate_project     # Ensures the client is built up to date
+import public.sysml_client as client
 
+
+def set_entity_ids(ids):
+    def cb(entity):
+        entity.Id = ids.pop(0)
+        return entity
+    return cb
+
+
+def mk_ds():
+    config = DataConfiguration(
+        hierarchy_elements=client.explorer_classes,
+        block_entities=client.block_entities,
+        relation_entities=client.relation_classes,
+        port_entities=client.port_classes,
+        block_representations=client.block_representations,
+        relation_representations=client.relation_representations,
+        port_representations=client.port_representations,
+        base_url='/data'
+    )
+
+    ds = DataStore(config)
+    return ds
 
 @prepare
 def simulated_diagram_tests():
-
-    import public.sysml_client as client
-
     # Set the context for the diagram editor. Normally this is in the HTML file.
     from browser import document as d
     from browser import html
@@ -65,8 +87,10 @@ def simulated_diagram_tests():
 
     @test
     def drag_and_drop():
-        diagram, rest = new_diagram(1, MagicMock())
-        diagram.diagram_id = 5
+        ds = mk_ds()
+        add_expected_response('/data/diagram_contents/5', 'get', Response(201, json=[]))
+        diagram, rest = new_diagram(5, ds)
+        rest.add = set_entity_ids([400])
         instance = client.Block(name='One', parent=3, Id=123)
         restif = Mock()
         restif.get_hierarchy = Mock(side_effect=lambda cb: cb([instance]))
@@ -74,6 +98,20 @@ def simulated_diagram_tests():
         ev = events.DragStart()
         d['explorer'].select(f'.{explorer.name_cls}')[0].dispatchEvent(ev)
         assert ev.dataTransfer.data
+        add_expected_response('/data/Block/123/create_representation', 'post', Response(201, json={
+            'Id': 400,
+            '__classname__': '_BlockRepresentation',
+            'block': 123,
+            'parent': None,
+            'diagram': 5,
+            'x': 400,
+            'y': 500,
+            'width': 64,
+            'height': 40,
+            'children': [],
+            'block_cls': 'BlockRepresentation',
+            '_entity': {'name': 'One', 'parent': 3, 'Id': 123},
+        }))
         diagram.canvas.dispatchEvent(events.DragEnter(dataTransfer=ev.dataTransfer))
         diagram.canvas.dispatchEvent(events.DragOver(dataTransfer=ev.dataTransfer))
         diagram.canvas.dispatchEvent(events.DragOver(dataTransfer=ev.dataTransfer))
@@ -84,6 +122,60 @@ def simulated_diagram_tests():
         assert repr.name == 'One'
         assert repr.diagram == 5
         assert repr.block == 123
+        assert repr.Id == 400
+        assert not unexpected_requests
+
+    @test
+    def drag_and_drop_with_ports():
+        ds = mk_ds()
+        add_expected_response('/data/diagram_contents/5', 'get', Response(201, json=[]))
+        diagram, rest = new_diagram(5, ds)
+        instance = client.Block(name='One', parent=3, Id=123)
+        instance.children.append(client.FlowPort(name='output', parent=123, Id=124))
+        ds.cache[Collection.block][123] = deepcopy(instance)
+        ds.cache[Collection.block][124] = deepcopy(instance.children[0])
+        restif = Mock()
+        restif.get_hierarchy = Mock(side_effect=lambda cb: cb([instance]))
+        explorer.make_explorer(d['explorer'], restif, client.allowed_children)
+        ev = events.DragStart()
+        ev.dataTransfer.data = {'entity': json.dumps(instance, cls=ExtendibleJsonEncoder)}
+        add_expected_response('/data/Block/123/create_representation', 'post', Response(201, json={
+            'Id': 400,
+            '__classname__': '_BlockRepresentation',
+            'block': 123,
+            'parent': None,
+            'diagram': 5,
+            'x': 400,
+            'y': 500,
+            'width': 64,
+            'height': 40,
+            'block_cls': 'BlockRepresentation',
+            '_entity': {'name': 'One', 'parent': 3, 'Id': 123},
+            'children': [
+                {
+                    'Id': 401,
+                    'block': 124,
+                    'parent': 400,
+                    'diagram': 5,
+                    '__classname__': '_BlockRepresentation',
+                    'block_cls': 'FlowPortRepresentation',
+                    '_entity': {'name': 'Output', 'parent': 123, 'Id': 124}
+                }
+            ]
+        }))
+        diagram.canvas.dispatchEvent(events.DragEnter(dataTransfer=ev.dataTransfer))
+        diagram.canvas.dispatchEvent(events.DragOver(dataTransfer=ev.dataTransfer))
+        diagram.canvas.dispatchEvent(events.DragOver(dataTransfer=ev.dataTransfer))
+        diagram.canvas.dispatchEvent(events.Drop(dataTransfer=ev.dataTransfer))
+        diagram.canvas.dispatchEvent(events.DragEnd(dataTransfer=ev.dataTransfer))
+        assert diagram.children
+        repr = diagram.children[0]
+        assert len(repr.ports) == 1
+        port = repr.ports[0]
+        assert port.Id == 401
+        assert port.parent == 400
+        assert port.block == 124
+        assert port.diagram == 5
 
     @test
     def load_diagram():
@@ -91,18 +183,7 @@ def simulated_diagram_tests():
         from data_store import DataConfiguration, DataStore, Collection
         import public.sysml_client as client
 
-        config = DataConfiguration(
-            hierarchy_elements=client.explorer_classes,
-            block_entities=client.block_entities,
-            relation_entities=client.relation_classes,
-            port_entities=client.port_classes,
-            block_representations=client.block_representations,
-            relation_representations=client.relation_representations,
-            port_representations=client.port_representations,
-            base_url='/data'
-        )
-
-        ds = DataStore(config)
+        ds = mk_ds()
 
         add_expected_response('/data/diagram_contents/3', 'get', Response(
             200,
