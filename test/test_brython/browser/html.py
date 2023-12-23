@@ -238,6 +238,9 @@ class tag:
                 raise RuntimeError("Unrecognized content")
         if 'className' in kwargs:
             kwargs['Class'] = kwargs['className']
+        if 'text' in kwargs:
+            self.text = kwargs['text']
+            del kwargs['text']
         self.attrs = kwargs
         self.classList = set(self.attrs.get('Class', '').split())
         if 'style' in kwargs:
@@ -730,8 +733,8 @@ def selector_filter_tests():
         assert len(test_set.select('[Class*="ie"]')) == 2
         assert len(test_set.select('[flag|="btn"]')) == 1
         assert len(test_set.select('[Class~="btn"]')) == 1
-        assert len(test_set.select('[text^="click" i]')) == 1
-        assert len(test_set.select('[text$="me" i]')) == 1
+        assert len(test_set.select('[onclick^="onbtnclick" i]')) == 1
+        assert len(test_set.select('[onclick$="click()" i]')) == 1
     @test
     def combination_selectors():
         assert len(test_set.select('INPUT, BUTTON')) == 6

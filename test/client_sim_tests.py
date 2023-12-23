@@ -222,6 +222,8 @@ def simulated_diagram_tests():
         assert len(d['canvas'].select('[data-class="BlockRepresentation"]')) == 2
         assert len(d['canvas'].select('[data-class="FlowPortRepresentation"]')) == 1
 
+
+
 @prepare
 def simulated_explorer_tests():
     from data_store import DataConfiguration, DataStore, Collection
@@ -261,18 +263,29 @@ def simulated_explorer_tests():
               "__classname__": "FunctionalModel"},
                 {"order": 0, "Id": 2, "name": "Structural Model", "description": "", "parent": None,
               "__classname__": "StructuralModel"},
-                {"order": 0, "Id": 3, "entities": [], "parent": 2, "name": "test",
-                                                    "__classname__": "BlockDefinitionDiagram"},
 
             ]))
         make_explorer(d['explorer'], ds, client.allowed_children)
         # Get the second line in the explorer and right-click it.
         lines = d.get(selector='.eline [draggable="true"]')
-        assert len(lines) == 3
-        l = lines[1]
+        assert len(lines) == 2
+        l = [l for l in lines if 'Structural' in str(l)][0]
         l.dispatchEvent(events.ContextMenu())
-        options = d.select('UL [text="Create"] LI')
-        # TODO: This test is not complete.
+        # Find the option to create a new diagram
+        items = list(l.select('*'))
+        print(f'Len items: {len(items)} {[i.text for i in items]}')
+        option = [item for item in l.select('*') if item.text == 'BlockDefinitionDiagram'][0]
+        option.dispatchEvent(events.Click())
+        # There should be a form to enter the name for the new diagram.
+        # Enter a name and click OK
+        input = d.select(".brython-dialog-main input")[0]
+        input.value = 'My Diagram'
+        button = [b for b in d.select(".brython-dialog-main button") if b.text.lower() == 'ok'][0]
+        add_expected_response('/data/BlockDefinitionDiagram', 'post', Response(201, json={'Id': 3}))
+        button.dispatchEvent(events.Click())
+        lines = d.get(selector='.eline [draggable="true"]')
+        assert len(lines) == 3
+
 
 
 if __name__ == '__main__':
