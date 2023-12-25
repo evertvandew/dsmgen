@@ -235,10 +235,13 @@ def simulated_explorer_tests():
     # Set the context for the diagram editor. Normally this is in the HTML file.
     from browser import document as d
     from browser import html
-    d.clear()
-    d <= html.DIV(id='explorer')
-    d <= html.DIV(id='canvas')
-    d <= html.DIV(id='details')
+
+    def reset_document():
+        d.clear()
+        d <= html.DIV(id='explorer')
+        d <= html.DIV(id='canvas')
+        d <= html.DIV(id='details')
+    reset_document()
 
     config = DataConfiguration(
         hierarchy_elements=client.explorer_classes,
@@ -285,6 +288,35 @@ def simulated_explorer_tests():
         button.dispatchEvent(events.Click())
         lines = d.get(selector='.eline [draggable="true"]')
         assert len(lines) == 3
+
+    @test
+    def left_click():
+        reset_document()
+        ds = DataStore(config)
+
+        clear_expected_response()
+        add_expected_response('/data/hierarchy', 'get', Response(
+            200,
+            json=[
+                {"order": 0, "Id": 1, "name": "Functional Model", "description": "", "parent": None,
+              "__classname__": "FunctionalModel"},
+                {"order": 0, "Id": 2, "name": "Structural Model", "description": "", "parent": None,
+              "__classname__": "StructuralModel"},
+
+            ]))
+        make_explorer(d['explorer'], ds, client.allowed_children)
+        blank = d['explorer']
+        ds.subscribe('click', blank, client.on_explorer_click)
+
+        # Get the second line in the explorer and left-click it.
+        lines = d.get(selector='.eline [draggable="true"]')
+        assert len(lines) == 2
+        # Check the details editor is empty
+        assert len(d.select('#details *')) == 0
+        l = [l for l in lines if 'Structural' in str(l)][0]
+        l.dispatchEvent(events.Click())
+        # Check the details editor is not empty
+        assert len(d.select('#details *')) > 0
 
 
 

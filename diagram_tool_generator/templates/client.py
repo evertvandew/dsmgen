@@ -246,7 +246,7 @@ def on_explorer_click(_event_name, _event_source, data_store, details):
     properties_div = document['details']
     for e in properties_div.children:
         e.remove()
-    properties_div <= dataClassEditor(object, data_store, update=update)
+    properties_div <= dataClassEditor(data_element, data_store, update=update)
 
 
 

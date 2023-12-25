@@ -263,7 +263,10 @@ class tag:
             self.children.append(other)
             other.parent = self
         elif isinstance(other, str):
-            raise RuntimeError("HTML content is not (yet) supported by this mockup")
+            if '<' in other:
+                raise RuntimeError("HTML content is not (yet) supported by this mockup")
+            else:
+                self.attrs['text'] = other
         elif isinstance(other, Iterable):
             for item in other:
                 self.__le__(item)
