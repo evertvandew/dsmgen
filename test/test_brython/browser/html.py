@@ -472,7 +472,11 @@ class IMG(tag): pass
 class INPUT(tag):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.value = 0 if self.attrs.get('type', 'text') == 'number' else ''
+        if 'value' in kwargs:
+            self.value = kwargs['value']
+            del kwargs['value']
+        else:
+            self.value = 0 if self.attrs.get('type', 'text') == 'number' else ''
 
 class INS(tag): pass
 
@@ -564,7 +568,7 @@ class TBODY(tag): pass
 
 class TD(tag): pass
 
-class TEXTAREA(tag): pass
+class TEXTAREA(INPUT): pass
 
 class TFOOT(tag): pass
 

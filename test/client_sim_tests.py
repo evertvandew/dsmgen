@@ -318,6 +318,17 @@ def simulated_explorer_tests():
         # Check the details editor is not empty
         assert len(d.select('#details *')) > 0
 
+        # Change the value of the Structural Model,
+        btn = d.select_one('#details button')
+        edit_field = d.select_one('#details input')
+        assert edit_field.value == 'Structural Model'
+        edit_field.value = 'blablablabla'
+        add_expected_response('/data/StructuralModel/2', 'post', Response(200))
+        btn.dispatchEvent(events.Click())
+        assert len(expected_responses) == 0
+        assert len(unexpected_requests) == 0
+        assert ds.cache[Collection.hierarchy][2].name == 'blablablabla'
+
 
 
 if __name__ == '__main__':

@@ -238,10 +238,15 @@ def on_diagram_selection(_e_name, _e_source, data_store, details):
 
 def on_explorer_click(_event_name, _event_source, data_store, details):
     """ Called when an element was left-clicked. """
+    def datastore_update(update: Dict):
+        for k, v in json.loads(update).items():
+            setattr(data_element, k, v)
+        data_store.update(data_element)
+
     target_dbid = details['target_dbid']
     target_type: str = details['target_type']
     data_element = details['data_element']
-    update = details.get('update', False) or data_store.update
+    update = details.get('update', False) or datastore_update
     console.log(f"Clicked on element {target_dbid}")
     properties_div = document['details']
     for e in properties_div.children:
