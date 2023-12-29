@@ -139,7 +139,7 @@ def data_store_tests():
         ds.add(item)
         assert item.Id == 123
         assert ok
-        assert ds.cache[Collection.block][123] == item
+        assert ds.shadow_copy[Collection.block][123] == item
 
     @test
     def add_repr_new_model():
@@ -159,10 +159,10 @@ def data_store_tests():
         ds.add(item)
         assert item.block == 123
         assert item.Id == 121
-        assert 123 in ds.cache[Collection.block]
-        assert 121 in ds.cache[Collection.block_repr]
-        assert ds.cache[Collection.block_repr][121] == item
-        assert ds.cache[Collection.block][123].parent == 456
+        assert 123 in ds.shadow_copy[Collection.block]
+        assert 121 in ds.shadow_copy[Collection.block_repr]
+        assert ds.shadow_copy[Collection.block_repr][121] == item
+        assert ds.shadow_copy[Collection.block][123].parent == 456
         assert len(expected_responses) == 0
         assert not unexpected_requests
 
@@ -184,8 +184,8 @@ def data_store_tests():
         ds.add(item)
         assert item.relationship == 123
         assert item.Id == 121
-        assert 123 in ds.cache[Collection.relation]
-        assert 121 in ds.cache[Collection.relation_repr]
+        assert 123 in ds.shadow_copy[Collection.relation]
+        assert 121 in ds.shadow_copy[Collection.relation_repr]
         assert len(expected_responses) == 0
         assert not unexpected_requests
 
@@ -193,7 +193,7 @@ def data_store_tests():
     def add_repr_existing_model():
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block')
-        ds.cache[Collection.block][123] = model
+        ds.update_cache(model)
         item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
               name='Test1', description='This is a test block')
         def check_request_repr(url, method, kwargs):
@@ -203,9 +203,9 @@ def data_store_tests():
         add_expected_response('/data/_BlockRepresentation', 'post', get_response=check_request_repr)
         ds.add(item)
         assert item.Id == 121
-        assert 123 in ds.cache[Collection.block]
-        assert 121 in ds.cache[Collection.block_repr]
-        assert ds.cache[Collection.block_repr][121] == item
+        assert 123 in ds.shadow_copy[Collection.block]
+        assert 121 in ds.shadow_copy[Collection.block_repr]
+        assert ds.shadow_copy[Collection.block_repr][121] == item
         assert len(expected_responses) == 0
         assert not unexpected_requests
 
@@ -213,30 +213,30 @@ def data_store_tests():
     def delete_block():
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block')
-        ds.cache[Collection.block][123] = model
+        ds.update_cache(model)
         item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
               name='Test1', description='This is a test block', Id=121)
-        ds.cache[Collection.block_repr][121] = item
+        ds.update_cache(item)
         add_expected_response('/data/_BlockRepresentation/121', 'delete', Response(204))
         ds.delete(item)
-        assert not ds.cache[Collection.block_repr]
+        assert not ds.shadow_copy[Collection.block_repr]
         add_expected_response('/data/Block/123', 'delete', Response(204))
         ds.delete(model)
-        assert not ds.cache[Collection.block]
+        assert not ds.shadow_copy[Collection.block]
 
     @test
     def delete_relationship():
         ds = DataStore(config)
         model = client.BlockReference(Id=123)
-        ds.cache[Collection.relation][123] = model
+        ds.update_cache(model)
         item = client.BlockReferenceRepresentation(Id=121, start=1, finish=2, waypoints=[])
-        ds.cache[Collection.relation_repr][121] = item
+        ds.update_cache(item)
         add_expected_response('/data/_RelationshipRepresentation/121', 'delete', Response(204))
         ds.delete(item)
-        assert not ds.cache[Collection.relation_repr]
+        assert not ds.shadow_copy[Collection.relation_repr]
         add_expected_response('/data/BlockReference/123', 'delete', Response(204))
         ds.delete(model)
-        assert not ds.cache[Collection.relation]
+        assert not ds.shadow_copy[Collection.relation]
 
     @test
     def update_repr():
@@ -244,8 +244,8 @@ def data_store_tests():
         model = client.Block(Id=123, name='Test1', description='This is a test block', parent=456)
         item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
               name='Test1', description='This is a test block', Id=121)
-        ds.cache[Collection.block][123] = deepcopy(model)
-        ds.cache[Collection.block_repr][121] = deepcopy(item)
+        ds.update_cache(model)
+        ds.update_cache(item)
 
         # Check the update is filtered out
         ds.update(item)
@@ -260,8 +260,8 @@ def data_store_tests():
         assert len(expected_responses) == 0
         assert not unexpected_requests
         # Check the cache is also updated.
-        assert ds.cache[Collection.block_repr][121] == item
-        assert id(ds.cache[Collection.block_repr][121]) != id(item), "The cache must store a copy of the submitted object"
+        assert ds.shadow_copy[Collection.block_repr][121] == item
+        assert id(ds.shadow_copy[Collection.block_repr][121]) != id(item), "The shadow_copy must store a copy of the submitted object"
 
         # Update the model
         item.name = 'Test123'
@@ -270,9 +270,9 @@ def data_store_tests():
         ds.update(item)
         assert len(expected_responses) == 0
         assert not unexpected_requests
-        # Check the cache is also updated.
-        assert ds.cache[Collection.block][123].name == item.name
-        assert isinstance(ds.cache[Collection.block][123], client.Block)
+        # Check the shadow_copy is also updated.
+        assert ds.shadow_copy[Collection.block][123].name == item.name
+        assert isinstance(ds.shadow_copy[Collection.block][123], client.Block)
 
         # Update both representation and model
         item.name = 'More Testing'
@@ -294,11 +294,12 @@ def data_store_tests():
         model = client.Block(Id=123, name='Test1', description='This is a test block', parent=456)
         item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
               name='Test1', description='This is a test block', Id=121)
-        ds.cache[Collection.block][123] = deepcopy(model)
-        ds.cache[Collection.block_repr][121] = deepcopy(item)
+        ds.update_cache(model)
+        ds.update_cache(item)
 
         # Now add a port and try to save it.
         p1 = client.FlowPortRepresentation()
+        ds.update_cache(p1)
         item.ports.append(p1)
         add_expected_response('/data/FlowPort', 'post', Response(201, json={'Id': 155}),
                               check_request=check_request_data)
@@ -310,13 +311,13 @@ def data_store_tests():
         assert p1.parent == 121
         assert p1.diagram == 456
         # Expect a new Port to be created as well as its representation.
-        assert 155 in ds.cache[Collection.block]
-        assert 65 in ds.cache[Collection.block_repr]
+        assert 155 in ds.shadow_copy[Collection.block]
+        assert 65 in ds.shadow_copy[Collection.block_repr]
         assert p1.block == 155
         assert p1.parent == 121
-        assert len(ds.cache[Collection.block_repr][121].ports) == 1
+        assert len(ds.shadow_copy[Collection.block_repr][121].ports) == 1
         for k in ['diagram', 'parent', 'block', 'name', 'orientation']:
-            assert getattr(ds.cache[Collection.block_repr][121].ports[0], k) == getattr(p1, k)
+            assert getattr(ds.shadow_copy[Collection.block_repr][121].ports[0], k) == getattr(p1, k)
         assert not unexpected_requests
         assert len(expected_responses) == 0
 
@@ -330,7 +331,7 @@ def data_store_tests():
         ds.update(item)
         assert not unexpected_requests
         assert len(expected_responses) == 0
-        assert ds.cache[Collection.block_repr][65].styling == {'color': 'yellow'}
+        assert ds.shadow_copy[Collection.block_repr][65].styling == {'color': 'yellow'}
 
         # Update the model part of the port
         p1.name = 'Output'
@@ -338,7 +339,7 @@ def data_store_tests():
         ds.update(item)
         assert not unexpected_requests
         assert len(expected_responses) == 0
-        assert ds.cache[Collection.block][155].name == 'Output'
+        assert ds.shadow_copy[Collection.block][155].name == 'Output'
 
         # Now delete the port
         item.ports = []
@@ -347,8 +348,8 @@ def data_store_tests():
         ds.update(item)
         assert not unexpected_requests
         assert len(expected_responses) == 0
-        assert 65 not in ds.cache[Collection.block_repr]
-        assert 155 not in ds.cache[Collection.block]
+        assert 65 not in ds.shadow_copy[Collection.block_repr]
+        assert 155 not in ds.shadow_copy[Collection.block]
 
 @prepare
 def json_encoder_tests():
@@ -364,4 +365,4 @@ def json_encoder_tests():
 
 
 if __name__ == '__main__':
-    run_tests('json_encoder_tests.*')
+    run_tests()

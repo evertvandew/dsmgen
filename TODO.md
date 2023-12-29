@@ -1,16 +1,5 @@
 
 
-# Feature support for ports:
-* When dropping a block with ports, also drop representations for the ports
-* When loading a diagram, also load the associated ports
-- Store the Orientation in the styling for a port. Also useful for dedicated input & output ports.
-- Generate Port representations
-- Generate a list of allowed ports for each block
-- Generate blocks with ports a special variable to contain them
-- Add a PortRepresentation to the database model
-- In the client, treat ports as sub-blocks when persisting new or updated blocks
-
-
 # Bugs:
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
 * Some exceptions occur when manipulating connections.
@@ -18,21 +7,24 @@
 
 
 # TODO for the First Viable Product Release:
-* Support for container blocks
-  * Limiting the position of internal waypoints to within the container
-  * Dynamically create and remove ports as connections crossing the boundary are changed.
 * Allow conversion of one type element to another
 * Allow conversion of one relationship to another
-* Interact with a tree view of the model
 * Edit the styling of lines.
 * Make a collection of diagrams, supporting at least UML and SYSML.
 * When a user adds a connection that already exists, that should be reused.
+* When a user deletes the last representation of a connection, the underlying connection must be deleted.
 
 # Refactoring
 * Replace the REST "API" stuff with simple forwarding scheme. Letting objects maintain their own dirty state is a bad idea.
   Use a more centralized approach where actions are detected and lead to centralized sequences being run to handle the change.
 
 # Future enhancements
+* Support for "laned" diagrams (sequence diagrams, gantt charts)
+* Support for "puzzle" plug-in diagrams (scratch, Nassi–Shneiderman)
+* Support for container blocks
+  * Limiting the position of internal waypoints to within the container
+  * Dynamically create and remove ports as connections crossing the boundary are changed.
+  * Support for tabbed containers (LabVIEW)
 * Allow styling of ports
 * Let e.g. directionality of a port affect its rendering
 * Support styling multiple objects at once
@@ -54,6 +46,7 @@
 
 
 # Done:
+* Interact with a tree view of the model
 * Refactor the client-side serialization to put more logic in the data classes, not the RestApi.
 * Add shape for Document
 * Support multiple document types
@@ -68,4 +61,13 @@
   * Limit the size of the container to the extent of its children & their relationships
   * When objects are added to a group, they must be ordered above the group.
   * When deleting an object inside a group, delete its relationships.
+* Feature support for ports:
+  - When dropping a block with ports, also drop representations for the ports
+  - When loading a diagram, also load the associated ports
+  - Store the Orientation in the styling for a port. Also useful for dedicated input & output ports.
+  - Generate Port representations
+  - Generate a list of allowed ports for each block
+  - Generate blocks with ports a special variable to contain them
+  - Add a PortRepresentation to the database model
+  - In the client, treat ports as sub-blocks when persisting new or updated blocks
 

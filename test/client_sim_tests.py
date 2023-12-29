@@ -132,8 +132,8 @@ def simulated_diagram_tests():
         diagram, rest = new_diagram(5, ds)
         instance = client.Block(name='One', parent=3, Id=123)
         instance.children.append(client.FlowPort(name='output', parent=123, Id=124))
-        ds.cache[Collection.block][123] = deepcopy(instance)
-        ds.cache[Collection.block][124] = deepcopy(instance.children[0])
+        ds.update_cache(instance)
+        ds.update_cache(instance.children[0])
         restif = Mock()
         restif.get_hierarchy = Mock(side_effect=lambda cb: cb([instance]))
         explorer.make_explorer(d['explorer'], restif, client.allowed_children)
@@ -327,8 +327,58 @@ def simulated_explorer_tests():
         btn.dispatchEvent(events.Click())
         assert len(expected_responses) == 0
         assert len(unexpected_requests) == 0
-        assert ds.cache[Collection.hierarchy][2].name == 'blablablabla'
+        assert ds.get(Collection.hierarchy, 2).name == 'blablablabla'
 
+    @test
+    def drag_drop():
+        reset_document()
+        ds = DataStore(config)
+
+        clear_expected_response()
+        add_expected_response('/data/hierarchy', 'get', Response(
+            200,
+            json=[
+                {"order": 0, "Id": 1, "name": "Functional Model", "description": "", "parent": None,
+              "__classname__": "FunctionalModel"},
+                {"order": 0, "Id": 2, "name": "Structural Model", "description": "", "parent": None,
+              "__classname__": "StructuralModel"},
+
+            ]))
+        make_explorer(d['explorer'], ds, client.allowed_children)
+        blank = d['explorer']
+
+        source = [i for i in d['explorer'].select(f'.{explorer.name_cls}') if 'Structural' in str(i)][0]
+        ev = events.DragStart()
+        source.dispatchEvent(ev)
+        assert ev.dataTransfer.data
+        target = [i for i in d['explorer'].select(f'.{explorer.name_cls}') if 'Functional' in str(i)][0]
+        target.dispatchEvent(events.DragEnter(dataTransfer=ev.dataTransfer))
+        target.dispatchEvent(events.DragOver(dataTransfer=ev.dataTransfer))
+        target.dispatchEvent(events.DragOver(dataTransfer=ev.dataTransfer))
+        target.dispatchEvent(events.Drop(dataTransfer=ev.dataTransfer))
+        target.dispatchEvent(events.DragEnd(dataTransfer=ev.dataTransfer))
+
+        # Acknowledge that a move is desired
+        btns = d.select('.brython-dialog-main button')
+        ok_btn = [b for b in btns if b.text.lower() == 'ok'][0]
+        def get_response(url, method, kwargs):
+            data = json.loads(kwargs['data'])
+            assert data['parent'] == 1
+            return Response(200, json=data)
+        add_expected_response('/data/StructuralModel/2', 'post', get_response=get_response)
+        add_expected_response('/data/hierarchy', 'get', Response(
+            200,
+            json=[
+                {"order": 0, "Id": 1, "name": "Functional Model", "description": "", "parent": None,
+              "__classname__": "FunctionalModel"},
+                {"order": 0, "Id": 2, "name": "Structural Model", "description": "", "parent": 1,
+              "__classname__": "StructuralModel"},
+
+            ]))
+        ok_btn.dispatchEvent(events.Click())
+
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
 
 
 if __name__ == '__main__':
