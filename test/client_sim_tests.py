@@ -12,7 +12,7 @@ from inspect import signature
 from typing import List, Dict, Any
 from shapes import Shape, Relationship, Point, HIDDEN
 from browser import events
-from browser.ajax import add_expected_response, unexpected_requests, Response
+from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses
 from unittest.mock import Mock, MagicMock
 import diagrams
 import explorer
@@ -43,6 +43,69 @@ def mk_ds():
 
     ds = DataStore(config)
     return ds
+
+
+example_diagram = [
+    {"Id": 1, "diagram": 3, "block": 4, "x": 401.0, "y": 104.0, "z": 0.0, "width": 64.0, "height": 40.0,
+     "styling": {"color": "yellow"}, "block_cls": "BlockRepresentation",
+     "__classname__": "_BlockRepresentation",
+     "_entity": {"order": 0, "Id": 4, "parent": None, "name": "Test1",
+                 "description": "This is a test block",
+                 "__classname__": "Block"}},
+    {"Id": 2, "diagram": 3, "block": 5, "x": 369.0, "y": 345.0, "z": 0.0, "width": 64.0, "height": 40.0,
+     "styling": {}, "block_cls": "BlockRepresentation", "__classname__": "_BlockRepresentation",
+     "_entity": {"order": 0, "Id": 5, "parent": 2, "name": "Test2", "description": "",
+                 "__classname__": "Block"}},
+    {"Id": 3, "diagram": 3, "block": 7, "x": 101.0, "y": 360.0, "z": 0.0, "width": 110.0, "height": 65.0,
+     "styling": {"bordercolor": "#000000", "bordersize": "2", "blockcolor": "#fffbd6", "fold_size": "10",
+                 "font": "Arial", "fontsize": "16", "textcolor": "#000000", "xmargin": 2, "ymargin": 2,
+                 "halign": 11, "valign": 2}, "block_cls": "NoteRepresentation",
+     "__classname__": "_BlockRepresentation",
+     "_entity": {"order": 0, "Id": 7, "description": "Dit is een commentaar", "parent": 3,
+                 "__classname__": "Note"}},
+    {"Id": 1, "diagram": 3, "relationship": 1, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]",
+     "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation",
+     "_entity": {"Id": 1, "stereotype": 1, "source": 4, "target": 5, "source_multiplicity": 1,
+                 "target_multiplicity": 1, "__classname__": "BlockReference"}},
+    {"Id": 51, "diagram": 3, "block": 10, "parent": 2, "__classname__": "_BlockRepresentation",
+     "block_cls": "FlowPortRepresentation",
+     "_entity": {"Id": 10, "parent": 5, "__classname__": "FlowPort"}
+     }
+]
+
+
+port2port = [
+    {"Id": 1, "diagram": 3, "block": 4, "x": 401.0, "y": 104.0, "z": 0.0, "width": 64.0, "height": 40.0,
+     "styling": {"color": "yellow"}, "block_cls": "BlockRepresentation",
+     "__classname__": "_BlockRepresentation",
+     "_entity": {"order": 0, "Id": 4, "parent": None, "name": "Test1",
+                 "description": "This is a test block",
+                 "__classname__": "Block"}},
+    {"Id": 2, "diagram": 3, "block": 5, "x": 369.0, "y": 345.0, "z": 0.0, "width": 64.0, "height": 40.0,
+     "styling": {}, "block_cls": "BlockRepresentation", "__classname__": "_BlockRepresentation",
+     "_entity": {"order": 0, "Id": 5, "parent": 2, "name": "Test2", "description": "",
+                 "__classname__": "Block"}},
+    {"Id": 3, "diagram": 3, "block": 7, "x": 101.0, "y": 360.0, "z": 0.0, "width": 110.0, "height": 65.0,
+     "styling": {"bordercolor": "#000000", "bordersize": "2", "blockcolor": "#fffbd6", "fold_size": "10",
+                 "font": "Arial", "fontsize": "16", "textcolor": "#000000", "xmargin": 2, "ymargin": 2,
+                 "halign": 11, "valign": 2}, "block_cls": "BlockRepresentation",
+     "__classname__": "_BlockRepresentation",
+     "_entity": {"order": 0, "Id": 7, "name": "Test 3", "description": "Dit is een commentaar", "parent": 2,
+                 "__classname__": "Block"}},
+    {"Id": 51, "diagram": 3, "block": 10, "parent": 2, "__classname__": "_BlockRepresentation",
+     "block_cls": "FlowPortRepresentation",
+     "_entity": {"Id": 10, "parent": 5, "__classname__": "FlowPort"}
+     },
+    {"Id": 52, "diagram": 3, "block": 11, "parent": 3, "__classname__": "_BlockRepresentation",
+     "block_cls": "FlowPortRepresentation",
+     "_entity": {"Id": 10, "parent": 7, "__classname__": "FlowPort"}
+     },
+    {"Id": 1, "diagram": 3, "relationship": 1, "source_repr_id": 51, "target_repr_id": 52, "routing": "[]",
+     "z": 0.0, "styling": {}, "rel_cls": "FlowPortConnectionRepresentation",
+     "_entity": {"Id": 1, "stereotype": 1, "source": 10, "target": 11, "source_multiplicity": 1,
+                 "target_multiplicity": 1, "__classname__": "FlowPortConnection"}},
+
+]
 
 @prepare
 def simulated_diagram_tests():
@@ -179,39 +242,11 @@ def simulated_diagram_tests():
 
     @test
     def load_diagram():
-        from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses
-        from data_store import DataConfiguration, DataStore, Collection
-        import public.sysml_client as client
-
         ds = mk_ds()
 
         add_expected_response('/data/diagram_contents/3', 'get', Response(
             200,
-            json=[{"Id": 1, "diagram": 3, "block": 4, "x": 401.0, "y": 104.0, "z": 0.0, "width": 64.0, "height": 40.0,
-                   "styling": {"color": "yellow"}, "block_cls": "BlockRepresentation",
-                   "__classname__": "_BlockRepresentation",
-                   "_entity": {"order": 0, "Id": 4, "parent": None, "name": "Test1",
-                               "description": "This is a test block",
-                               "__classname__": "Block"}},
-                  {"Id": 2, "diagram": 3, "block": 5, "x": 369.0, "y": 345.0, "z": 0.0, "width": 64.0, "height": 40.0,
-                   "styling": {}, "block_cls": "BlockRepresentation", "__classname__": "_BlockRepresentation",
-                   "_entity": {"order": 0, "Id": 5, "parent": 2, "name": "Test2", "description": "",
-                               "__classname__": "Block"}},
-                  {"Id": 3, "diagram": 3, "block": 7, "x": 101.0, "y": 360.0, "z": 0.0, "width": 110.0, "height": 65.0,
-                   "styling": {"bordercolor": "#000000", "bordersize": "2", "blockcolor": "#fffbd6", "fold_size": "10",
-                               "font": "Arial", "fontsize": "16", "textcolor": "#000000", "xmargin": 2, "ymargin": 2,
-                               "halign": 11, "valign": 2}, "block_cls": "NoteRepresentation",
-                   "__classname__": "_BlockRepresentation",
-                   "_entity": {"order": 0, "Id": 7, "description": "Dit is een commentaar", "parent": 3,
-                               "__classname__": "Note"}},
-                  {"Id": 1, "diagram": 3, "relationship": 1, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]",
-                   "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation",
-                   "_entity": {"Id": 1, "stereotype": 1, "source": 4, "target": 5, "source_multiplicity": 1,
-                               "target_multiplicity": 1, "__classname__": "BlockReference"}},
-                  {"Id": 51, "diagram": 3, "block": 10, "parent": 2, "__classname__": "_BlockRepresentation",
-                   "block_cls": "FlowPortRepresentation",
-                   "_entity": {"Id": 10, "parent": 5, "__classname__": "FlowPort"}}
-                  ]))
+            json=example_diagram))
         diagram, rest = new_diagram(3, ds)
         assert len(expected_responses) == 0
         assert not unexpected_requests
@@ -222,6 +257,37 @@ def simulated_diagram_tests():
         assert len(d['canvas'].select('[data-class="BlockRepresentation"]')) == 2
         assert len(d['canvas'].select('[data-class="FlowPortRepresentation"]')) == 1
 
+    @test
+    def connection_property_editor():
+        import public.sysml_client as client
+        ds = mk_ds()
+
+        add_expected_response('/data/diagram_contents/3', 'get', Response(
+            200,
+            json=port2port))
+        diagram, rest = new_diagram(3, ds)
+        ds.subscribe('shape_selected', diagram.canvas, client.on_diagram_selection)
+        connection = diagram.connections[0]
+        connection.path.dispatchEvent(events.MouseDown())
+        nonlocal d
+        form = d.select('form')
+        assert len(form) == 1
+        html_form = str(form)
+        assert 'name' in html_form
+        assert 'linecolor' in html_form
+        edit = d.select_one('form #edit_name')
+        edit.value = 'Connection'
+        btn = d.select_one('#details .btn-primary')
+
+        add_expected_response('/data/FlowPortConnection/1', 'post', Response(200, json={}))
+        add_expected_response('/data/_RelationshipRepresentation/1', 'post', Response(200, json={}))
+        btn.dispatchEvent(events.Click())
+
+        live_instance = ds.get(Collection.relation, 1)
+        assert live_instance.name == 'Connection'
+
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
 
 
 @prepare

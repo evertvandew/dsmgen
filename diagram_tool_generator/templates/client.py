@@ -234,7 +234,8 @@ def on_diagram_selection(_e_name, _e_source, data_store, details):
     properties_div = document['details']
     for e in properties_div.children:
         e.remove()
-    properties_div <= dataClassEditor(object, data_store, update=update)
+    edit_ports = type(object).__name__ in block_entities or type(object).__name__ in block_representations
+    properties_div <= dataClassEditor(object, data_store, update=update, edit_ports=edit_ports)
 
 def on_explorer_click(_event_name, _event_source, data_store, details):
     """ Called when an element was left-clicked. """
