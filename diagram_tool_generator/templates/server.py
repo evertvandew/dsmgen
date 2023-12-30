@@ -228,8 +228,16 @@ def delete_entity_data(path, index):
     if issubclass(table, dm.Base):
         with dm.session_context() as session:
             record = session.query(table).filter(table.Id==index).all()
+            # If the last representation of a connection is deleted, delete it from the model.
             if record:
-                session.delete(record[0])
+                record = record[0]
+                session.delete(record)
+
+                if table is dm._RelationshipRepresentation:
+                    count = session.query(table).filter(table.relationship==record.relationship).count()
+                    if count == 0:
+                        # Delete the relationship from the model.
+                        session.query(dm._Relationship).filter(dm._Relationship.Id==record.relationship).delete()
                 return flask.make_response('Deleted', 204)
             else:
                 return flask.make_response('Not found', 404)

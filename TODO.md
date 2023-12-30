@@ -7,18 +7,15 @@
 
 
 # TODO for the First Viable Product Release:
-* Allow conversion of one type element to another
-* Allow conversion of one relationship to another
 * Edit the styling of lines.
 * Make a collection of diagrams, supporting at least UML and SYSML.
-* When a user adds a connection that already exists, that should be reused.
-* When a user deletes the last representation of a connection, the underlying connection must be deleted.
 
 # Refactoring
-* Replace the REST "API" stuff with simple forwarding scheme. Letting objects maintain their own dirty state is a bad idea.
-  Use a more centralized approach where actions are detected and lead to centralized sequences being run to handle the change.
 
 # Future enhancements
+* When a user adds a connection that already exists, that should be reused.
+* Allow conversion of one type element to another
+* Allow conversion of one relationship to another
 * Support for "laned" diagrams (sequence diagrams, gantt charts)
 * Support for "puzzle" plug-in diagrams (scratch, Nassi–Shneiderman)
 * Support for container blocks
@@ -46,6 +43,7 @@
 
 
 # Done:
+* When a user deletes the last representation of a connection, the underlying connection must be deleted.
 * Interact with a tree view of the model
 * Refactor the client-side serialization to put more logic in the data classes, not the RestApi.
 * Add shape for Document
@@ -70,4 +68,6 @@
   - Generate blocks with ports a special variable to contain them
   - Add a PortRepresentation to the database model
   - In the client, treat ports as sub-blocks when persisting new or updated blocks
+* Replace the REST "API" stuff with simple forwarding scheme. Letting objects maintain their own dirty state is a bad idea.
+  Use a more centralized approach where actions are detected and lead to centralized sequences being run to handle the change.
 

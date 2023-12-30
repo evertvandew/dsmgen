@@ -8,7 +8,6 @@ from dataclasses import is_dataclass
 from test_frame import prepare, test, run_tests, cleanup
 import generate_project     # Ensures the client is built up to date
 
-
 def run_server():
     """ Start the server in a seperate process. Return the URL to access it.
         The framework will automatically stop the server when the test is finished.
@@ -24,6 +23,7 @@ def run_server():
 
 @prepare
 def test_server():
+    #base_url = 'http://localhost:5200'
     base_url = run_server()
 
     from build import sysml_data as sm
@@ -217,6 +217,37 @@ def test_server():
             assert p['diagram'] == 2
             assert p['parent'] == 1
 
+    @test
+    def test_relationship_delete():
+        sm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
+        clear_db()
+        load_db([
+            sm.Note(Id=1, description="Don't mind me"),
+            sm.BlockDefinitionDiagram(Id=2, name="Test diagram"),
+            sm.Block(Id=3, name="Block 1", description="Dit is een test", parent=2, order=1),
+            sm._Relationship(Id=1, subtype='Anchor', source_id=3, target_id=1),
+            sm._BlockRepresentation(Id=1, block=1, diagram=2),
+            sm._BlockRepresentation(Id=2, block=3, diagram=2),
+            sm._RelationshipRepresentation(Id=1, diagram=2, relationship=1, source_repr_id=1, target_repr_id=2, rel_cls='Anchor'),
+            sm.BlockDefinitionDiagram(Id=4, name="Test diagram"),
+            sm._BlockRepresentation(Id=3, block=1, diagram=4),
+            sm._BlockRepresentation(Id=4, block=3, diagram=4),
+            sm._RelationshipRepresentation(Id=2, diagram=4, relationship=1, source_repr_id=3, target_repr_id=4,
+                                           rel_cls='Anchor')
+        ])
+
+        # Delete the first representation
+        r = requests.delete(base_url+'/data/_RelationshipRepresentation/1')
+        assert r.status_code == 204
+        # Ensure the relationship still exists
+        r = requests.get(base_url+'/data/_Relationship/1')
+        assert r.status_code == 200
+        # Delete the second representation
+        r = requests.delete(base_url+'/data/_RelationshipRepresentation/2')
+        assert r.status_code == 204
+        # Ensure the relationship has been deleted as well.
+        r = requests.get(base_url+'/data/_Relationship/1')
+        assert r.status_code == 404
 
 
 if __name__ == '__main__':
