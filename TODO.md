@@ -1,14 +1,15 @@
 
 
 # Bugs:
+* When playing with properties, often the ports of a block are duplicated.
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
 * Some exceptions occur when manipulating connections.
 * Use `get_type_hints` instead of raw `__annotations__`.
 
 
 # TODO for the First Viable Product Release:
-* Edit the styling of lines.
 * Make a collection of diagrams, supporting at least UML and SYSML.
+  - For now, except the sequence diagram because it requires laneing support.
 
 # Refactoring
 
@@ -43,6 +44,7 @@
 
 
 # Done:
+* Edit the styling of lines.
 * When a user deletes the last representation of a connection, the underlying connection must be deleted.
 * Interact with a tree view of the model
 * Refactor the client-side serialization to put more logic in the data classes, not the RestApi.
