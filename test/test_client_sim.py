@@ -76,20 +76,20 @@ example_diagram = [
 
 port2port = [
     {"Id": 1, "diagram": 3, "block": 4, "x": 401.0, "y": 104.0, "z": 0.0, "width": 64.0, "height": 40.0,
-     "styling": {"color": "yellow"}, "block_cls": "BlockRepresentation",
+     "styling": {"color": "yellow"}, "block_cls": "BlockRepresentation", "parent": None,
      "__classname__": "_BlockRepresentation",
      "_entity": {"order": 0, "Id": 4, "parent": None, "name": "Test1",
                  "description": "This is a test block",
                  "__classname__": "Block"}},
     {"Id": 2, "diagram": 3, "block": 5, "x": 369.0, "y": 345.0, "z": 0.0, "width": 64.0, "height": 40.0,
-     "styling": {}, "block_cls": "BlockRepresentation", "__classname__": "_BlockRepresentation",
+     "styling": {}, "block_cls": "BlockRepresentation", "__classname__": "_BlockRepresentation", "parent": None,
      "_entity": {"order": 0, "Id": 5, "parent": 2, "name": "Test2", "description": "",
                  "__classname__": "Block"}},
     {"Id": 3, "diagram": 3, "block": 7, "x": 101.0, "y": 360.0, "z": 0.0, "width": 110.0, "height": 65.0,
      "styling": {"bordercolor": "#000000", "bordersize": "2", "blockcolor": "#fffbd6", "fold_size": "10",
                  "font": "Arial", "fontsize": "16", "textcolor": "#000000", "xmargin": 2, "ymargin": 2,
                  "halign": 11, "valign": 2}, "block_cls": "BlockRepresentation",
-     "__classname__": "_BlockRepresentation",
+     "__classname__": "_BlockRepresentation", "parent": None,
      "_entity": {"order": 0, "Id": 7, "name": "Test 3", "description": "Dit is een commentaar", "parent": 2,
                  "__classname__": "Block"}},
     {"Id": 51, "diagram": 3, "block": 10, "parent": 2, "__classname__": "_BlockRepresentation",
@@ -251,7 +251,7 @@ def simulated_diagram_tests():
         assert len(expected_responses) == 0
         assert not unexpected_requests
 
-        # Check the various elemenets were rendered to the DOM
+        # Check the various elements were rendered to the DOM
         nonlocal d
         assert len(d['canvas'].select('[data-class="NoteRepresentation"]')) == 1
         assert len(d['canvas'].select('[data-class="BlockRepresentation"]')) == 2
@@ -269,6 +269,8 @@ def simulated_diagram_tests():
         ds.subscribe('shape_selected', diagram.canvas, client.on_diagram_selection)
         connection = diagram.connections[0]
         connection.path.dispatchEvent(events.MouseDown())
+        connection.path.dispatchEvent(events.MouseUp())
+        assert not unexpected_requests
         nonlocal d
         form = d.select('form')
         assert len(form) == 1
@@ -285,6 +287,32 @@ def simulated_diagram_tests():
 
         live_instance = ds.get(Collection.relation, 1)
         assert live_instance.name == 'Connection'
+
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
+
+    @test
+    def block_property_editor():
+        import public.sysml_client as client
+        ds = mk_ds()
+
+        add_expected_response('/data/diagram_contents/3', 'get', Response(
+            200,
+            json=port2port))
+        diagram, rest = new_diagram(3, ds)
+        ds.subscribe('shape_selected', diagram, client.on_diagram_selection)
+        block = [c for c in diagram.children if c.ports][0]
+        block.shape.dispatchEvent(events.MouseDown())
+        block.shape.dispatchEvent(events.MouseUp())
+        assert not unexpected_requests
+        nonlocal d
+        form = d.select('form')
+        assert len(form) == 1
+        html_form = str(form)
+        assert 'name' in html_form
+        assert 'description' in html_form
+        assert 'TR' in html_form            # the editor for the port
+        assert 'blockcolor' in html_form
 
         assert not unexpected_requests
         assert len(expected_responses) == 0

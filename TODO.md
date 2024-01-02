@@ -8,12 +8,14 @@
 
 
 # TODO for the First Viable Product Release:
+* Support managing multiple diagrams using tabs.
 * Make a collection of diagrams, supporting at least UML and SYSML.
   - For now, except the sequence diagram because it requires laneing support.
 
 # Refactoring
 
 # Future enhancements
+* Allow extra details to be shown around a relationship.
 * When a user adds a connection that already exists, that should be reused.
 * Allow conversion of one type element to another
 * Allow conversion of one relationship to another
