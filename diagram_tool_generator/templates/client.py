@@ -275,7 +275,7 @@ def run(explorer, canvas, details):
     blank = document[explorer]
     diagram_tabview = TabView('canvas')
 
-    def on_explorer_dblclick(_event_name, _event_source, data_store, details):
+    def on_explorer_dblclick(_event_name, event_source, data_store, details):
         """ Called when an element was left-clicked. """
         canvas = details['context']['canvas']
         target_dbid: int = details['target_dbid']
@@ -285,15 +285,16 @@ def run(explorer, canvas, details):
         # If a diagram is double-clicked, open it.
         def oncomplete(response):
             # Clear any existing diagrams
-            container = document[canvas]
-            container.html = ''
             svg_tag = html.SVG()
             svg_tag <= getMarkerDefinitions()
             svg_tag.classList.add('diagram')
-            container <= svg_tag
+            # container <= svg_tag
             ## In future: subscribe to events in the diagram api.
             diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], data_store, svg_tag,
                                             representation_lookup, connections_from)
+            diagram_details = data_store.get(target_type, target_dbid)
+            console.log(f'DETAILS: {details}')
+            diagram_tabview.add_page(diagram_details.name, svg_tag, diagram.close)
             data_store.subscribe('shape_selected', svg_tag, on_diagram_selection)
 
         if target_type in diagram_classes:
