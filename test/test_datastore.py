@@ -48,7 +48,7 @@ def data_store_tests():
                 {"order": 0, "Id": 1, "name": "Functional Model", "description": "", "parent": None,
               "__classname__": "FunctionalModel"},
              {"order": 0, "Id": 2, "name": "Structural Model", "description": "", "parent": None,
-              "__classname__": "StructuralModel"}, {"order": 0, "Id": 3, "entities": [], "parent": 2, "name": "test",
+              "__classname__": "StructuralModel"}, {"order": 0, "Id": 3, "parent": 2, "name": "test",
                                                     "__classname__": "BlockDefinitionDiagram"},
              {"order": 0, "Id": 4, "parent": None, "name": "Test1", "description": "", "__classname__": "Block"},
              {"order": 0, "Id": 5, "parent": 2, "name": "Test Block", "description": "", "__classname__": "Block"},

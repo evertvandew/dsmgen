@@ -12,7 +12,7 @@
     </svg>
 
     <script type="text/python">
-        from browser import document, console, html, window
+        from browser import document, console, html, window, svg
         import diagrams
         from property_editor import dataClassEditor
         import shapes
@@ -27,11 +27,12 @@
         all_shapes = [s for s in all_shapes if s.getType() != 'textwidget']
         #all_shapes = [s for s in all_shapes if s.getType() == 'bar']
         for i, b in enumerate(all_shapes):
-            x, y = 100 + 200 * (i%5), 100 + 100 * (i // 5)
+            x, y = 150 + 200 * (i%5), 100 + 100 * (i // 5)
             console.log(f"Creating instance of {b.getType()}")
             s = shapes.Shape(x=x, y=y, width=100, height=40, shape_type=b.getType())
             s.name=b.getType()
             diagram.addBlock(s)
+            diagram.canvas.appendChild(svg.text(b.getType(), x=x, y=y-12))
 
     </script>
 </body>

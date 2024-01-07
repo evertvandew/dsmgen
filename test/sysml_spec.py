@@ -109,9 +109,8 @@ class FlowPortConnection:
 
     styling = "end:hat"
 
-@BlockDiagram(styling='icon:image')
+@BlockDiagram(Block, Note, Constraint, styling='icon:image')
 class BlockDefinitionDiagram:
-    entities: [Block, Note, Constraint]
     parent: XRef('children', Block, StructuralModel, hidden)
     name: str
 

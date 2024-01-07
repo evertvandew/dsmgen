@@ -12,8 +12,8 @@ import svg_shapes
     The generated client uses the Brython Python-In-A-Browser technology.
 """
 
-from dataclasses import fields, is_dataclass
 import model_definition as mdef
+from model_definition import fields, is_dataclass
 
 %>
 
@@ -44,10 +44,10 @@ class ${entity.__name__}:
     ## All elements must have a default value so they can be created from scratch
     ${f.name}: ${generator.get_html_type(f.type)} = ${generator.get_default(f.type)}
     % endfor
-    %if entity in generator.md.port:
+    %if generator.md.is_port(entity):
     orientation: shapes.BlockOrientations = shapes.BlockOrientations.RIGHT
     %endif
-    % if not entity in generator.md.relationship:
+    % if not generator.md.is_relationship(entity):
     order: shapes.HIDDEN = 0
     children: shapes.HIDDEN = field(default_factory=list)
 
@@ -60,9 +60,16 @@ class ${entity.__name__}:
 
 ## Create the representations of the various blocks and relationships
 # Representations of the various graphical elements
-% for cls in generator.md.entity:
+% for cls in [c for c in generator.md.representables if not generator.md.is_relationship(c)]:
+    <%
+        # Determine the base class of the Representation
+        if generator.md.is_port(cls):
+            base_class = 'FlowPort'
+        else:
+            base_class = mdef.get_style(cls, 'structure', 'Block')
+    %>
 @dataclass
-class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 'Block')}):
+class ${cls.__name__}Representation(diagrams.${base_class}):
     Id: shapes.HIDDEN = 0
     diagram: shapes.HIDDEN = 0
     block: shapes.HIDDEN = 0
@@ -80,35 +87,17 @@ class ${cls.__name__}Representation(diagrams.${mdef.get_style(cls, 'structure', 
 
     @classmethod
     def repr_category(cls):
+        %if generator.md.is_port(cls):
+        return 'port'
+        %else:
         return 'block'
+        %endif
 
     % if cls.__name__ in generator.get_allowed_ports():
     @classmethod
     def get_allowed_ports(cls):
         return [${", ".join(f'{c}Representation' for c in generator.get_allowed_ports()[cls.__name__])}]
     % endif
-
-% endfor
-
-
-% for cls in generator.md.port:
-@dataclass
-class ${cls.__name__}Representation(diagrams.FlowPort):
-    Id: shapes.HIDDEN = 0
-    diagram: shapes.HIDDEN = 0
-    block: shapes.HIDDEN = 0
-    parent: shapes.HIDDEN = 0
-    % for attr in generator.get_diagram_attributes(cls):
-    ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
-    % endfor
-
-    shape_type = shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
-
-    logical_class = ${cls.__name__}
-
-    @classmethod
-    def repr_category(cls):
-        return 'port'
 
 % endfor
 
@@ -146,7 +135,7 @@ class ${cls.__name__}Representation(diagrams.Relationship):
 ## Create the diagram definitions
 # Definitions for rendering the various diagrams
 % for cls in generator.md.diagrams:
-<% block_names = [f'"{e.__name__}": {e.__name__}Representation' for e in cls.__annotations__['entities']] %>
+<% block_names = [f'"{e.__name__}": {e.__name__}Representation' for e in cls.entities] %>
 class ${cls.__name__}Representation(diagrams.Diagram):
     allowed_blocks = {${", ".join(block_names)}}
 
@@ -176,7 +165,7 @@ explorer_classes = {
 }
 
 block_entities = {
-    <%  lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.entity] %>
+    <%  lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.blocks] %>
     ${',\n    '.join(lines)}
 }
 
@@ -189,7 +178,7 @@ port_classes = {
     ${',\n    '.join(lines)}
 }
 block_representations = {
-    <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.entity] %>
+    <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.blocks] %>
     ${',\n    '.join(lines)}
 }
 relation_representations = {
@@ -203,13 +192,13 @@ port_representations = {
 
 representation_classes = {
     <%  lines = [f'"{c.__name__}Representation": {c.__name__}Representation'
-        for c in generator.md.entity + generator.md.port + generator.md.relationship] %>
+        for c in generator.md.representables] %>
     ${',\n    '.join(lines)}
 }
 
 representation_lookup = {
     <%  lines = [f'"{c.__name__}": {c.__name__}Representation'
-        for c in generator.md.entity + generator.md.port + generator.md.relationship] %>
+        for c in generator.md.representables] %>
     ${',\n    '.join(lines)}
 }
 

@@ -8,11 +8,13 @@
 
 
 # TODO for the First Viable Product Release:
-* Support managing multiple diagrams using tabs.
 * Make a collection of diagrams, supporting at least UML and SYSML.
   - For now, except the sequence diagram because it requires laneing support.
 
 # Refactoring
+* Make parts in the model definition that are used in generating the tool, parts of the decorator call
+  instead of the dataclass part.
+* Check if the various entities in the model_definition still need to be dataclasses.
 
 # Future enhancements
 * Allow extra details to be shown around a relationship.
@@ -46,6 +48,7 @@
 
 
 # Done:
+* Support managing multiple diagrams using tabs.
 * Edit the styling of lines.
 * When a user deletes the last representation of a connection, the underlying connection must be deleted.
 * Interact with a tree view of the model

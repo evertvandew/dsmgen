@@ -18,7 +18,7 @@ import sys
 import importlib
 from dataclasses import fields
 from typing import Self, Any, List, Dict
-from itertools import chain
+import argparse
 
 from mako.template import Template
 
@@ -65,6 +65,16 @@ class Generator:
         assert len(all_names) == len(md.all_model_items), 'Duplicate names in the definitions'
         self.all_names = all_names
 
+        # Replace forward references to classes with the actual classes where relevant
+        # Forward references are strings containing the names of classes.
+        def mk_cls(name):
+            if isinstance(name, str):
+                return all_names[name]
+            return name
+
+        for cls in md.diagrams:
+            cls.entities = [mk_cls(n) for n in cls.entities]
+
         self.dependencies = determine_dependencies(all_names)
 
         # Collect which children can be created for a model item.
@@ -80,8 +90,8 @@ class Generator:
                     elif name == 'Self':
                         children[cls.__name__].add(cls.__name__)
         # Also look at the allowed "entities" in diagrams.
-        for cls in [c for c in mdef.model_definition.all_model_items if 'entities' in c.__annotations__]:
-            children[cls.__name__] |= {c.__name__ for c in get_inner_types(cls, cls.__annotations__['entities'])}
+        for cls in mdef.model_definition.diagrams:
+            children[cls.__name__] |= {c.__name__ for c in get_inner_types(cls, cls.entities)}
         self.children = children
 
         self.ordered_items = self.order_dependencies()
@@ -155,6 +165,10 @@ class Generator:
             if mdef.optional in field_type.types:
                 return 'OptionalRef(int)'
             return 'int'
+        if conversion := mdef.model_definition.get_conversions(field_type):
+            return conversion.client.typename
+        if isinstance(field_type, str):
+            return field_type
         return field_type.__name__
 
     @staticmethod
@@ -181,6 +195,8 @@ class Generator:
             return 'None'
         if isinstance(field_type, mdef.selection):
             return '1'
+        if conversion := mdef.model_definition.get_conversions(field_type):
+            return conversion.client.default
         if field_type is int:
             return '0'
         if field_type is str:
@@ -194,7 +210,7 @@ class Generator:
     def get_connections_from(self):
         """ Determine which connections can be started from the specific class. """
         all_connections = []
-        for cls in mdef.model_definition.entity + mdef.model_definition.port:
+        for cls in mdef.model_definition.blocks + mdef.model_definition.port:
             connections = [c for c in mdef.model_definition.relationship if cls in c.__annotations__['source'].types]
             options = {}
             for c in connections:
@@ -262,4 +278,7 @@ def generate_tool(config: Configuration):
 
 
 if __name__ == '__main__':
-    generate_tool(Configuration('sysml_spec.py'))
+    parser = argparse.ArgumentParser()
+    parser.add_argument('specification', default='sysml_spec.py')
+    args = parser.parse_args()
+    generate_tool(Configuration(args.specification))

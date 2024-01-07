@@ -18,7 +18,9 @@ def get_sql_type(t):
         'datetime': 'DateTime',
         'time': 'Time',
         'float': 'Float',
-        'longstr': 'str'
+        'longstr': 'str',
+        'parameter_spec': 'str',
+        'parameter_values': 'str'
     }.get(t, '')
     return tp or t
 
@@ -243,6 +245,8 @@ class NotFound(RuntimeError): pass
 
 
 class longstr(str): pass
+class parameter_spec(str): pass
+class parameter_values(str): pass
 
 class AWrapper:
     def store(self, session=None, accept_id=False):
@@ -381,11 +385,10 @@ class AMessage(ABlock):
     # Generated dataclasses
 % for entity in generator.ordered_items:
 <%
-    stereotype = 'ABlock' if entity in generator.md.entity else \
+    stereotype = 'ABlock' if entity in generator.md.blocks else \
                  'ARelationship' if entity in generator.md.relationship else \
                  'APort' if entity in generator.md.port else \
-                 'ALogicalElement' if entity in generator.md.logical_model else \
-                 'ADiagram'
+                 'ADiagram' if entity in generator.md.diagrams else 'ALogicalElement'
 %>
 @dataclass
 class ${entity.__name__}(${stereotype}):
