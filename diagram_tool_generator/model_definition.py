@@ -89,6 +89,10 @@ class ModelDefinition:
         return PortElement in cls.categories
     def is_relationship(self, cls):
         return ConnectionElement in cls.categories
+    def is_diagram(self, cls):
+        return DiagramElement in cls.categories
+    def is_representable(self, cls):
+        return RepresentableElement in cls.categories
 
     def get_conversions(self, cls: Any) -> Optional[TypeConversion]:
         name = cls if isinstance(cls, str) else (cls.__name__ if isinstance(cls, type) else type(cls).__name__)
@@ -157,7 +161,7 @@ def BlockInstance(styling=''):
 def Relationship(styling=''):
     """ Definition of a connection between entities. """
     def decorate(cls):
-        cls.categories = [ConnectionElement]
+        cls.categories = [ConnectionElement, RepresentableElement]
         cls = dataclass(cls)
         model_definition.model_elements.append(cls)
         styling_definition[cls.__name__] = split_styling(styling)

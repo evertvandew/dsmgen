@@ -55,6 +55,17 @@ class ${entity.__name__}:
         return "${mdef.get_style(entity, 'icon', 'folder')}"
     % endif
 
+    % if generator.md.is_diagram(entity):
+    <% block_names = [f'"{e.__name__}": "{e.__name__}Representation"' for e in entity.entities] %>
+    class Diagram(diagrams.Diagram):
+        allowed_blocks = {${", ".join(block_names)}}
+        @classmethod
+        def get_allowed_blocks(cls) -> Dict[str, Any]:
+            # The allowed blocks are given as a Dict[str, str]. Here we replace the str references to classes
+            # by actual classes.
+            return {k: globals()[v] for k, v in cls.allowed_blocks.items()}
+    % endif
+
 % endfor
 
 
@@ -155,7 +166,10 @@ allowed_ports = {
 
 diagram_definitions = {
     % for cls in generator.md.diagrams:
-    "${cls.__name__}": ${cls.__name__}Representation,
+    "${cls.__name__}": ${cls.__name__}.Diagram,
+    % if generator.md.is_representable(cls):
+    "${cls.__name__}Representation": ${cls.__name__}.Diagram,
+    % endif
     % endfor
 }
 
