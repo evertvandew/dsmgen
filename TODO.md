@@ -1,7 +1,8 @@
 
 
 # Bugs:
-* When playing with properties, often the ports of a block are duplicated.
+* When editing the name of a block, the explorer is not updated.
+* When entering multiple blocks in the explorer, the second block gets the name of the first one.
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
 * Some exceptions occur when manipulating connections.
 * Use `get_type_hints` instead of raw `__annotations__`.

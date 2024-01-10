@@ -6,12 +6,20 @@ import logging
 import flask
 import magic
 import sys
+from typing import Any, Dict
 from dataclasses import is_dataclass
 import ${generator.module_name}data as dm
 
 
 
 app = flask.Flask(__name__)
+
+# Instance representations are treated (slightly) different than other representations,
+# so we need to know which they are
+<%
+    ir = ", ".join([f'"{e.__name__}Representation"' for e in generator.md.instance_of])
+%>
+INSTANCE_REPRESENTATIONS = [${ir}]
 
 def get_request_data():
     if flask.request.data:
@@ -46,6 +54,90 @@ def my_get_mime(path):
     else:
         mime = mime.replace(' [ [', '')
     return mime
+
+
+
+def create_port_representations(definition_id, representation_id, diagram, session, dm):
+    # Find all direct children of this block
+    children = session.query(dm._Entity).filter(dm._Entity.parent==definition_id).all()
+    # Select only the ports
+    port_entities = [p for p in children if p.type == dm.EntityType.Port]
+    port_reprs = [dm._BlockRepresentation(
+            diagram=diagram,
+            block=ch.Id,
+            parent=representation_id,
+            x=0,
+            y=0,
+            z=0,
+            width=0,
+            height=0,
+            styling='',
+            block_cls=ch.subtype + 'Representation',
+        ) for ch in port_entities]
+    for p in port_reprs:
+        session.add(p)
+    return port_entities, port_reprs
+
+def create_block_representation(index, table, data, session, dm):
+    if issubclass(table, dm.AInstance):
+        # ensure the index actually exists, for safety
+        if session.query(dm._Entity).filter(dm._Entity.Id == index).count() != 1:
+            return flask.make_response(f'Not found', 404)
+        # We are creating a new instance, it also needs adding in the
+        entity = table(parent=data['diagram'], definition=index)
+        entity.store(session=session)
+    else:
+        entity = table.retrieve(index, session=session)
+
+    record = dm._BlockRepresentation(
+        diagram=data['diagram'],
+        block=entity.Id,
+        parent=None,
+        x=data['x'],
+        y=data['y'],
+        z=data.get('z', 0),
+        width=data['width'],
+        height=data['height'],
+        styling='',
+        block_cls=type(entity).__name__ + 'Representation'
+    )
+    record.post_init()
+    session.add(record)
+    session.commit()
+
+    if issubclass(table, dm.AInstance):
+        # For an instance, represent the ports belonging to the original entity, not the instance we created just now.
+        port_entities, port_reprs = create_port_representations(index, record.Id, data['diagram'], session, dm)
+    else:
+        # Represent the ports belonging to the block being represented.
+        port_entities, port_reprs = create_port_representations(entity.Id, record.Id, data['diagram'], session, dm)
+    session.commit()
+    record_dict = record.asdict()
+    record_dict['_entity'] = entity.asdict()
+    record_dict['children'] = [p.asdict() for p in port_reprs]
+    for e, p in zip(port_entities, record_dict['children']):
+        p['_entity'] = e.asdict()
+    return flask.make_response(json.dumps(record_dict, cls=dm.ExtendibleJsonEncoder), 201)
+
+def create_relation_representation(index: int, table: type, data: Dict[str, Any], session, dm: type):
+    entity = table.retrieve(index, session=session)
+    # We need the waypoints supplied by the client.
+    record = dm._RelationshipRepresentation(
+        diagram=data['diagram'],
+        relationship=index,
+        source_repr_id=data['source'],
+        target_repr_id=data['target'],
+        routing=data['routing'],
+        z=data['z'],
+        styling='',
+        rel_cls=table.__name__ + 'Representation'
+    )
+    record.post_init()
+    session.add(record)
+    session.commit()
+    result_dict = record.asdict()
+    result_dict['_entity'] = entity.asdict()
+    return flask.make_response(json.dumps(record), 201)
 
 
 # #############################################################################
@@ -146,42 +238,62 @@ def create_representation(path, index):
     if not (table := dm.__dict__.get(path, '')):
         return flask.make_response('Not found', 404)
 
-    # Only the "entities" in the data model can have representations.
-    # Port representations are not created independently.
-    if not issubclass(table, dm.AWrapper) or issubclass(table, dm.APort):
-        return flask.make_response("Can not create a representation", 405)
-
-    data = get_request_data()
-    entity = table.retrieve(index)
-
-    # Create the Representation for representations
-    if issubclass(table, dm.ARelationship):
-        with dm.session_context() as session:
-            # We need the waypoints supplied by the client.
-            record = dm._RelationshipRepresentation(
-                diagram=data['diagram'],
-                relationship=index,
-                source_repr_id=data['source'],
-                target_repr_id=data['target'],
-                routing=data['routing'],
-                z=data['z'],
-                styling='',
-                rel_cls=path+'Representation'
-            )
-            record.post_init()
-            session.add(record)
-            session.commit()
-            result_dict = record.asdict()
-            result_dict['_entity'] = entity.asdict()
-            return flask.make_response(json.dumps(), 201)
-
-    # Create the Representation for other entities
     with dm.session_context() as session:
-        # Find all direct children of this block
-        children = session.query(dm._Entity).filter(dm._Entity.parent==index).all()
+        # Only the "entities" in the data model can have representations.
+        # Port representations are not created independently.
+        if not issubclass(table, dm.AWrapper) or issubclass(table, dm.APort):
+            return flask.make_response("Can not create a representation", 405)
+
+        data = get_request_data()
+
+        # Check we are creating something for an existing diagram
+        diagrams = session.query(dm._Entity).filter(dm._Entity.Id == int(data['diagram'])).all()
+        if len(diagrams) != 1:
+            return flask.make_response('Not found', 404)
+        diagram = diagrams[0]
+        diagram_cls = dm.__dict__.get(diagram.subtype, '')
+        if not issubclass(diagram_cls, dm.ADiagram):
+            return flask.make_response("Can not create a representation", 405)
+
+        # Create the Representation for representations
+        if issubclass(table, dm.ARelationship):
+            return create_relation_representation(index, table, data, session, dm)
+
+        # Create the Representation for other entities
+        return create_block_representation(index, table, data, session, dm)
+
+@app.route("/data/<path:path>/<int:index>/create_instance", methods=['POST'])
+def create_instance(path, index):
+    """ Create an instance of a pre-defined class / block / etc.
+        The following steps are taken:
+        1. The Instance object is created in the hierarchical model for storing parameters.
+        2. The representation is created for the diagram.
+        3. The representations for the ports associated with the pre-defined block are created
+        Arguments:
+            path -- the name of the Instance class to be created.
+            index -- the index of the definition record.
+    """
+    if not (table := dm.__dict__.get(path, '')):
+        return flask.make_response('Not found 1', 404)
+    data = get_request_data()
+
+    with dm.session_context() as session:
+        # Check the definition object actually exists
+        nr_definitions = session.query(dm._Entity).filter(dm._Entity.Id == index).count()
+        print("Found records:", nr_definitions)
+        nr_definitions = len(nr_definitions)
+        if nr_definitions != 1:
+            return flask.make_response(f'Not found 2 - {nr_definitions}', 404)
+
+        # Create the structural element for this entity and persist it.
+        # The instance is created under the diagram in the hierarchical model.
+        model_record = table(parent=data['diagram'], definition=index)
+        model_record.store()
+
+        # Create the representation of the Instance
         record = dm._BlockRepresentation(
             diagram=data['diagram'],
-            block=index,
+            block=model_record.Id,
             parent=None,
             x=data['x'],
             y=data['y'],
@@ -189,37 +301,20 @@ def create_representation(path, index):
             width=data['width'],
             height=data['height'],
             styling='',
-            block_cls=path+'Representation'
+            block_cls=f'{path}Representation'
         )
         record.post_init()
         session.add(record)
         session.commit()
 
-        # Create representation of the ports among the children.
-        # TODO: Inner networks are not yet supported.
-        port_entities = [p for p in children if p.type == dm.EntityType.Port]
-        ports = [dm._BlockRepresentation(
-                diagram=data['diagram'],
-                block=ch.Id,
-                parent=record.Id,
-                x=0,
-                y=0,
-                z=0,
-                width=0,
-                height=0,
-                styling='',
-                block_cls=ch.subtype + 'Representation',
-            ) for ch in port_entities]
-        for p in ports:
-            session.add(p)
-        session.commit()
+        # Create any ports associated with this object
+        port_entities, port_reprs = create_port_representations(index, record.Id, data['diagram'], session, dm)
         record_dict = record.asdict()
-        record_dict['_entity'] = entity.asdict()
-        record_dict['children'] = [p.asdict() for p in ports]
+        record_dict['_entity'] = model_record.asdict()
+        record_dict['children'] = [p.asdict() for p in port_reprs]
         for e, p in zip(port_entities, record_dict['children']):
             p['_entity'] = e.asdict()
         return flask.make_response(json.dumps(record_dict, cls=dm.ExtendibleJsonEncoder), 201)
-
 
 @app.route("/data/<path:path>/<int:index>", methods=['DELETE'])
 def delete_entity_data(path, index):
@@ -228,16 +323,24 @@ def delete_entity_data(path, index):
     if issubclass(table, dm.Base):
         with dm.session_context() as session:
             record = session.query(table).filter(table.Id==index).all()
-            # If the last representation of a connection is deleted, delete it from the model.
             if record:
                 record = record[0]
                 session.delete(record)
 
+                # If the last representation of a connection or instance is deleted, delete it from the model.
                 if table is dm._RelationshipRepresentation:
                     count = session.query(table).filter(table.relationship==record.relationship).count()
                     if count == 0:
                         # Delete the relationship from the model.
                         session.query(dm._Relationship).filter(dm._Relationship.Id==record.relationship).delete()
+                elif table is dm._BlockRepresentation:
+                    if record.block_cls in INSTANCE_REPRESENTATIONS:
+                        # Check if there are any more representation of this block
+                        count = session.query(table).filter(table.block == record.block).count()
+                        if count == 0:
+                            # Delete the underlying Instance from the model.
+                            session.query(dm._Entity).filter(dm._Entity.Id == record.block).delete()
+
                 return flask.make_response('Deleted', 204)
             else:
                 return flask.make_response('Not found', 404)

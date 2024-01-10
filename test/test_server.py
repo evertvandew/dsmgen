@@ -8,16 +8,20 @@ from dataclasses import is_dataclass
 from test_frame import prepare, test, run_tests, cleanup
 import generate_project     # Ensures the client is built up to date
 
+
+START_SERVER = True
+
 def run_server():
     """ Start the server in a seperate process. Return the URL to access it.
         The framework will automatically stop the server when the test is finished.
     """
-    server = subprocess.Popen(['/usr/local/bin/python3.11', 'sysml_run.py', '5200'], cwd=os.getcwd()+'/build')
-    time.sleep(1)         # Allow the server to start up
-    @cleanup
-    def stop_server():
-        server.terminate()
-        server.wait()
+    if START_SERVER:
+        server = subprocess.Popen(['/usr/local/bin/python3.11', 'sysml_run.py', '5200'], cwd=os.getcwd()+'/build')
+        time.sleep(1)         # Allow the server to start up
+        @cleanup
+        def stop_server():
+            server.terminate()
+            server.wait()
     return 'http://localhost:5200'
 
 
@@ -194,7 +198,7 @@ def test_server():
         assert results[1]['diagram'] == 2
 
     @test
-    def test_create_representation():
+    def test_create_block_representation():
         # Load the DB with a block and two ports, then make a representation of it.
         sm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
         clear_db()
@@ -206,7 +210,7 @@ def test_server():
         ])
         r = requests.post(
             base_url+'/data/Block/2/create_representation',
-            data=json.dumps({'diagram': 2, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40}),
+            data=json.dumps({'diagram': 1, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40}),
             headers={'Content-Type': 'application/json'}
         )
         assert r.status_code == 201
@@ -214,7 +218,7 @@ def test_server():
         for i, p in enumerate(results['children']):
             assert p['block_cls'] == 'FlowPortRepresentation'
             assert p['block'] == 3 + i
-            assert p['diagram'] == 2
+            assert p['diagram'] == 1
             assert p['parent'] == 1
 
     @test
@@ -249,6 +253,57 @@ def test_server():
         r = requests.get(base_url+'/data/_Relationship/1')
         assert r.status_code == 404
 
+    @test
+    def test_create_delete_instance():
+        sm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
+        clear_db()
+        load_db([
+            sm.Note(Id=1, description="Don't mind me"),
+            sm.BlockDefinitionDiagram(Id=2, name="Test diagram"),
+            sm.Block(Id=3, name="Block 1", description="Dit is een test", parent=2, order=1),
+            sm.FlowPort(Id=4, name='output', parent=3),
+            sm.FlowPort(Id=5, name='input', parent=3)
+        ])
+
+        # Create an instance
+        r = requests.post(
+            base_url+'/data/BlockInstance/3/create_representation',
+            data=json.dumps({'diagram': 2, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40}),
+            headers={'Content-Type': 'application/json'}
+        )
+        assert r.status_code == 201
+        results = json.loads(r.content)
+        assert results['block_cls'] == 'BlockInstanceRepresentation'
+        assert results['Id'] == 1
+        assert results['diagram'] == 2
+        assert results['parent'] == None
+        assert len(results['children']) == 2
+        assert results['_entity']['__classname__'] == 'BlockInstance'
+        assert results['_entity']['Id'] == 6
+        assert results['_entity']['parent'] == 2    # The Instance block is created under the diagram
+        assert results['_entity']['definition'] == 3
+        for i, p in enumerate(results['children']):
+            assert p['block_cls'] == 'FlowPortRepresentation'
+            assert p['block'] == 4 + i
+            assert p['diagram'] == 2
+            assert p['parent'] == 1
+        # Check the underlying Instance can be accessed
+        r = requests.get(base_url + '/data/BlockInstance/6')
+        assert r.status_code == 200
+
+        # Now delete the Instance Representation and check that the underlying Instance is deleted as well
+        r = requests.delete(base_url+'/data/_BlockRepresentation/1')
+        assert r.status_code == 204
+        # Check the underlying Instance is gone
+        r = requests.get(base_url + '/data/BlockInstance/6')
+        assert r.status_code == 404
+        # Check the port representations are gone
+        r = requests.get(base_url+'/data/_BlockRepresentation/2')
+        assert r.status_code == 404
+        r = requests.get(base_url+'/data/_BlockRepresentation/3')
+        assert r.status_code == 404
+
 
 if __name__ == '__main__':
+    #run_tests('*.test_create_delete_instance')
     run_tests()

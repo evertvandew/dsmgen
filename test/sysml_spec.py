@@ -2,7 +2,7 @@
 from typing import Self, Any
 from model_definition import (Entity, Relationship, Port, BlockDiagram, LogicalModel, ModelRoot, required,
                               optional, selection, detail, longstr, XRef, ModelVersion, initial_state,
-                              hidden)
+                              hidden, BlockInstance)
 
 ModelVersion('0.1')
 
@@ -114,6 +114,8 @@ class BlockDefinitionDiagram:
     parent: XRef('children', Block, StructuralModel, hidden)
     name: str
 
+@BlockInstance(parents=[Any], definitions=[Block])
+class BlockInstance: pass
 
 ###############################################################################
 ## Entities for requirements

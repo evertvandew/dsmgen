@@ -40,6 +40,11 @@ from sqlalchemy.ext.declarative import declarative_base, declared_attr
 
 engine = create_engine("${config.dbase_url}")
 
+def _fk_pragma_on_connect(dbapi_con, con_record):
+    dbapi_con.execute('pragma foreign_keys=ON')
+
+event.listen(engine, 'connect', _fk_pragma_on_connect)
+
 Session = sessionmaker(engine)
 
 class OptionalRef:
@@ -143,6 +148,7 @@ class EntityType(IntEnum):
     LogicalElement = auto()
     Port = auto()
     Message = auto()
+    Instance = auto()
 
 class _Entity(Base):
     Id: int = Column(Integer, primary_key=True)
@@ -297,18 +303,20 @@ class AWrapper:
         return d
 
     @classmethod
-    def retrieve(cls, Id):
-        with session_context() as session:
-            record = session.query(cls.get_db_table()).filter_by(Id=Id).first()
-            if record is None:
-                raise NotFound()
-            if record.subtype != cls.__name__:
-                raise WrongType()
-            details = record.details if isinstance(record.details, str) else record.details.decode('utf8')
-            data_dict = json.loads(details)
-            assert data_dict['__classname__'] == cls.__name__
-            del data_dict['__classname__']
-            return cls(**data_dict)
+    def retrieve(cls, Id, session=None):
+        if session is None:
+            with session_context() as session:
+                return cls.retrieve(Id, session=session)
+        record = session.query(cls.get_db_table()).filter_by(Id=Id).first()
+        if record is None:
+            raise NotFound()
+        if record.subtype != cls.__name__:
+            raise WrongType()
+        details = record.details if isinstance(record.details, str) else record.details.decode('utf8')
+        data_dict = json.loads(details)
+        assert data_dict['__classname__'] == cls.__name__
+        del data_dict['__classname__']
+        return cls(**data_dict)
 
     def update(self):
         with session_context() as session:
@@ -346,6 +354,11 @@ class ABlock(AWrapper):
             'parent': self.parent if hasattr(self, 'parent') else None,
             'order': self.order
         }
+
+class AInstance(ABlock):
+    @classmethod
+    def get_entity_type(cls):
+        return EntityType.Instance
 
 class ARelationship(AWrapper):
     @staticmethod
@@ -385,7 +398,8 @@ class AMessage(ABlock):
     # Generated dataclasses
 % for entity in generator.ordered_items:
 <%
-    stereotype = 'ABlock' if entity in generator.md.blocks else \
+    stereotype = 'AInstance' if entity in generator.md.instance_of else \
+                  'ABlock' if entity in generator.md.blocks else \
                  'ARelationship' if entity in generator.md.relationship else \
                  'APort' if entity in generator.md.port else \
                  'ADiagram' if entity in generator.md.diagrams else 'ALogicalElement'

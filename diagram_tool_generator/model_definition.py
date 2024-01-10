@@ -21,6 +21,7 @@ class ConnectionElement: pass
 class RepresentableElement: pass
 class DiagramElement: pass
 class PortElement: pass
+class InstanceOf: pass
 
 
 class LaneDirection(IntEnum):
@@ -54,6 +55,7 @@ class ModelDefinition:
     model_elements: List[Any] = field(default_factory=list)
     initial_records: List[Any] = field(default_factory=list)
     type_conversions: Dict[str, TypeConversion] = field(default_factory=dict)
+    element_lookup: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def diagrams(self) -> List[Any]:
@@ -79,6 +81,9 @@ class ModelDefinition:
     @property
     def port(self) -> List[Any]:
         return [e for e in self.model_elements if PortElement in e.categories]
+    @property
+    def instance_of(self) -> List[Any]:
+        return [e for e in self.model_elements if InstanceOf in e.categories]
 
     @property
     def all_model_items(self) -> List[Any]:
@@ -93,12 +98,20 @@ class ModelDefinition:
         return DiagramElement in cls.categories
     def is_representable(self, cls):
         return RepresentableElement in cls.categories
+    def is_instance_of(self, cls):
+        return InstanceOf in cls.categories
+
 
     def get_conversions(self, cls: Any) -> Optional[TypeConversion]:
         name = cls if isinstance(cls, str) else (cls.__name__ if isinstance(cls, type) else type(cls).__name__)
         if not isinstance(name, str):
             raise False
         return self.type_conversions.get(name, None)
+
+    def get_cls_by_name(self, name):
+        if not self.element_lookup:
+            self.element_lookup = {cls.__name__: cls for cls in self.model_elements}
+        return self.element_lookup[name]
 
 model_definition = ModelDefinition()
 
@@ -134,13 +147,14 @@ def Entity(styling=''):
         return cls
     return decorate
 
-def CompoundEntity(*entities, styling=''):
+def CompoundEntity(parents, elements, styling=''):
     """ Definition of a thing rendered as a "shape": blocks, actors, objects, actions, etc, etc, etc,
         but that are also a diagram themselves. In the graphical editor, double-clicking this should
         open an editor for the inned diagram.
     """
     def decorate(cls):
-        cls.entities = entities
+        cls.entities = elements
+        cls.__annotations__['parent'] = XRef('children', *parents, hidden)
         cls.categories = [ExplorableElement, RepresentableElement, DiagramElement]
         cls = dataclass(cls)
         model_definition.model_elements.append(cls)
@@ -148,9 +162,11 @@ def CompoundEntity(*entities, styling=''):
         return cls
     return decorate
 
-def BlockInstance(styling=''):
+def BlockInstance(parents, definitions, styling=''):
     def decorate(cls):
-        cls.categories = [ExplorableElement, RepresentableElement]
+        cls.__annotations__['parent'] = XRef('children', *parents, hidden)
+        cls.__annotations__['definition'] = XRef('children', *definitions, hidden)
+        cls.categories = [ExplorableElement, RepresentableElement, InstanceOf]
         cls = dataclass(cls)
         model_definition.model_elements.append(cls)
         styling_definition[cls.__name__] = split_styling(styling)

@@ -56,15 +56,22 @@ class ${entity.__name__}:
     % endif
 
     % if generator.md.is_diagram(entity):
-    <% block_names = [f'"{e.__name__}": "{e.__name__}Representation"' for e in entity.entities] %>
     class Diagram(diagrams.Diagram):
-        allowed_blocks = {${", ".join(block_names)}}
+        allowed_blocks = {${", ".join(generator.get_allowed_drops(entity))}}
         @classmethod
         def get_allowed_blocks(cls) -> Dict[str, Any]:
             # The allowed blocks are given as a Dict[str, str]. Here we replace the str references to classes
             # by actual classes.
             return {k: globals()[v] for k, v in cls.allowed_blocks.items()}
     % endif
+
+    @classmethod
+    def is_instance_of(cls):
+        % if generator.md.is_instance_of(entity):
+        return True
+        %else:
+        return False
+        %endif
 
 % endfor
 
@@ -110,6 +117,14 @@ class ${cls.__name__}Representation(diagrams.${base_class}):
         return [${", ".join(f'{c}Representation' for c in generator.get_allowed_ports()[cls.__name__])}]
     % endif
 
+    @classmethod
+    def is_instance_of(cls):
+        % if generator.md.is_instance_of(cls):
+        return True
+        %else:
+        return False
+        %endif
+
 % endfor
 
 <%
@@ -143,14 +158,6 @@ class ${cls.__name__}Representation(diagrams.Relationship):
 
 % endfor
 
-## Create the diagram definitions
-# Definitions for rendering the various diagrams
-% for cls in generator.md.diagrams:
-<% block_names = [f'"{e.__name__}": {e.__name__}Representation' for e in cls.entities] %>
-class ${cls.__name__}Representation(diagrams.Diagram):
-    allowed_blocks = {${", ".join(block_names)}}
-
-% endfor
 
 allowed_children = {
     % for name in generator.all_names.keys():
@@ -189,6 +196,10 @@ relation_classes = {
 }
 port_classes = {
     <% lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.port] %>
+    ${',\n    '.join(lines)}
+}
+instance_classes = {
+    <% lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.instance_of] %>
     ${',\n    '.join(lines)}
 }
 block_representations = {

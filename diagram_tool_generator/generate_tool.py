@@ -14,7 +14,6 @@ With Jinja2, we'd be fighting to get all the different functionality pushed into
 """
 
 import os, os.path
-import sys
 import importlib
 from dataclasses import fields
 from typing import Self, Any, List, Dict
@@ -28,6 +27,13 @@ from config import Configuration
 
 
 def get_inner_types(owner, field_type):
+    def get_type(field_type):
+        if isinstance(field_type, str):
+            return mdef.model_definition.get_cls_by_name(field_type)
+        if field_type is Self:
+            return owner
+        return field_type
+
     """ Find out what the inner type of a field is. Used to find cross-references between items. """
     if type(field_type) in [list, tuple]:
         possible_types = [t for t in field_type if not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation))]
@@ -36,8 +42,9 @@ def get_inner_types(owner, field_type):
         assert possible_types, f'No type defined for field {field_type}'
         return (t for ts in possible_types for t in get_inner_types(owner, ts))
     if isinstance(field_type, mdef.XRef):
-        return [t for t in field_type.types if not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation))]
-    return [field_type]
+        return [get_type(t) for t in field_type.types if not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation))]
+
+    return [get_type(field_type)]
 
 
 def determine_dependencies(all_names):
@@ -65,15 +72,17 @@ class Generator:
         assert len(all_names) == len(md.all_model_items), 'Duplicate names in the definitions'
         self.all_names = all_names
 
-        # Replace forward references to classes with the actual classes where relevant
-        # Forward references are strings containing the names of classes.
-        def mk_cls(name):
+        # Replace forward references and self-references to classes with the actual classes where relevant
+        # Forward references are strings containing the names of classes, self references are typing.Self
+        def mk_cls(cls, name):
             if isinstance(name, str):
                 return all_names[name]
+            if name is Self:
+                return cls
             return name
 
         for cls in md.diagrams:
-            cls.entities = [mk_cls(n) for n in cls.entities]
+            cls.entities = [mk_cls(cls, n) for n in cls.entities]
 
         self.dependencies = determine_dependencies(all_names)
 
@@ -226,6 +235,19 @@ class Generator:
             lines = [f'{k}: [{", ".join(o)}]' for k, o in options.items()]
             all_connections.append(f"{cls.__name__}Representation: {{ {', '.join(lines)} }}")
         return all_connections
+
+    def get_allowed_drops(self, cls):
+        """ Determine which items can be dropped on a diagram, and which items are the result. """
+        # Allowed blocks are specified in the "entities".
+        # One class of blocks needs special treatment: the "Instance" blocks.
+        allowed_blocks = {e: f"{e.__name__}Representation" for e in cls.entities if not mdef.model_definition.is_instance_of(e)}
+        instance_blocks = [e for e in cls.entities if mdef.model_definition.is_instance_of(e)]
+        for e in instance_blocks:
+            for p in get_inner_types(cls, e.__annotations__['definition']):
+                allowed_blocks[p] = f"{e.__name__}Representation"
+
+        block_names = [f'"{e.__name__}": "{s}"' for e, s in allowed_blocks.items()]
+        return block_names
 
 
 def generate_tool(config: Configuration):
