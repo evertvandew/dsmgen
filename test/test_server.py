@@ -282,6 +282,11 @@ def test_server():
         assert results['_entity']['Id'] == 6
         assert results['_entity']['parent'] == 2    # The Instance block is created under the diagram
         assert results['_entity']['definition'] == 3
+        assert results['_definition']['__classname__'] == 'Block'
+        assert results['_definition']['Id'] == 3
+        assert results['_definition']['name'] == 'Block 1'
+        assert results['_definition']['description'] == 'Dit is een test'
+
         for i, p in enumerate(results['children']):
             assert p['block_cls'] == 'FlowPortRepresentation'
             assert p['block'] == 4 + i

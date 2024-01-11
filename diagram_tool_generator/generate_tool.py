@@ -240,14 +240,25 @@ class Generator:
         """ Determine which items can be dropped on a diagram, and which items are the result. """
         # Allowed blocks are specified in the "entities".
         # One class of blocks needs special treatment: the "Instance" blocks.
-        allowed_blocks = {e: f"{e.__name__}Representation" for e in cls.entities if not mdef.model_definition.is_instance_of(e)}
+        allowed_blocks = {e: e.__name__ for e in cls.entities if not mdef.model_definition.is_instance_of(e)}
         instance_blocks = [e for e in cls.entities if mdef.model_definition.is_instance_of(e)]
         for e in instance_blocks:
             for p in get_inner_types(cls, e.__annotations__['definition']):
-                allowed_blocks[p] = f"{e.__name__}Representation"
+                allowed_blocks[p] = e.__name__
 
         block_names = [f'"{e.__name__}": "{s}"' for e, s in allowed_blocks.items()]
         return block_names
+
+    def get_derived_values(self, cls):
+        """ In the specification, a value can be assigned to a field that is not actually stored in the object
+            but derived from other elements. These are specified by a field that has a constant string value.
+            These constants should not have annotations.
+            These derived values are only used in Representations.
+        """
+        # Look for fields without annotations and a string constant value.
+        derived_values = {name: value for name, value in cls.__dict__.items()
+                          if name not in cls.__annotations__ and type(value) == str and not name.startswith('__')}
+        return derived_values
 
 
 def generate_tool(config: Configuration):

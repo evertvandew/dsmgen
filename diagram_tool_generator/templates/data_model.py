@@ -338,6 +338,7 @@ class AWrapper:
         data_dict = {k:v for k,v in data_dict.items() if k != '__classname__'}
         return cls(**data_dict)
 
+
 @dataclass
 class ABlock(AWrapper):
     order: int = 0

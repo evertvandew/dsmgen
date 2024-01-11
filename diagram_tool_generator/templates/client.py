@@ -95,6 +95,9 @@ class ${cls.__name__}Representation(diagrams.${base_class}):
     % if cls.__name__ in generator.get_allowed_ports():
     ports: [diagrams.CP] = field(default_factory=list)
     % endif
+    % if generator.md.is_instance_of(cls):
+    _definition: Dict[str, Any] = field(default_factory=dict)
+    % endif
     % for attr in generator.get_diagram_attributes(cls):
     ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
@@ -124,6 +127,12 @@ class ${cls.__name__}Representation(diagrams.${base_class}):
         %else:
         return False
         %endif
+
+    % for name, value in generator.get_derived_values(cls).items():
+    @property
+    def ${name}(self):
+        return f"${value}"
+    % endfor
 
 % endfor
 

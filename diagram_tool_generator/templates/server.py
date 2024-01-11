@@ -86,6 +86,8 @@ def create_block_representation(index, table, data, session, dm):
         # We are creating a new instance, it also needs adding in the
         entity = table(parent=data['diagram'], definition=index)
         entity.store(session=session)
+        definition_record = session.query(dm._Entity).filter(dm._Entity.Id == index).first()
+        definition = dm.AWrapper.load_from_db(definition_record)
     else:
         entity = table.retrieve(index, session=session)
 
@@ -114,6 +116,8 @@ def create_block_representation(index, table, data, session, dm):
     session.commit()
     record_dict = record.asdict()
     record_dict['_entity'] = entity.asdict()
+    if issubclass(table, dm.AInstance):
+        record_dict['_definition'] = definition.asdict()
     record_dict['children'] = [p.asdict() for p in port_reprs]
     for e, p in zip(port_entities, record_dict['children']):
         p['_entity'] = e.asdict()
@@ -380,10 +384,21 @@ def diagram_contents(index):
         relat_reps = session.query(dm._RelationshipRepresentation, dm._Relationship).filter(dm._RelationshipRepresentation.diagram==index).join(dm._Relationship).all()
         data = [(r[0].asdict(), r[1].asdict()) for r in block_reps+relat_reps]
 
+        instance_indices = [i for i, r in enumerate(block_reps) if r[0].block_cls in INSTANCE_REPRESENTATIONS]
+        instance_details = [json.loads(data[i][1]['details']) for i in instance_indices]
+        definition_ids = [details['definition'] for details in instance_details]
+        definitions = {r.Id: r.asdict() for r in
+                       session.query(dm._Entity).filter(dm._Entity.Id.in_(definition_ids)).all()}
+
     # Decode the details in each Entity
     for r in data:
         details = json.loads(r[1]['details'])
         r[0]['_entity'] = details
+
+    for i, def_id in zip(instance_indices, definition_ids):
+        d = definitions[def_id]
+        details = json.loads(d['details'])
+        data[i][0]['_definition'] = details
 
     data = [r[0] for r in data]
 
