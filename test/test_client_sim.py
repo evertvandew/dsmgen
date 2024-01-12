@@ -123,13 +123,16 @@ def simulated_diagram_tests():
         svg = html.SVG()
         svg.classList.add('diagram')
         container <= svg
+        config = diagrams.DiagramConfiguration(
+            client.representation_lookup,
+            client.connections_from
+        )
         diagram = diagrams.load_diagram(
             diagram_id,
             client.diagram_definitions['BlockDefinitionDiagram'],
+            config,
             diagram_api,
-            svg,
-            client.representation_lookup,
-            client.connections_from
+            svg
         )
         return diagram, diagram_api
 
@@ -414,9 +417,10 @@ def simulated_explorer_tests():
 
         # Change the value of the Structural Model,
         btn = d.select_one('#details button')
-        edit_field = d.select_one('#details input')
-        assert edit_field.value == 'Structural Model'
-        edit_field.value = 'blablablabla'
+        edit_fields = [i for i in d.select('#details input') if i.value == 'Structural Model']
+        assert len(edit_fields) == 1
+        assert edit_fields[0].value == 'Structural Model'
+        edit_fields[0].value = 'blablablabla'
         add_expected_response('/data/StructuralModel/2', 'post', Response(200))
         btn.dispatchEvent(events.Click())
         assert len(expected_responses) == 0
@@ -476,4 +480,4 @@ def simulated_explorer_tests():
 
 
 if __name__ == '__main__':
-    run_tests()
+    run_tests('*.left_click')

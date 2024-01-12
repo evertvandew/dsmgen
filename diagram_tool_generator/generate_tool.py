@@ -131,6 +131,27 @@ class Generator:
                 l.append(p.__name__)
         return result
 
+    def get_allowed_drops(self, cls):
+        """ Determine which items can be dropped on a diagram, and which items are the result. """
+        # Allowed blocks are specified in the "entities".
+        # One class of blocks needs special treatment: the "Instance" blocks.
+        allowed_blocks = {e: e.__name__ for e in cls.entities if not mdef.model_definition.is_instance_of(e)}
+        instance_blocks = [e for e in cls.entities if mdef.model_definition.is_instance_of(e)]
+        for e in instance_blocks:
+            for p in get_inner_types(cls, e.__annotations__['definition']):
+                allowed_blocks[p] = e.__name__
+
+        block_names = [f'"{e.__name__}": "{s}"' for e, s in allowed_blocks.items()]
+        return block_names
+
+    def get_allowed_creates(self, cls):
+        """ Determine which items can be created in a diagram using the Create widget, and which items are the result.
+        """
+        allowed_blocks = {e: e.__name__ for e in cls.entities if not mdef.model_definition.is_instance_of(e)}
+        port_blocks = self.get_allowed_ports().get(cls.__name__, [])
+        block_names = [f'"{e.__name__}": "{s}"' for e, s in allowed_blocks.items()] + \
+                      [f'"{b}": "{b}"' for b in port_blocks]
+        return block_names
 
     def get_diagram_attributes(self, cls):
         """ Retrieve the attributes of a class that a intended for editing by a user. """
@@ -235,19 +256,6 @@ class Generator:
             lines = [f'{k}: [{", ".join(o)}]' for k, o in options.items()]
             all_connections.append(f"{cls.__name__}Representation: {{ {', '.join(lines)} }}")
         return all_connections
-
-    def get_allowed_drops(self, cls):
-        """ Determine which items can be dropped on a diagram, and which items are the result. """
-        # Allowed blocks are specified in the "entities".
-        # One class of blocks needs special treatment: the "Instance" blocks.
-        allowed_blocks = {e: e.__name__ for e in cls.entities if not mdef.model_definition.is_instance_of(e)}
-        instance_blocks = [e for e in cls.entities if mdef.model_definition.is_instance_of(e)]
-        for e in instance_blocks:
-            for p in get_inner_types(cls, e.__annotations__['definition']):
-                allowed_blocks[p] = e.__name__
-
-        block_names = [f'"{e.__name__}": "{s}"' for e, s in allowed_blocks.items()]
-        return block_names
 
     def get_derived_values(self, cls):
         """ In the specification, a value can be assigned to a field that is not actually stored in the object

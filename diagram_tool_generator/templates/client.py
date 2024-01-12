@@ -35,6 +35,13 @@ from svg_shapes import getMarkerDefinitions
 from tab_view import TabView
 
 
+def resolve(name):
+    r, *parts = name.split('.')
+    var = globals()[r]
+    for p in parts:
+        var = getattr(var, p)
+    return var
+
 # Modelling 'Entities:'
 % for entity in generator.ordered_items:
 @dataclass
@@ -57,12 +64,16 @@ class ${entity.__name__}:
 
     % if generator.md.is_diagram(entity):
     class Diagram(diagrams.Diagram):
-        allowed_blocks = {${", ".join(generator.get_allowed_drops(entity))}}
+        allowed_drops_blocks = {${", ".join(generator.get_allowed_drops(entity))}}
+        allowed_create_blocks = {${", ".join(generator.get_allowed_creates(entity))}}
         @classmethod
-        def get_allowed_blocks(cls) -> Dict[str, Any]:
+        def get_allowed_blocks(cls, for_drop=False) -> Dict[str, Any]:
             # The allowed blocks are given as a Dict[str, str]. Here we replace the str references to classes
             # by actual classes.
-            return {k: globals()[v] for k, v in cls.allowed_blocks.items()}
+            if for_drop:
+                return {k: resolve(v) for k, v in cls.allowed_drops_blocks.items()}
+            else:
+                return {k: resolve(v) for k, v in cls.allowed_create_blocks.items()}
     % endif
 
     @classmethod
@@ -89,7 +100,6 @@ class ${entity.__name__}:
 @dataclass
 class ${cls.__name__}Representation(diagrams.${base_class}):
     Id: shapes.HIDDEN = 0
-    diagram: shapes.HIDDEN = 0
     block: shapes.HIDDEN = 0
     parent: shapes.HIDDEN = 0
     % if cls.__name__ in generator.get_allowed_ports():
@@ -102,7 +112,7 @@ class ${cls.__name__}Representation(diagrams.${base_class}):
     ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
 
-    shape_type = shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
+    note_type = shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
 
     logical_class = ${cls.__name__}
 
@@ -213,6 +223,7 @@ instance_classes = {
 }
 block_representations = {
     <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.blocks] %>
+    "PortLabel": diagrams.PortLabel,
     ${',\n    '.join(lines)}
 }
 relation_representations = {
@@ -239,6 +250,18 @@ representation_lookup = {
 connections_from = {
     ${",\n    ".join(generator.get_connections_from())}
 }
+
+
+class DiagramConfig(diagrams.DiagramConfiguration):
+    def get_repr_for_create(self, cls) -> type:
+        repr = super().get_repr_for_create(cls)
+        console.log(f"Got repr {repr.__name__}, {issubclass(repr, diagrams.CP)}")
+        if issubclass(repr, diagrams.CP):
+            # The user tries to create a new port. Inside a diagram, that is represented by a Label,
+            # not by the normal representation for this CP.
+            return diagrams.PortLabel
+        return repr
+
 
 def flatten(data):
     if isinstance(data, Iterable):
@@ -313,8 +336,8 @@ def run(explorer, canvas, details):
             svg_tag.classList.add('diagram')
             # container <= svg_tag
             ## In future: subscribe to events in the diagram api.
-            diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], data_store, svg_tag,
-                                            representation_lookup, connections_from)
+            config = DiagramConfig(representation_lookup, connections_from)
+            diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], config, data_store, svg_tag)
             diagram_details = data_store.get(target_type, target_dbid)
             console.log(f'DETAILS: {details}')
             diagram_tabview.add_page(diagram_details.name, svg_tag, diagram.close)
