@@ -14,7 +14,14 @@ Lower order number comes first.
 # Representation of the hierarchical model in diagrams
 
 Elements from the hierarchical model can be represented in diagrams. 
-A representation can also have a parent, which is always another representation.
+A representation can also have a parent, which is always another representation. This is used for ports belonging to
+the block, and for inner blocks within a composite block.
+
+Representations contain the database ID of the diagram they belong to. This means blocks can have representations in
+multiple diagrams.
+
+Each representation has a field `logical_class` that holds the type of the model entity represented by this particular
+representation. It is set during construction of the instance.
 
 
 

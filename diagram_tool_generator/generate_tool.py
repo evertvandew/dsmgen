@@ -251,10 +251,10 @@ class Generator:
                         l = options.setdefault('Any', [])
                         l.append(c.__name__)
                     else:
-                        l = options.setdefault(t.__name__+'Representation', [])
+                        l = options.setdefault(t.__name__, [])
                         l.append(c.__name__)
             lines = [f'{k}: [{", ".join(o)}]' for k, o in options.items()]
-            all_connections.append(f"{cls.__name__}Representation: {{ {', '.join(lines)} }}")
+            all_connections.append(f"{cls.__name__}: {{ {', '.join(lines)} }}")
         return all_connections
 
     def get_derived_values(self, cls):

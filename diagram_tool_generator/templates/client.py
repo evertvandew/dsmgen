@@ -101,7 +101,8 @@ class ${entity.__name__}:
 class ${cls.__name__}Representation(diagrams.${base_class}):
     Id: shapes.HIDDEN = 0
     block: shapes.HIDDEN = 0
-    parent: shapes.HIDDEN = 0
+    parent: shapes.HIDDEN = None
+    diagram: shapes.HIDDEN = 0
     % if cls.__name__ in generator.get_allowed_ports():
     ports: [diagrams.CP] = field(default_factory=list)
     % endif
@@ -112,9 +113,11 @@ class ${cls.__name__}Representation(diagrams.${base_class}):
     ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
 
-    note_type = shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
+    logical_class = None
 
-    logical_class = ${cls.__name__}
+    @classmethod
+    def getShapeDescriptor(cls):
+        return shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
 
     @classmethod
     def repr_category(cls):
@@ -146,6 +149,26 @@ class ${cls.__name__}Representation(diagrams.${base_class}):
 
 % endfor
 
+
+@dataclass
+class PortLabel(diagrams.Note):
+    Id: shapes.HIDDEN = 0
+    block: shapes.HIDDEN = None
+    parent: shapes.HIDDEN = None
+    diagram: shapes.HIDDEN = None
+    name: str = ''
+
+    logical_class = None
+
+    @classmethod
+    def repr_category(cls):
+        return 'block'
+
+    @classmethod
+    def getShapeDescriptor(cls):
+        return shapes.BasicShape.getDescriptor("label")
+
+
 <%
     def get_relationship_type(field_type):
         if is_dataclass(field_type):
@@ -165,11 +188,12 @@ class ${cls.__name__}Representation(diagrams.Relationship):
     Id: shapes.HIDDEN = 0
     diagram: shapes.HIDDEN = 0
     relationship: shapes.HIDDEN = 0
+
     % for attr in fields(cls):
     ${attr.name}: ${get_relationship_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
 
-    logical_class = ${cls.__name__}
+    logical_class = None
 
     @classmethod
     def repr_category(cls):
@@ -223,7 +247,7 @@ instance_classes = {
 }
 block_representations = {
     <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.blocks] %>
-    "PortLabel": diagrams.PortLabel,
+    "PortLabel": PortLabel,
     ${',\n    '.join(lines)}
 }
 relation_representations = {
@@ -259,7 +283,7 @@ class DiagramConfig(diagrams.DiagramConfiguration):
         if issubclass(repr, diagrams.CP):
             # The user tries to create a new port. Inside a diagram, that is represented by a Label,
             # not by the normal representation for this CP.
-            return diagrams.PortLabel
+            return PortLabel
         return repr
 
 

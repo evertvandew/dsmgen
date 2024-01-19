@@ -138,18 +138,50 @@ def simulated_diagram_tests():
 
     @test
     def create_and_move_block():
-        diagram, rest = new_diagram(1, MagicMock())
-        instance = client.BlockRepresentation(name='', x=300, y=300, height=64, width=100, block=1, Id=1)
-        diagram.addBlock(instance)
-        assert len(diagram.children) == 1
+        def create_and_move(instance):
+            old_nr_children = len(diagram.children)
+            diagram.addBlock(instance)
+            assert len(diagram.children) == old_nr_children + 1
 
-        # Simulate dragging the block
-        block = diagram.children[0]
-        block.shape.dispatchEvent(events.MouseDown())
-        block.shape.dispatchEvent(events.MouseMove(offsetX=200, offsetY=100))
-        block.shape.dispatchEvent(events.MouseUp(offsetX=200, offsetY=100))
-        assert block.x == 500
-        assert block.y == 400
+            # Simulate dragging the block
+            block = diagram.children[old_nr_children]
+            block.shape.dispatchEvent(events.MouseDown())
+            block.shape.dispatchEvent(events.MouseMove(offsetX=200, offsetY=100))
+            block.shape.dispatchEvent(events.MouseUp(offsetX=200, offsetY=100))
+            assert block.x == 500
+            assert block.y == 400
+
+        # Do a normal block
+        diagram, rest = new_diagram(1, MagicMock())
+        create_and_move(client.BlockRepresentation(name='', x=300, y=300, height=64, width=100, block=1, Id=1))
+
+        # Add a port label representation
+        create_and_move(client.PortLabel(name='', x=300, y=300, height=64, width=100, block=1, Id=1))
+
+        # Add a SubprogramDefinition
+        create_and_move(client.SubProgramDefinitionRepresentation(name='', x=300, y=300, height=64, width=100, block=1, Id=1))
+
+    @test
+    def create_connect_blocks():
+        # Connect two PortLabels: an input and an output.
+        diagram, rest = new_diagram(1, MagicMock())
+        input = client.PortLabel(name='Input', x=100, y=300, height=64, width=100, block=1, Id=1)
+        output = client.PortLabel(name='Output', x=400, y=300, height=64, width=100, block=1, Id=1)
+        input.logical_class = client.FlowPort
+        output.logical_class = client.FlowPort
+        diagram.addBlock(input)
+        diagram.addBlock(output)
+        diagram.changeFSM(diagrams.ConnectionEditor())
+        input.shape.dispatchEvent(events.MouseDown())
+        input.shape.dispatchEvent(events.MouseUp())
+        output.shape.dispatchEvent(events.MouseDown())
+        output.shape.dispatchEvent(events.MouseUp())
+        assert len(diagram.connections) == 1
+        conn = diagram.connections[0]
+        assert type(conn).__name__ == 'FlowPortConnectionRepresentation'
+        assert conn.start.id == 10
+        assert conn.finish.id == 11
+
 
     @test
     def drag_and_drop():
@@ -176,7 +208,7 @@ def simulated_diagram_tests():
             'height': 40,
             'children': [],
             'block_cls': 'BlockRepresentation',
-            '_entity': {'name': 'One', 'parent': 3, 'Id': 123},
+            '_entity': {'name': 'One', 'parent': 3, 'Id': 123, '__classname__': 'Block'},
         }))
         diagram.canvas.dispatchEvent(events.DragEnter(dataTransfer=ev.dataTransfer))
         diagram.canvas.dispatchEvent(events.DragOver(dataTransfer=ev.dataTransfer))
@@ -216,7 +248,7 @@ def simulated_diagram_tests():
             'width': 64,
             'height': 40,
             'block_cls': 'BlockRepresentation',
-            '_entity': {'name': 'One', 'parent': 3, 'Id': 123},
+            '_entity': {'name': 'One', 'parent': 3, 'Id': 123, '__classname__': 'Block'},
             'children': [
                 {
                     'Id': 401,
@@ -225,7 +257,7 @@ def simulated_diagram_tests():
                     'diagram': 5,
                     '__classname__': '_BlockRepresentation',
                     'block_cls': 'FlowPortRepresentation',
-                    '_entity': {'name': 'Output', 'parent': 123, 'Id': 124}
+                    '_entity': {'name': 'Output', 'parent': 123, 'Id': 124, '__classname__': 'FlowPort'}
                 }
             ]
         }))
@@ -480,4 +512,4 @@ def simulated_explorer_tests():
 
 
 if __name__ == '__main__':
-    run_tests('*.left_click')
+    run_tests()

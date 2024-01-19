@@ -1,10 +1,12 @@
 
 
 # Bugs:
-* When editing the name of a block, the explorer is not updated.
+* When editing the name of a block or adding one, the explorer is not updated.
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
 * Some exceptions occur when manipulating connections.
 * Use `get_type_hints` instead of raw `__annotations__`.
+* Double-click on a subprogram doesn't open the associated diagram.
+* When dragging an object, escape does not stop the behaviour if the mouse is not pressed down.
 
 
 # TODO for the First Viable Product Release:
@@ -17,6 +19,8 @@
 * Check if the various entities in the model_definition still need to be dataclasses.
 
 # Future enhancements
+* Make transactions of what happens in an event handler, so that if an exception occurs, the system stays in a known 
+  state.
 * Allow extra details to be shown around a relationship.
 * When a user adds a connection that already exists, that should be reused.
 * Allow conversion of one type element to another

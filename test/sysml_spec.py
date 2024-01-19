@@ -2,7 +2,7 @@
 from typing import Self, Any
 from model_definition import (Entity, Relationship, Port, BlockDiagram, LogicalModel, ModelRoot, required,
                               optional, selection, detail, longstr, XRef, ModelVersion, initial_state,
-                              hidden, BlockInstance)
+                              hidden, BlockInstance, parameter_spec, CompoundEntity)
 
 ModelVersion('0.1')
 
@@ -56,17 +56,23 @@ class Block:
     name: str
     description: (longstr, detail)
 
+@CompoundEntity(parents=[StructuralModel], elements=[Note, "Block"], styling = "shape:rect;structure:Block;blockcolor:yellow;icon:square-full;icon:image")
+class SubProgramDefinition:
+    name: str
+    description: (longstr, detail)
+    parameters: (parameter_spec, detail)
+
 @Port(styling = "shape:square;fill:green;icon:arrows-alt-h")
 class FullPort:
     name: str
-    parent: XRef('ports', Block, hidden)
+    parent: XRef('ports', Block, SubProgramDefinition, hidden)
     provides: XRef('producers', ProtocolDefinition, optional)
     requires: XRef('consumers', ProtocolDefinition, optional)
 
 @Port(styling = "shape:square;fill:blue;icon:arrows-alt-h")
 class FlowPort:
     name: str
-    parent: XRef('ports', Block, hidden)
+    parent: XRef('ports', Block, SubProgramDefinition, hidden)
     inputs: XRef('consumers', ProtocolDefinition, optional)
     outputs: XRef('producers', ProtocolDefinition, optional)
 
