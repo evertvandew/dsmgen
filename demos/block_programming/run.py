@@ -1,31 +1,22 @@
 
-import subprocess
-
-import os, os.path
+import os.path
 import sys
-import subprocess
 import glob
 
 
+TOOL_HOME = os.path.abspath('../../diagram_tool_generator')
 
-def generate_tool(project):
-    # Generate the tool, create directories, clean up etc.
-    for d in ['public', 'build', 'build/data']:
-        if not os.path.exists(d):
-            os.mkdir(d)
-    subprocess.run(f"../../diagram_tool_generator/generate_tool.py {project}_spec.py", shell=True)
-
-    links = ['public/stylesheet.css', 'public/src', 'public/assets']
-    for link in links:
-        if not os.path.exists(link):
-            os.symlink(os.path.abspath(f'../../{link}'), link)
+if TOOL_HOME not in sys.path:
+    sys.path.append(TOOL_HOME)
 
 
-# Generate all the components of the tool.
-specs = glob.glob('*_spec.py')
-project = os.path.basename(specs[0]).split('_spec')[0]
-generate_tool(project)
-sys.path.append('build')
+# Do a basic check if the spec file compiles.
+import block_programming_spec
+print("The specification file can be parsed")
 
-from block_programming_run import run
-run(5101)
+import run_project
+
+specs = glob.glob('*_spec.py')[0]
+project = os.path.basename(specs).split('_spec')[0]
+
+run_project.run(specs, project, 5101)

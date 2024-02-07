@@ -10,6 +10,7 @@
 
 
 # TODO for the First Viable Product Release:
+* Make a demo of the block_programming model.
 * Make a collection of diagrams, supporting at least UML and SYSML.
   - For now, except the sequence diagram because it requires laneing support.
 

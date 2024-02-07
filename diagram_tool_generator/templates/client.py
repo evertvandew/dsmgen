@@ -29,7 +29,7 @@ from enum import IntEnum
 from inspect import getmro
 import diagrams
 import shapes
-from property_editor import dataClassEditor, longstr, OptionalRef
+from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, parameter_values
 from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder
 from svg_shapes import getMarkerDefinitions
 from tab_view import TabView
@@ -114,6 +114,9 @@ class ${cls.__name__}Representation(diagrams.${base_class}):
     % endfor
 
     logical_class = None
+
+    def getEntityForConnection(self):
+        return self.logical_class
 
     @classmethod
     def getShapeDescriptor(cls):
@@ -274,6 +277,8 @@ representation_lookup = {
 connections_from = {
     ${",\n    ".join(generator.get_connections_from())}
 }
+
+opposite_ports = ${generator.get_opposite_ports()}
 
 
 class DiagramConfig(diagrams.DiagramConfiguration):

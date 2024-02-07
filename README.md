@@ -16,7 +16,7 @@ of Brython, modern Python 3 is (almost) fully supported in the browser.
 When the design is sufficiently solid, it should probably be ported to a language that is easier to maintain 
 (i.e. where a compiler helps keeping the code consistent).
 That language may be Typescript, though I'd prefer a better language.
-Perhaps even Rust with a code transpiler to create Javascript.
+Perhaps even Rust to generate WASM, and use `wasm_bindgen` to connect to the DOM API. I love Rust.
 As the intelligent part of the tool is in a code generator, it will be relatively easy to port to another language.
 
 

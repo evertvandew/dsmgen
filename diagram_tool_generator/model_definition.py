@@ -115,6 +115,10 @@ class ModelDefinition:
 
 model_definition = ModelDefinition()
 
+def clear():
+    global model_definition
+    model_definition = ModelDefinition()
+
 def add_type_conversion(cls, sqlalchemy: TypeDefault, server: TypeDefault, client: TypeDefault):
     """ Define how a custom type is represented in the various parts of the system:
 
@@ -288,7 +292,8 @@ class fmt_datetime(datetime):
 class XRef:
     def __init__(self, remote_name:str, *types):
         self.remote_name = remote_name
-        self.types = types
+        self.types = [t for t in types if not (isinstance(t, type) and issubclass(t, OptionalAnnotation))]
+        self.options = [t for t in types if not t in self.types]
 
 add_type_conversion(XRef, TypeDefault('Integer', 'None'), TypeDefault('int', 'None'), TypeDefault('int', 'None'))
 

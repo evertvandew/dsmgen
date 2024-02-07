@@ -505,7 +505,7 @@ class Diagram(OwnerInterface):
         self.addConnection(connection)
 
     def connect(self, a, b):
-        ta, tb = a.logical_class, b.logical_class
+        ta, tb = a.getEntityForConnection(), b.getEntityForConnection()
         clss = self.config.get_allowed_connections(ta, tb) + self.config.get_allowed_connections(ta, Any)
         if not clss:
             d = InfoDialog('Can not connect', f"A {type(a).__name__} can not be connected to a {type(b).__name__}")

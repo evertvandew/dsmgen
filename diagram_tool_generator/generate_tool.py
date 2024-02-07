@@ -195,6 +195,8 @@ class Generator:
             if mdef.optional in field_type.types:
                 return 'OptionalRef(int)'
             return 'int'
+        if isinstance(field_type, mdef.parameter_values):
+            return 'str'
         if conversion := mdef.model_definition.get_conversions(field_type):
             return conversion.client.typename
         if isinstance(field_type, str):
@@ -257,6 +259,27 @@ class Generator:
             all_connections.append(f"{cls.__name__}: {{ {', '.join(lines)} }}")
         return all_connections
 
+    def get_opposite_ports(self):
+        """ For ports that are allowed in compounded entities, determine what the opposite port is.
+            Inside the subdiagram, each port acts as its opposite.
+        """
+        opposite_ports = {}
+        for c in mdef.model_definition.relationship:
+            # Relationships that have 'Any' in the source or targets can not be mirrored.
+            if Any in c.__annotations__['source'].types or Any in c.__annotations__['target'].types:
+                continue
+            sources = [t.__name__ for t in c.__annotations__['source'].types]
+            targets = [t.__name__ for t in c.__annotations__['target'].types]
+            # Only add relationships that have a single source and a single target
+            if len(sources) > 1 or len(targets) > 1:
+                continue
+            opposite_ports[c.__name__] = [
+                (sources[0], targets[0]),
+                (targets[0], sources[0])
+            ]
+        # Return a string representing the "opposite_ports" dictionary
+        return repr(opposite_ports)
+
     def get_derived_values(self, cls):
         """ In the specification, a value can be assigned to a field that is not actually stored in the object
             but derived from other elements. These are specified by a field that has a constant string value.
@@ -270,6 +293,9 @@ class Generator:
 
 
 def generate_tool(config: Configuration):
+    # Reset any previous generation
+    model_definition.clear()
+
     # Find and import the specified model
     module_name = os.path.splitext(os.path.basename(config.model_def))[0].replace('spec', '')
     spec = importlib.util.spec_from_file_location(module_name, config.model_def)

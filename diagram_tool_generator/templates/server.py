@@ -426,6 +426,9 @@ def send_static(path):
     if os.path.exists(fname):
         mime_type = my_get_mime(fname)
         return flask.send_from_directory('${config.client_dir}', path, mimetype=mime_type)
+    if path.endswith('.py'):
+        mime_type = my_get_mime(path)
+        return flask.send_from_directory(app.config['client_src'], path, mimetype=mime_type)
     return "NOT FOUND", 404
 
 @app.route('/')
@@ -433,12 +436,14 @@ def send_index():
     return flask.send_from_directory("${config.client_dir}", 'index.html', mimetype='text/html')
 
 
-def run(port):
+def run(port, client_src):
     if not os.path.exists('data'):
         os.mkdir('data')
+    app.config['client_dir'] = 'public'
+    app.config['client_src'] = '../'+client_src
     dm.init_db()
     app.run(threaded=True, host='0.0.0.0', port=int(port))
 
 
 if __name__ == '__main__':
-    run(sys.argv[1] if len(sys.argv) > 1 else '5100')
+    run(sys.argv[1] if len(sys.argv) > 1 else '5100', 'client_src')
