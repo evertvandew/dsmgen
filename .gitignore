@@ -8,3 +8,4 @@ bin/
 src/*.js
 test/*.js
 build/*
+**/build/*

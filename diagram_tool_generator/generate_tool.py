@@ -18,13 +18,14 @@ import importlib
 from dataclasses import fields
 from typing import Self, Any, List, Dict
 import argparse
+import sys
 
 from mako.template import Template
 
 import model_definition
 import model_definition as mdef
 from config import Configuration
-
+from test_frame import prepare, test, run_tests, cleanup
 
 def get_inner_types(owner, field_type):
     def get_type(field_type):
@@ -61,12 +62,12 @@ def determine_dependencies(all_names):
 
 
 class Generator:
-    def __init__(self, config, module_name):
+    def __init__(self, config, module_name, model_definition=mdef.model_definition):
         self.config = config
         self.module_name = module_name
 
         # Generate some look up tables and dependency lists
-        md = mdef.model_definition
+        md = model_definition
         all_names: dict[str, Any] = {c.__name__: c for c in md.all_model_items}
         # Check there are no duplicates in the names.
         assert len(all_names) == len(md.all_model_items), 'Duplicate names in the definitions'
@@ -100,7 +101,7 @@ class Generator:
                         children[cls.__name__].add(cls.__name__)
         # Also look at the allowed "entities" in diagrams.
         for cls in mdef.model_definition.diagrams:
-            children[cls.__name__] |= {c.__name__ for c in get_inner_types(cls, cls.entities)}
+            children[cls.__name__] = {c.__name__ for c in get_inner_types(cls, cls.entities)}
         self.children = children
 
         self.ordered_items = self.order_dependencies()
@@ -205,8 +206,9 @@ class Generator:
 
     @staticmethod
     def get_type_options(field_type):
+        """ Return the possible types of a field, and the options given to the field. """
         if isinstance(field_type, model_definition.XRef):
-            return Generator.get_type_options(field_type.types)
+            return Generator.get_type_options(field_type.types) + field_type.options
         if isinstance(field_type, list) or isinstance(field_type, tuple):
             return [o for t in field_type for o in Generator.get_type_options(t)]
         return [field_type] if isinstance(field_type, type) and issubclass(field_type, mdef.OptionalAnnotation) else []
@@ -292,20 +294,27 @@ class Generator:
         return derived_values
 
 
-def generate_tool(config: Configuration):
-    # Reset any previous generation
-    model_definition.clear()
+    @staticmethod
+    def load_from_config(config: Configuration):
+        # Reset any previous generation
+        model_definition.clear()
 
-    # Find and import the specified model
-    module_name = os.path.splitext(os.path.basename(config.model_def))[0].replace('spec', '')
-    spec = importlib.util.spec_from_file_location(module_name, config.model_def)
-    new_mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(new_mod)
+        # Find and import the specified model
+        module_name = os.path.splitext(os.path.basename(config.model_def))[0].replace('_spec', '')
+        spec = importlib.util.spec_from_file_location(module_name, config.model_def)
+        new_mod = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = new_mod
+        spec.loader.exec_module(new_mod)
+        generator = Generator(config, module_name)
+        return generator
+
+
+def generate_tool(config: Configuration):
 
     homedir = config.homedir
     tooldir = os.path.dirname(__file__)
 
-
+    generator = Generator.load_from_config(config)
 
 
     def ensure_dir_exists(p):
@@ -321,7 +330,7 @@ def generate_tool(config: Configuration):
         """ Return a directory relative to the homedir """
         return os.path.normpath(os.path.join(homedir, basedir, p))
 
-    generator = Generator(config, module_name)
+
 
     #for cls in mdef.model_definition.entity:
     #    for f in fields(cls):
@@ -344,8 +353,35 @@ def generate_tool(config: Configuration):
 
 
 
+@prepare
+def generator_tests():
+    """ Unit tests for the generator tool """
+
+    model_definition.clear()
+
+    @cleanup
+    def clean_model_definition():
+        model_definition.clear()
+
+    @test
+    def test_get_diagram_attributes():
+        generator = Generator.load_from_config(Configuration('test/sysml_spec.py'))
+        sysml_spec = sys.modules['sysml']
+        attrs = generator.get_diagram_attributes(sysml_spec.Block)
+        assert len(attrs) == 2
+        names = [f.name for f in attrs]
+        assert 'name' in names
+        assert 'description' in names
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('specification', default='sysml_spec.py')
+    parser.add_argument('--test', action='store_true')
     args = parser.parse_args()
-    generate_tool(Configuration(args.specification))
+
+    if args.test:
+        run_tests()
+    else:
+        generate_tool(Configuration(args.specification))

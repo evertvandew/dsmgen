@@ -287,6 +287,9 @@ class Shape(Stylable):
     def getShapeDescriptor(cls):
         return BasicShape.getDescriptor("rect")
 
+    def getEntityForConnection(self):
+        return getattr(self, 'logical_class', None)
+
 @dataclass
 class CP:
     orientation: BlockOrientations = BlockOrientations.RIGHT

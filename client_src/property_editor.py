@@ -2,8 +2,8 @@ from browser import document, console, html, bind
 from browser.widgets.dialog import Dialog, EntryDialog, InfoDialog
 import enum
 import diagrams
-from dataclasses import fields, MISSING
-from typing import Hashable, Dict
+from dataclasses import fields, MISSING, dataclass, Field
+from typing import Hashable, Dict, Any
 import json
 from svg_shapes import HAlign, VAlign
 from shapes import HIDDEN
@@ -48,7 +48,10 @@ type2default = {
 }
 
 
-def type2Constructor(t):
+def type2Constructor(t: type):
+    """ Find the right constructor for a specific type. The constructor is used to convert the value inside the
+        edit field of the property editor, into an instance of this type.
+    """
     if t == Dict[str, str]:
         return lambda v: dict([[k.strip() for k in item.split(':')]  for item in v.split(';')])
     elif t == HIDDEN:
@@ -59,6 +62,8 @@ def type2Constructor(t):
         return str
     return t
 
+
+# Define a lookup table to convert values to a type the property editor can handle.
 value_formatter = {
     float: float,
     str: str,
@@ -69,11 +74,13 @@ value_formatter = {
 }
 
 def isEditable(field):
+    """ Return true if a user is allowed to directly edit this value. """
     if field.type is HIDDEN:
         return False
     return (isinstance(field.type, type) and issubclass(field.type, enum.IntEnum)) or field.type==longstr or (isinstance(field.type, Hashable) and field.type in type2HtmlInput)
 
 def isPortCollection(field):
+    """ Return true if the field a collection of ports. """
     if not isinstance(field.type, list):
         return False
     return any(isinstance(t, type) and issubclass(t, diagrams.CP) for t in field.type)
@@ -81,7 +88,10 @@ def isPortCollection(field):
 def isStylable(objecttype):
     return hasattr(objecttype, 'getStyleKeys')
 
-def getInputForField(o, field):
+def getInputForField(o: dataclass, field: Field):
+    """ Determine the right edit widget to use for a specific field description.
+        The field is an instance of
+    """
     if isinstance(field.type, type) and issubclass(field.type, enum.IntEnum):
         input = html.SELECT(id=f"edit_{field.name}", name=field.name)
         value = getattr(o, field.name) if o else ''
@@ -103,7 +113,8 @@ def getInputForField(o, field):
         input.className = 'form-control'
         return input
 
-def getInputForStyle(o, key, value):
+def getInputForStyle(o: Any, key, value):
+    """ Determine an appropriate edit widget for a specific style item. """
     if 'color' in key:
         return html.INPUT(id=f"styling_{key}", name=key, value=value, type='color')
     if 'align' in key:
@@ -120,6 +131,7 @@ def getInputForStyle(o, key, value):
 
 
 def str2int(x):
+    """ Convert a string to an integer. The empty string is mapped to 0. """
     if x:
         return int(x)
     return 0
@@ -268,7 +280,7 @@ def select_port_fields(objecttype):
     return [f for f in fields(objecttype) if isPortCollection(f)]
 
 
-def dataClassEditorForm(o, objecttype, data_store: DataStore, default=None, update=None, edit_ports=False):
+def dataClassEditorForm(o: Any, objecttype: type, data_store: DataStore, default=None, update=None, edit_ports=False):
     """ Return a form for editing the values in a data object, without buttons. """
     # Use the annotations to create the properties editor
     form = html.FORM()
