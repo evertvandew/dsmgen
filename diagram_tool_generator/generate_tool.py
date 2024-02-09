@@ -27,39 +27,6 @@ import model_definition as mdef
 from config import Configuration
 from test_frame import prepare, test, run_tests, cleanup
 
-def get_inner_types(owner, field_type):
-    def get_type(field_type):
-        if isinstance(field_type, str):
-            return mdef.model_definition.get_cls_by_name(field_type)
-        if field_type is Self:
-            return owner
-        return field_type
-
-    """ Find out what the inner type of a field is. Used to find cross-references between items. """
-    if type(field_type) in [list, tuple]:
-        possible_types = [t for t in field_type if not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation))]
-        if Self in field_type:
-            possible_types.append(owner)
-        assert possible_types, f'No type defined for field {field_type}'
-        return (t for ts in possible_types for t in get_inner_types(owner, ts))
-    if isinstance(field_type, mdef.XRef):
-        return [get_type(t) for t in field_type.types if not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation))]
-
-    return [get_type(field_type)]
-
-
-def determine_dependencies(all_names):
-    xrefs = {}
-
-    # Find all references to these names
-    for name, cls in all_names.items():
-        my_xrefs = [t.__name__ for f in fields(cls) for t in get_inner_types(cls, f.type) if
-                    isinstance(t, type) and t.__name__ in all_names and t != cls]
-        xrefs[name] = set(my_xrefs)
-    return xrefs
-
-
-
 
 class Generator:
     def __init__(self, config, module_name):
@@ -86,7 +53,7 @@ class Generator:
         for cls in md.diagrams:
             cls.entities = [mk_cls(cls, n) for n in cls.entities]
 
-        self.dependencies = determine_dependencies(all_names)
+        self.dependencies = self.determine_dependencies(all_names)
 
         # Collect which children can be created for a model item.
         children = {n: set() for n in all_names}
@@ -94,7 +61,7 @@ class Generator:
         for cls in md.all_model_items:
             pass
             if t := cls.__annotations__.get('parent', False):
-                for d in get_inner_types(cls, t):
+                for d in self.get_inner_types(cls, t):
                     name = d.__name__
                     if name in all_names:
                         children[name].add(cls.__name__)
@@ -102,7 +69,7 @@ class Generator:
                         children[cls.__name__].add(cls.__name__)
         # Also look at the allowed "entities" in diagrams.
         for cls in md.diagrams:
-            children[cls.__name__] = {c.__name__ for c in get_inner_types(cls, cls.entities)}
+            children[cls.__name__] = {c.__name__ for c in self.get_inner_types(cls, cls.entities)}
         self.children = children
 
         self.ordered_items = self.order_dependencies()
@@ -139,7 +106,7 @@ class Generator:
         allowed_blocks = {e: e.__name__ for e in cls.entities if not self.md.is_instance_of(e)}
         instance_blocks = [e for e in cls.entities if self.md.is_instance_of(e)]
         for e in instance_blocks:
-            for p in get_inner_types(cls, e.__annotations__['definition']):
+            for p in self.get_inner_types(cls, e.__annotations__['definition']):
                 allowed_blocks[p] = e.__name__
 
         block_names = [f'"{e.__name__}": "{s}"' for e, s in allowed_blocks.items()]
@@ -212,6 +179,38 @@ class Generator:
         if isinstance(field_type, list) or isinstance(field_type, tuple):
             return [o for t in field_type for o in Generator.get_type_options(t)]
         return [field_type] if isinstance(field_type, type) and issubclass(field_type, mdef.OptionalAnnotation) else []
+
+    def get_inner_types(self, owner, field_type):
+        def get_type(field_type):
+            if isinstance(field_type, str):
+                return self.md.get_cls_by_name(field_type)
+            if field_type is Self:
+                return owner
+            return field_type
+
+        """ Find out what the inner type of a field is. Used to find cross-references between items. """
+        if type(field_type) in [list, tuple]:
+            possible_types = [t for t in field_type if
+                              not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation))]
+            if Self in field_type:
+                possible_types.append(owner)
+            assert possible_types, f'No type defined for field {field_type}'
+            return (t for ts in possible_types for t in self.get_inner_types(owner, ts))
+        if isinstance(field_type, mdef.XRef):
+            return [get_type(t) for t in field_type.types if
+                    not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation))]
+
+        return [get_type(field_type)]
+
+    def determine_dependencies(self, all_names):
+        xrefs = {}
+
+        # Find all references to these names
+        for name, cls in all_names.items():
+            my_xrefs = [t.__name__ for f in fields(cls) for t in self.get_inner_types(cls, f.type) if
+                        isinstance(t, type) and t.__name__ in all_names and t != cls]
+            xrefs[name] = set(my_xrefs)
+        return xrefs
 
     def get_html_type(self, field_type):
         if mdef.hidden in self.get_type_options(field_type):

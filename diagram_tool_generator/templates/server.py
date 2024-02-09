@@ -433,7 +433,8 @@ def send_static(path):
 
 @app.route('/')
 def send_index():
-    return flask.send_from_directory("${config.client_dir}", 'index.html', mimetype='text/html')
+    return flask.redirect("${generator.module_name}client.html", 302)
+    #return flask.send_from_directory("${config.client_dir}", 'index.html', mimetype='text/html')
 
 
 def run(port, client_src):
