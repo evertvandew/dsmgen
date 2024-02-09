@@ -15,7 +15,7 @@ from typing import List, Any, Optional, Dict
 from dataclasses import dataclass, field, is_dataclass, fields
 
 
-
+# Define a number of types that are used in reporting the class of a model entity.
 class ExplorableElement: pass
 class ConnectionElement: pass
 class RepresentableElement: pass
@@ -50,12 +50,31 @@ class TypeConversion:
         c = getattr(self, context)
         return c.typename
 
+
+def split_styling(styling):
+    """ Split the string used to define styling into a dictionary useful for lookup"""
+    if not ':' in styling:
+        return {}
+    return {k:v for k, v in [l.split(':') for l in styling.split(';')]}
+
+
 @dataclass
 class ModelDefinition:
     model_elements: List[Any] = field(default_factory=list)
     initial_records: List[Any] = field(default_factory=list)
     type_conversions: Dict[str, TypeConversion] = field(default_factory=dict)
     element_lookup: Dict[str, Any] = field(default_factory=dict)
+    styling_definition: Dict[str, Any] = field(default_factory=dict)
+
+
+    def __post_init__(self):
+        self.add_type_conversion(longstr, TypeDefault('String', '""'), TypeDefault('str', '""'), TypeDefault('str', '""'))
+        self.add_type_conversion(parameter_spec, TypeDefault('String', '""'), TypeDefault('dict', 'field(default_factory=dict)'),
+                            TypeDefault('dict', 'field(default_factory=dict)'))
+        self.add_type_conversion(parameter_values, TypeDefault('String', '""'),
+                            TypeDefault('dict', 'field(default_factory=dict)'),
+                            TypeDefault('dict', 'field(default_factory=dict)'))
+        self.add_type_conversion(XRef, TypeDefault('Integer', 'None'), TypeDefault('int', 'None'), TypeDefault('int', 'None'))
 
     @property
     def diagrams(self) -> List[Any]:
@@ -113,146 +132,138 @@ class ModelDefinition:
             self.element_lookup = {cls.__name__: cls for cls in self.model_elements}
         return self.element_lookup[name]
 
-model_definition = ModelDefinition()
 
-def clear():
-    global model_definition
-    model_definition = ModelDefinition()
+    def add_type_conversion(self, cls, sqlalchemy: TypeDefault, server: TypeDefault, client: TypeDefault):
+        """ Define how a custom type is represented in the various parts of the system:
 
-def add_type_conversion(cls, sqlalchemy: TypeDefault, server: TypeDefault, client: TypeDefault):
-    """ Define how a custom type is represented in the various parts of the system:
-
-    Arguments:
-    cls -- The class that is used in the model specification
-    sqlalchemy -- the SQLAlchemy type used to represent this data
-    server -- how the type is represented in the dataclasses used by the server. Must be JSON serializable.
-    client -- how the type is represented in the dataclasses used by the Brython client. Must be JSON serializable.
-    """
-    conversion = TypeConversion(cls.__name__, sqlalchemy, server, client)
-    model_definition.type_conversions[cls.__name__] = conversion
+        Arguments:
+        cls -- The class that is used in the model specification
+        sqlalchemy -- the SQLAlchemy type used to represent this data
+        server -- how the type is represented in the dataclasses used by the server. Must be JSON serializable.
+        client -- how the type is represented in the dataclasses used by the Brython client. Must be JSON serializable.
+        """
+        conversion = TypeConversion(cls.__name__, sqlalchemy, server, client)
+        self.type_conversions[cls.__name__] = conversion
 
 
-styling_definition = {}
+    def Entity(self, styling=''):
+        """ Definition of a thing rendered as a "shape": blocks, actors, objects, actions, etc, etc, etc """
+        def decorate(cls):
+            cls.categories = [ExplorableElement, RepresentableElement]
+            cls = dataclass(cls)
+            self.model_elements.append(cls)
+            self.styling_definition[cls.__name__] = split_styling(styling)
+            return cls
+        return decorate
+
+    def CompoundEntity(self, parents, elements, styling=''):
+        """ Definition of a thing rendered as a "shape": blocks, actors, objects, actions, etc, etc, etc,
+            but that are also a diagram themselves. In the graphical editor, double-clicking this should
+            open an editor for the inned diagram.
+        """
+        def decorate(cls):
+            cls.entities = elements
+            cls.__annotations__['parent'] = XRef('children', *parents, hidden)
+            cls.categories = [ExplorableElement, RepresentableElement, DiagramElement]
+            cls = dataclass(cls)
+            self.model_elements.append(cls)
+            self.styling_definition[cls.__name__] = split_styling(styling)
+            return cls
+        return decorate
+
+    def BlockInstance(self, parents, definitions, styling=''):
+        def decorate(cls):
+            cls.__annotations__['parent'] = XRef('children', *parents, hidden)
+            cls.__annotations__['definition'] = XRef('children', *definitions, hidden)
+            cls.categories = [ExplorableElement, RepresentableElement, InstanceOf]
+            cls = dataclass(cls)
+            self.model_elements.append(cls)
+            self.styling_definition[cls.__name__] = split_styling(styling)
+            return cls
+        return decorate
 
 
-def split_styling(styling):
-    """ Split the string used to define styling into a dictionary useful for lookup"""
-    if not ':' in styling:
-        return {}
-    return {k:v for k, v in [l.split(':') for l in styling.split(';')]}
+    def Relationship(self, styling=''):
+        """ Definition of a connection between entities. """
+        def decorate(cls):
+            cls.categories = [ConnectionElement, RepresentableElement]
+            cls = dataclass(cls)
+            self.model_elements.append(cls)
+            self.styling_definition[cls.__name__] = split_styling(styling)
+            return cls
+        return decorate
 
-def Entity(styling=''):
-    """ Definition of a thing rendered as a "shape": blocks, actors, objects, actions, etc, etc, etc """
-    def decorate(cls):
-        cls.categories = [ExplorableElement, RepresentableElement]
-        cls = dataclass(cls)
-        model_definition.model_elements.append(cls)
-        styling_definition[cls.__name__] = split_styling(styling)
-        return cls
-    return decorate
+    def Port(self, styling=''):
+        """ Some entities can have IO "ports", or connection points. """
+        def decorate(cls):
+            cls.categories = [ExplorableElement, RepresentableElement, PortElement]
+            cls = dataclass(cls)
+            self.model_elements.append(cls)
+            self.styling_definition[cls.__name__] = split_styling(styling)
+            return cls
+        return decorate
 
-def CompoundEntity(parents, elements, styling=''):
-    """ Definition of a thing rendered as a "shape": blocks, actors, objects, actions, etc, etc, etc,
-        but that are also a diagram themselves. In the graphical editor, double-clicking this should
-        open an editor for the inned diagram.
-    """
-    def decorate(cls):
-        cls.entities = elements
-        cls.__annotations__['parent'] = XRef('children', *parents, hidden)
-        cls.categories = [ExplorableElement, RepresentableElement, DiagramElement]
-        cls = dataclass(cls)
-        model_definition.model_elements.append(cls)
-        styling_definition[cls.__name__] = split_styling(styling)
-        return cls
-    return decorate
-
-def BlockInstance(parents, definitions, styling=''):
-    def decorate(cls):
-        cls.__annotations__['parent'] = XRef('children', *parents, hidden)
-        cls.__annotations__['definition'] = XRef('children', *definitions, hidden)
-        cls.categories = [ExplorableElement, RepresentableElement, InstanceOf]
-        cls = dataclass(cls)
-        model_definition.model_elements.append(cls)
-        styling_definition[cls.__name__] = split_styling(styling)
-        return cls
-    return decorate
+    def BlockDiagram(self, *entities, styling=''):
+        """ Diagram where entities can be placed anywhere on the grid, and connected freely. """
+        def decorate(cls):
+            cls.entities = entities
+            cls.categories = [ExplorableElement, DiagramElement]
+            cls = dataclass(cls)
+            self.model_elements.append(cls)
+            self.styling_definition[cls.__name__] = split_styling(styling)
+            return cls
+        return decorate
 
 
-def Relationship(styling=''):
-    """ Definition of a connection between entities. """
-    def decorate(cls):
-        cls.categories = [ConnectionElement, RepresentableElement]
-        cls = dataclass(cls)
-        model_definition.model_elements.append(cls)
-        styling_definition[cls.__name__] = split_styling(styling)
-        return cls
-    return decorate
+    def LanedDiagram(self, *entities, styling=''):
+        """ A diagram with "lanes", e.g. an UML sequence diagram. """
+        def decorate(cls):
+            cls.entities = entities
+            cls.categories = [ExplorableElement, DiagramElement]
+            cls = dataclass(cls)
+            self.model_elements.append(cls)
+            self.styling_definition[cls.__name__] = split_styling(styling)
+            return cls
 
-def Port(styling=''):
-    """ Some entities can have IO "ports", or connection points. """
-    def decorate(cls):
-        cls.categories = [ExplorableElement, RepresentableElement, PortElement]
-        cls = dataclass(cls)
-        model_definition.model_elements.append(cls)
-        styling_definition[cls.__name__] = split_styling(styling)
-        return cls
-    return decorate
+        return decorate
 
-def BlockDiagram(*entities, styling=''):
-    """ Diagram where entities can be placed anywhere on the grid, and connected freely. """
-    def decorate(cls):
-        cls.entities = entities
-        cls.categories = [ExplorableElement, DiagramElement]
-        cls = dataclass(cls)
-        model_definition.model_elements.append(cls)
-        styling_definition[cls.__name__] = split_styling(styling)
-        return cls
-    return decorate
+    def LogicalModel(self, styling=''):
+        """ Part of the underlying logical model. The user can browse the data in the tool following these elements. """
+        def decorate(cls):
+            cls.categories = [ExplorableElement]
+            cls = dataclass(cls)
+            self.model_elements.append(cls)
+            self.styling_definition[cls.__name__] = split_styling(styling)
+            return cls
+        return decorate
 
-
-def LanedDiagram(*entities, styling=''):
-    """ A diagram with "lanes", e.g. an UML sequence diagram. """
-    def decorate(cls):
-        cls.entities = entities
-        cls.categories = [ExplorableElement, DiagramElement]
-        cls = dataclass(cls)
-        model_definition.model_elements.append(cls)
-        styling_definition[cls.__name__] = split_styling(styling)
-        return cls
-
-    return decorate
-
-def LogicalModel(styling=''):
-    """ Part of the underlying logical model. The user can browse the data in the tool following these elements. """
-    def decorate(cls):
-        cls.categories = [ExplorableElement]
-        cls = dataclass(cls)
-        model_definition.model_elements.append(cls)
-        styling_definition[cls.__name__] = split_styling(styling)
-        return cls
-    return decorate
-
-def ModelRoot(styling=''):
-    """ The root of the underlying logical model. From this element, the user can build
-        a model using the tool.
-    """
-    # TODO: Remove this, the initial elements are a better solution.
-    def decorate(cls):
-        cls.categories = [ExplorableElement]
-        cls = dataclass(cls)
-        return cls
-    return decorate
+    def ModelRoot(self, styling=''):
+        """ The root of the underlying logical model. From this element, the user can build
+            a model using the tool.
+        """
+        # TODO: Remove this, the initial elements are a better solution.
+        def decorate(cls):
+            cls.categories = [ExplorableElement]
+            cls = dataclass(cls)
+            return cls
+        return decorate
 
 
-###############################################################################
-## Bookkeeping helpers
-model_version = "0.0"
-def ModelVersion(v):
-    global model_version
-    model_version = v
+    def initial_state(self, records):
+        self.initial_records = records
 
-def get_version():
-    return model_version
+    def get_style(self, cls, key, default):
+        return self.styling_definition.get(cls.__name__, {}).get(key, default)
+
+
+    ###############################################################################
+    ## Bookkeeping helpers
+    model_version: str = "0.0"
+    def ModelVersion(self, v):
+        self.model_version = v
+
+    def get_version(self):
+        return self.model_version
 
 
 ###############################################################################
@@ -272,16 +283,13 @@ class selection:
         self.options: List[str] = options.split()
 
 class longstr: pass
-add_type_conversion(longstr, TypeDefault('String', '""'), TypeDefault('str', '""'), TypeDefault('str', '""'))
 
 class parameter_spec: pass
-add_type_conversion(parameter_spec, TypeDefault('String', '""'), TypeDefault('dict', 'field(default_factory=dict)'), TypeDefault('dict', 'field(default_factory=dict)'))
 
 @dataclass
 class parameter_values:
     parameter_definition: str
 
-add_type_conversion(parameter_values, TypeDefault('String', '""'), TypeDefault('dict', 'field(default_factory=dict)'), TypeDefault('dict', 'field(default_factory=dict)'))
 
 
 class fmt_datetime(datetime):
@@ -295,11 +303,3 @@ class XRef:
         self.types = [t for t in types if not (isinstance(t, type) and issubclass(t, OptionalAnnotation))]
         self.options = [t for t in types if not t in self.types]
 
-add_type_conversion(XRef, TypeDefault('Integer', 'None'), TypeDefault('int', 'None'), TypeDefault('int', 'None'))
-
-
-def initial_state(records):
-    model_definition.initial_records = records
-
-def get_style(cls, key, default):
-    return styling_definition.get(cls.__name__, {}).get(key, default)

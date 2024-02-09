@@ -62,12 +62,13 @@ def determine_dependencies(all_names):
 
 
 class Generator:
-    def __init__(self, config, module_name, model_definition=mdef.model_definition):
+    def __init__(self, config, module_name):
         self.config = config
         self.module_name = module_name
 
         # Generate some look up tables and dependency lists
-        md = model_definition
+        md = sys.modules[module_name].md
+        self.md = md
         all_names: dict[str, Any] = {c.__name__: c for c in md.all_model_items}
         # Check there are no duplicates in the names.
         assert len(all_names) == len(md.all_model_items), 'Duplicate names in the definitions'
@@ -90,7 +91,7 @@ class Generator:
         # Collect which children can be created for a model item.
         children = {n: set() for n in all_names}
         # First invert the "parent" relationship
-        for cls in mdef.model_definition.all_model_items:
+        for cls in md.all_model_items:
             pass
             if t := cls.__annotations__.get('parent', False):
                 for d in get_inner_types(cls, t):
@@ -100,20 +101,19 @@ class Generator:
                     elif name == 'Self':
                         children[cls.__name__].add(cls.__name__)
         # Also look at the allowed "entities" in diagrams.
-        for cls in mdef.model_definition.diagrams:
+        for cls in md.diagrams:
             children[cls.__name__] = {c.__name__ for c in get_inner_types(cls, cls.entities)}
         self.children = children
 
         self.ordered_items = self.order_dependencies()
-        self.md = md
-        self.styling = mdef.styling_definition
+        self.styling = md.styling_definition
 
 
     def get_logical_children(self, name: str):
         """ Determine which elements can be created as children of an item in the Logica Model. """
         # Determine which items depend on this item.
         # Relationships are NOT included, these are not explicit in the logical model.
-        relationships = [c.__name__ for c in mdef.model_definition.relationship]
+        relationships = [c.__name__ for c in self.md.relationship]
         children = [n for n in self.children[name] if n not in relationships]
 
         return children
@@ -123,7 +123,7 @@ class Generator:
             Returns a dictionary of the names of blocks and a list of port types
         """
         result = {}
-        for p in mdef.model_definition.port:
+        for p in self.md.port:
             # Assume the parent property is an XRef.
             for b in p.__annotations__['parent'].types:
                 if issubclass(b, mdef.OptionalAnnotation):
@@ -136,8 +136,8 @@ class Generator:
         """ Determine which items can be dropped on a diagram, and which items are the result. """
         # Allowed blocks are specified in the "entities".
         # One class of blocks needs special treatment: the "Instance" blocks.
-        allowed_blocks = {e: e.__name__ for e in cls.entities if not mdef.model_definition.is_instance_of(e)}
-        instance_blocks = [e for e in cls.entities if mdef.model_definition.is_instance_of(e)]
+        allowed_blocks = {e: e.__name__ for e in cls.entities if not self.md.is_instance_of(e)}
+        instance_blocks = [e for e in cls.entities if self.md.is_instance_of(e)]
         for e in instance_blocks:
             for p in get_inner_types(cls, e.__annotations__['definition']):
                 allowed_blocks[p] = e.__name__
@@ -148,7 +148,7 @@ class Generator:
     def get_allowed_creates(self, cls):
         """ Determine which items can be created in a diagram using the Create widget, and which items are the result.
         """
-        allowed_blocks = {e: e.__name__ for e in cls.entities if not mdef.model_definition.is_instance_of(e)}
+        allowed_blocks = {e: e.__name__ for e in cls.entities if not self.md.is_instance_of(e)}
         port_blocks = self.get_allowed_ports().get(cls.__name__, [])
         block_names = [f'"{e.__name__}": "{s}"' for e, s in allowed_blocks.items()] + \
                       [f'"{b}": "{b}"' for b in port_blocks]
@@ -198,7 +198,7 @@ class Generator:
             return 'int'
         if isinstance(field_type, mdef.parameter_values):
             return 'str'
-        if conversion := mdef.model_definition.get_conversions(field_type):
+        if conversion := self.md.get_conversions(field_type):
             return conversion.client.typename
         if isinstance(field_type, str):
             return field_type
@@ -229,7 +229,7 @@ class Generator:
             return 'None'
         if isinstance(field_type, mdef.selection):
             return '1'
-        if conversion := mdef.model_definition.get_conversions(field_type):
+        if conversion := self.md.get_conversions(field_type):
             return conversion.client.default
         if field_type is int:
             return '0'
@@ -244,8 +244,8 @@ class Generator:
     def get_connections_from(self):
         """ Determine which connections can be started from the specific class. """
         all_connections = []
-        for cls in mdef.model_definition.blocks + mdef.model_definition.port:
-            connections = [c for c in mdef.model_definition.relationship if cls in c.__annotations__['source'].types]
+        for cls in self.md.blocks + self.md.port:
+            connections = [c for c in self.md.relationship if cls in c.__annotations__['source'].types]
             options = {}
             for c in connections:
                 for t in c.__annotations__['target'].types:
@@ -266,7 +266,7 @@ class Generator:
             Inside the subdiagram, each port acts as its opposite.
         """
         opposite_ports = {}
-        for c in mdef.model_definition.relationship:
+        for c in self.md.relationship:
             # Relationships that have 'Any' in the source or targets can not be mirrored.
             if Any in c.__annotations__['source'].types or Any in c.__annotations__['target'].types:
                 continue
@@ -296,17 +296,14 @@ class Generator:
 
     @staticmethod
     def load_from_config(config: Configuration):
-        # Reset any previous generation
-        model_definition.clear()
-
         # Find and import the specified model
-        module_name = os.path.splitext(os.path.basename(config.model_def))[0].replace('_spec', '')
+        module_name = os.path.splitext(os.path.basename(config.model_def))[0].replace('spec', '')
         spec = importlib.util.spec_from_file_location(module_name, config.model_def)
         new_mod = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = new_mod
         spec.loader.exec_module(new_mod)
         generator = Generator(config, module_name)
-        return generator
+        return generator, module_name
 
 
 def generate_tool(config: Configuration):
@@ -314,7 +311,7 @@ def generate_tool(config: Configuration):
     homedir = config.homedir
     tooldir = os.path.dirname(__file__)
 
-    generator = Generator.load_from_config(config)
+    generator, module_name = Generator.load_from_config(config)
 
 
     def ensure_dir_exists(p):
@@ -356,17 +353,12 @@ def generate_tool(config: Configuration):
 @prepare
 def generator_tests():
     """ Unit tests for the generator tool """
-
-    model_definition.clear()
-
-    @cleanup
-    def clean_model_definition():
-        model_definition.clear()
+    TEST_SPEC = os.path.normpath(os.path.dirname(__file__)+'/../test/sysml_spec.py')
 
     @test
     def test_get_diagram_attributes():
-        generator = Generator.load_from_config(Configuration('test/sysml_spec.py'))
-        sysml_spec = sys.modules['sysml']
+        generator, module_name = Generator.load_from_config(Configuration(TEST_SPEC))
+        sysml_spec = sys.modules[module_name]
         attrs = generator.get_diagram_attributes(sysml_spec.Block)
         assert len(attrs) == 2
         names = [f.name for f in attrs]

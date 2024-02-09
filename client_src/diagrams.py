@@ -768,6 +768,9 @@ class FlowPort(CP):
     def getSize(self):
         return Point(1,1)
 
+    def getLogicalClass(self):
+        return getattr(self, 'logical_class', None)
+
 @dataclass
 class FlowPortIn(FlowPort):
     pass

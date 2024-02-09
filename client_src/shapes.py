@@ -288,6 +288,13 @@ class Shape(Stylable):
         return BasicShape.getDescriptor("rect")
 
     def getEntityForConnection(self):
+        """ Called to determine """
+        return getattr(self, 'logical_class', None)
+    def getLogicalClass(self):
+        """ Called to determine what class stores the logical details of this element.
+            In most cases, this is set by the object representing the entity. In some cases,
+            like the PortLabel, this must be determined runtime.
+        """
         return getattr(self, 'logical_class', None)
 
 @dataclass
@@ -610,6 +617,9 @@ class Relationship(Stylable):
         for key, value in values.items():
             setattr(self, key, value)
         self.updateShape()
+
+    def getLogicalClass(self):
+        return getattr(self, 'logical_class', None)
 
 
 @dataclass

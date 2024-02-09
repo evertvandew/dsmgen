@@ -393,13 +393,13 @@ class DataStore(EventDispatcher):
             return record
 
     def split_representation_item(self, collection, record) -> (Dict, Any):
-        model_cls = record.logical_class
+        model_cls = record.getLogicalClass()
         if model_cls is None:
             # Obtain the model class from the block or reference this representation points to
             if hasattr(record, 'block'):
-                model_id = record.block
-                mdl = self.get(Collection.block, model_id)
-                model_cls = type(mdl)
+                if model_id := record.block:
+                    mdl = self.get(Collection.block, model_id)
+                    model_cls = type(mdl)
             else:
                 model_id = record.relationship
                 mdl = self.get(Collection.relation, model_id)

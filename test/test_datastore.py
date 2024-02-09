@@ -151,7 +151,7 @@ def data_store_tests():
             return Response(201, json={'Id': 123})
 
         def check_request_repr(url, method, kwargs):
-            assert kwargs['data'] == '''{"diagram": 456, "block": 123, "parent": 0, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
+            assert kwargs['data'] == '''{"diagram": 456, "block": 123, "parent": null, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/Block', 'post', get_response=check_request_model)
@@ -197,7 +197,7 @@ def data_store_tests():
         item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
               name='Test1', description='This is a test block')
         def check_request_repr(url, method, kwargs):
-            assert kwargs['data'] == '''{"diagram": 456, "block": 123, "parent": 0, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
+            assert kwargs['data'] == '''{"diagram": 456, "block": 123, "parent": null, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/_BlockRepresentation', 'post', get_response=check_request_repr)

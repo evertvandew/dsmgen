@@ -1,25 +1,27 @@
 
 from typing import Self, Any
-from model_definition import (Entity, Relationship, Port, BlockDiagram, LogicalModel, ModelRoot, required,
-                              optional, selection, detail, longstr, XRef, ModelVersion, initial_state,
-                              hidden, BlockInstance, parameter_spec, CompoundEntity)
+from model_definition import (ModelDefinition, required,
+                              optional, selection, detail, longstr, XRef,
+                              hidden, parameter_spec)
 
-ModelVersion('0.1')
+# The tooling expects an ModelDifinition object named `md`
+md = ModelDefinition()
+md.ModelVersion('0.1')
 
 
 ###############################################################################
 ## Logical model
-@ModelRoot(styling='icon:folder')
+@md.ModelRoot(styling='icon:folder')
 class RootModel:
     pass
 
-@LogicalModel(styling='icon:folder')
+@md.LogicalModel(styling='icon:folder')
 class FunctionalModel:
     name: str
     description: longstr
     parent: XRef('children', Self, RootModel, hidden)
 
-@LogicalModel(styling='icon:folder')
+@md.LogicalModel(styling='icon:folder')
 class StructuralModel:
     name: str
     description: longstr
@@ -27,17 +29,17 @@ class StructuralModel:
 
 ###############################################################################
 ## Entities for Notes & Constraints
-@Entity(styling = "shape:note;structure:Note;icon:message")
+@md.Entity(styling = "shape:note;structure:Note;icon:message")
 class Note:
     description: (longstr, required)
     parent: XRef('children', Any, hidden)
 
-@Entity(styling = "shape:note;structure:Note;icon:note-sticky")
+@md.Entity(styling = "shape:note;structure:Note;icon:note-sticky")
 class Constraint:
     description: (longstr, required)
     parent: XRef('children', Any, hidden)
 
-@Relationship(styling = "end:hat")
+@md.Relationship(styling = "end:hat")
 class Anchor:
     source: XRef('owner', Note, Constraint, hidden)
     target: XRef('notes', Any, hidden)
@@ -45,38 +47,38 @@ class Anchor:
 
 ###############################################################################
 ## Entities for structural diagrams
-@LogicalModel
+@md.LogicalModel
 class ProtocolDefinition:
     description: longstr
     definition: longstr
 
-@Entity(styling = "shape:rect;structure:Block;icon:square-full")
+@md.Entity(styling = "shape:rect;structure:Block;icon:square-full")
 class Block:
     parent: XRef('children', Self, StructuralModel, hidden)
     name: str
     description: (longstr, detail)
 
-@CompoundEntity(parents=[StructuralModel], elements=[Note, "Block"], styling = "shape:rect;structure:Block;blockcolor:yellow;icon:square-full;icon:image")
+@md.CompoundEntity(parents=[StructuralModel], elements=[Note, "Block"], styling = "shape:rect;structure:Block;blockcolor:yellow;icon:square-full;icon:image")
 class SubProgramDefinition:
     name: str
     description: (longstr, detail)
     parameters: (parameter_spec, detail)
 
-@Port(styling = "shape:square;fill:green;icon:arrows-alt-h")
+@md.Port(styling = "shape:square;fill:green;icon:arrows-alt-h")
 class FullPort:
     name: str
     parent: XRef('ports', Block, SubProgramDefinition, hidden)
     provides: XRef('producers', ProtocolDefinition, optional)
     requires: XRef('consumers', ProtocolDefinition, optional)
 
-@Port(styling = "shape:square;fill:blue;icon:arrows-alt-h")
+@md.Port(styling = "shape:square;fill:blue;icon:arrows-alt-h")
 class FlowPort:
     name: str
     parent: XRef('ports', Block, SubProgramDefinition, hidden)
     inputs: XRef('consumers', ProtocolDefinition, optional)
     outputs: XRef('producers', ProtocolDefinition, optional)
 
-@Relationship(styling = "end:funccall(end)")
+@md.Relationship(styling = "end:funccall(end)")
 class BlockReference:
     stereotype: selection("None Association Aggregation Composition")
     source: XRef('associations', Block, hidden)
@@ -92,14 +94,14 @@ class BlockReference:
             'Composition': 'closeddiamond'
         }[self.stereotype]
 
-@Relationship()
+@md.Relationship()
 class BlockGeneralization:
     source: XRef('parent', Block, hidden)
     target: XRef('children', Block, hidden)
 
     styling = "end:opentriangle"
 
-@Relationship()
+@md.Relationship()
 class FullPortConnection:
     source: XRef('consumers', FullPort, hidden)
     target: XRef('producers', FullPort, hidden)
@@ -107,7 +109,7 @@ class FullPortConnection:
 
     styling = "end:hat"
 
-@Relationship()
+@md.Relationship()
 class FlowPortConnection:
     source: XRef('consumers', FlowPort, hidden)
     target: XRef('producers', FlowPort, hidden)
@@ -115,17 +117,17 @@ class FlowPortConnection:
 
     styling = "end:hat"
 
-@BlockDiagram(Block, Note, Constraint, styling='icon:image')
+@md.BlockDiagram(Block, Note, Constraint, styling='icon:image')
 class BlockDefinitionDiagram:
     parent: XRef('children', Block, StructuralModel, hidden)
     name: str
 
-@BlockInstance(parents=[Any], definitions=[Block])
+@md.BlockInstance(parents=[Any], definitions=[Block])
 class BlockInstance: pass
 
 ###############################################################################
 ## Entities for requirements
-@Entity(styling = "shape:ellipse;structure:Block;icon:file-lines")
+@md.Entity(styling = "shape:ellipse;structure:Block;icon:file-lines")
 class Requirement:
     parent: XRef('children', Self, FunctionalModel, hidden)
     name: str
@@ -134,7 +136,7 @@ class Requirement:
     category: (str, detail)
 
 
-initial_state([
+md.initial_state([
     FunctionalModel('Functional Model', '', None),
     StructuralModel('Structural Model', '', None)
 ])

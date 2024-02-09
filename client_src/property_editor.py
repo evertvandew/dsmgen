@@ -108,7 +108,11 @@ def getInputForField(o: dataclass, field: Field):
         input.className = 'form-control'
         return input
     if field.type in type2HtmlInput:
-        value = value_formatter[field.type](getattr(o, field.name) if o else type2default[field.type])
+        stored_value = getattr(o, field.name) if o else type2default[field.type]
+        if stored_value is None:
+            value = ''
+        else:
+            value = value_formatter[field.type](stored_value)
         input = html.INPUT(id=f"edit_{field.name}", name=field.name, value=value, **type2HtmlInput[field.type])
         input.className = 'form-control'
         return input

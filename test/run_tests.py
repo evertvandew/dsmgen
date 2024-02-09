@@ -7,5 +7,6 @@ import test_datamodel
 import test_datastore
 import test_property_editor
 import test_dispatcher
+import generate_tool
 
 test_frame.run_tests()

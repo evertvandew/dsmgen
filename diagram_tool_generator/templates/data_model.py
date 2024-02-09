@@ -122,11 +122,11 @@ def init_db():
     with session_context() as session:
         if session.query(Version).count() < 2:
             session.add(Version(category="generator", versionnr="0.1"))
-            session.add(Version(category="model", versionnr=${md.get_version()}))
+            session.add(Version(category="model", versionnr=${generator.md.get_version()}))
 
-        % if md.model_definition.initial_records:
+        % if generator.md.initial_records:
         if session.query(_Entity).count() == 0:
-            % for r in md.model_definition.initial_records:
+            % for r in generator.md.initial_records:
                 ${r}.store(session=session)
             % endfor
         % endif

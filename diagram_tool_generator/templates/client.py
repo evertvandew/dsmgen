@@ -59,7 +59,7 @@ class ${entity.__name__}:
     children: shapes.HIDDEN = field(default_factory=list)
 
     def get_icon(self):
-        return "${mdef.get_style(entity, 'icon', 'folder')}"
+        return "${generator.md.get_style(entity, 'icon', 'folder')}"
     % endif
 
     % if generator.md.is_diagram(entity):
@@ -95,7 +95,7 @@ class ${entity.__name__}:
         if generator.md.is_port(cls):
             base_class = 'FlowPort'
         else:
-            base_class = mdef.get_style(cls, 'structure', 'Block')
+            base_class = generator.md.get_style(cls, 'structure', 'Block')
     %>
 @dataclass
 class ${cls.__name__}Representation(diagrams.${base_class}):
@@ -113,14 +113,14 @@ class ${cls.__name__}Representation(diagrams.${base_class}):
     ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
 
-    logical_class = None
+    logical_class = ${cls.__name__}
 
     def getEntityForConnection(self):
         return self.logical_class
 
     @classmethod
     def getShapeDescriptor(cls):
-        return shapes.BasicShape.getDescriptor("${mdef.get_style(cls, 'shape', 'rect')}")
+        return shapes.BasicShape.getDescriptor("${generator.md.get_style(cls, 'shape', 'rect')}")
 
     @classmethod
     def repr_category(cls):
@@ -196,7 +196,7 @@ class ${cls.__name__}Representation(diagrams.Relationship):
     ${attr.name}: ${get_relationship_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
 
-    logical_class = None
+    logical_class = ${cls.__name__}
 
     @classmethod
     def repr_category(cls):

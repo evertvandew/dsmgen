@@ -4,17 +4,19 @@ Importing this module will ensure the project is built and artifacts generated.
 """
 
 import os, os.path
-import subprocess
+import generate_tool as gt
+
 
 def generate_tool():
     # Generate the tool, create directories, clean up etc.
     for d in ['public', 'build', 'build/data']:
         if not os.path.exists(d):
             os.mkdir(d)
-    subprocess.run("../diagram_tool_generator/generate_tool.py sysml_spec.py", shell=True)
+    gt.generate_tool(gt.Configuration("sysml_spec.py"))
     if not os.path.exists('public/src'):
         os.symlink(os.path.abspath('../public/src'), 'public/src')
 
 
 # Generate all the components of the tool.
+# As Python only imports modules once, this will get executed once no matter how many times it is imported
 generate_tool()
