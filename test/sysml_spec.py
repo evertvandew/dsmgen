@@ -117,13 +117,13 @@ class FlowPortConnection:
 
     styling = "end:hat"
 
-@md.BlockDiagram(Block, Note, Constraint, styling='icon:image')
+@md.BlockInstance(parents=[Any], definitions=[SubProgramDefinition])
+class BlockInstance: pass
+
+@md.BlockDiagram(Block, Note, Constraint, BlockInstance, styling='icon:image')
 class BlockDefinitionDiagram:
     parent: XRef('children', Block, StructuralModel, hidden)
     name: str
-
-@md.BlockInstance(parents=[Any], definitions=[Block])
-class BlockInstance: pass
 
 ###############################################################################
 ## Entities for requirements

@@ -352,6 +352,50 @@ def simulated_diagram_tests():
         assert not unexpected_requests
         assert len(expected_responses) == 0
 
+    @test
+    def handling_parameter_spec_dropped_block():
+        """ Simulate dropping a
+            Then instantiate it, and check the proper edit fields are presented and handled.
+        """
+        ds = mk_ds()
+        add_expected_response('/data/diagram_contents/5', 'get', Response(201, json=[]))
+        diagram, rest = new_diagram(5, ds)
+        rest.add = set_entity_ids([400])
+        instance = client.SubProgramDefinition(name='One', parent=3, Id=123, parameters={'limit': int, 'factor': float})
+        restif = Mock()
+        restif.get_hierarchy = Mock(side_effect=lambda cb: cb([instance]))
+        explorer.make_explorer(d['explorer'], restif, client.allowed_children)
+        ev = events.DragStart()
+        ev.dataTransfer.data = {'entity': json.dumps(instance, cls=ExtendibleJsonEncoder)}
+
+        add_expected_response('/data/BlockInstance/123/create_representation', 'post', Response(201, json={
+            'Id': 400,
+            '__classname__': '_BlockInstanceRepresentation',
+            'block': 123,
+            'parent': None,
+            'diagram': 5,
+            'x': 400,
+            'y': 500,
+            'width': 64,
+            'height': 40,
+            'children': [],
+            'block_cls': 'BlockInstanceRepresentation',
+            '_entity': {'name': 'One', 'parent': 3, 'Id': 123, 'parameters': 'limit:int,factor:float',  '__classname__': 'BlockInstance'},
+            '_definition': {'__classname__': 'SubProgramDefinition', 'Id': 3, 'name': 'Block 1', 'description': 'Dit is een test', 'parameters': 'limit:int,factor:float'}
+        }))
+
+        for cls in [events.DragEnter, events.DragOver, events.DragOver, events.Drop, events.DragEnd]:
+            diagram.canvas.dispatchEvent(cls(dataTransfer=ev.dataTransfer))
+
+        assert diagram.children
+        repr = diagram.children[0]
+        assert repr.diagram == 5
+        assert repr.block == 123
+        assert repr.Id == 400
+        assert not unexpected_requests
+
+
+
 
 @prepare
 def simulated_explorer_tests():

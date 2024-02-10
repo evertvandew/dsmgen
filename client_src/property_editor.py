@@ -14,9 +14,19 @@ from data_store import DataStore, ExtendibleJsonEncoder
 
 class longstr(str): pass
 
-class parameter_spec(str): pass
+class parameter_spec(str):
+    """ A parameter spec is represented in the REST api as a string with this structure:
+        "key1: type1, key2: type2".
+        When live in the application, the spec is represented as a dict of str:type pairs.
+    """
+    pass
 
-class parameter_values(str): pass
+class parameter_values(str):
+    """ A set of parameter values is represented in the REST api as a string with this structure:
+        "Key1: value1, key2: value2".
+        When live in the application, it is a simple key:value dictionary.
+    """
+    pass
 
 class OptionalRef:
     def __init__(self, t):

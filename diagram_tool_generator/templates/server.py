@@ -17,9 +17,21 @@ app = flask.Flask(__name__)
 # Instance representations are treated (slightly) different than other representations,
 # so we need to know which they are
 <%
+    import model_definition as mdef
+    from model_definition import fields, is_dataclass, parameter_spec
+
     ir = ", ".join([f'"{e.__name__}Representation"' for e in generator.md.instance_of])
+
+    parameter_specifications = {
+        e.__name__: [f.name for f in fields(e) if parameter_spec in generator.get_inner_types(e, f.type)]
+        for e in generator.ordered_items
+        if any(parameter_spec in generator.get_inner_types(e, f.type) for f in fields(e))
+    }
 %>
 INSTANCE_REPRESENTATIONS = [${ir}]
+
+PARAMETER_SPECIFICATIONS = ${repr(parameter_specifications)}
+
 
 def get_request_data():
     if flask.request.data:
@@ -56,6 +68,11 @@ def my_get_mime(path):
     return mime
 
 
+def get_parameters_defaults(spec: dm.parameter_spec):
+    """ Parse a parameter specification string into default parameters values string. """
+    parameter_defaults = {'int': 0, 'float': 0.0, 'str': ''}
+    return {k.strip():parameter_defaults[v.strip()] for k,v in [part.split(':') for part in spec.split(',')]}
+
 
 def create_port_representations(definition_id, representation_id, diagram, session, dm):
     # Find all direct children of this block
@@ -81,13 +98,22 @@ def create_port_representations(definition_id, representation_id, diagram, sessi
 def create_block_representation(index, table, data, session, dm):
     if issubclass(table, dm.AInstance):
         # ensure the index actually exists, for safety
-        if session.query(dm._Entity).filter(dm._Entity.Id == index).count() != 1:
+        definition_records = session.query(dm._Entity).filter(dm._Entity.Id == index).all()
+        if len(definition_records) != 1:
             return flask.make_response(f'Not found', 404)
-        # We are creating a new instance, it also needs adding in the
-        entity = table(parent=data['diagram'], definition=index)
-        entity.store(session=session)
-        definition_record = session.query(dm._Entity).filter(dm._Entity.Id == index).first()
+        definition_record = definition_records[0]
         definition = dm.AWrapper.load_from_db(definition_record)
+        # Prepare the set of data to be stored in the Instance model object
+        details = dict(parent=data['diagram'], definition=index)
+        # Find the 'parameter_spec' fields and add them to the instance
+        # This must be done runtime as the list of parameters is specified in the record being instantiated.
+        # It is not set statically in the model specification.
+        params = PARAMETER_SPECIFICATIONS.get(definition.__class__.__name__, [])
+        all_params = {p: get_parameters_defaults(getattr(definition, p)) for p in params}
+        details['parameters'] = all_params
+
+        entity = table(**details)
+        entity.store(session=session)
     else:
         entity = table.retrieve(index, session=session)
 
@@ -265,60 +291,6 @@ def create_representation(path, index):
 
         # Create the Representation for other entities
         return create_block_representation(index, table, data, session, dm)
-
-@app.route("/data/<path:path>/<int:index>/create_instance", methods=['POST'])
-def create_instance(path, index):
-    """ Create an instance of a pre-defined class / block / etc.
-        The following steps are taken:
-        1. The Instance object is created in the hierarchical model for storing parameters.
-        2. The representation is created for the diagram.
-        3. The representations for the ports associated with the pre-defined block are created
-        Arguments:
-            path -- the name of the Instance class to be created.
-            index -- the index of the definition record.
-    """
-    if not (table := dm.__dict__.get(path, '')):
-        return flask.make_response('Not found 1', 404)
-    data = get_request_data()
-
-    with dm.session_context() as session:
-        # Check the definition object actually exists
-        nr_definitions = session.query(dm._Entity).filter(dm._Entity.Id == index).count()
-        print("Found records:", nr_definitions)
-        nr_definitions = len(nr_definitions)
-        if nr_definitions != 1:
-            return flask.make_response(f'Not found 2 - {nr_definitions}', 404)
-
-        # Create the structural element for this entity and persist it.
-        # The instance is created under the diagram in the hierarchical model.
-        model_record = table(parent=data['diagram'], definition=index)
-        model_record.store()
-
-        # Create the representation of the Instance
-        record = dm._BlockRepresentation(
-            diagram=data['diagram'],
-            block=model_record.Id,
-            parent=None,
-            x=data['x'],
-            y=data['y'],
-            z=data.get('z', 0),
-            width=data['width'],
-            height=data['height'],
-            styling='',
-            block_cls=f'{path}Representation'
-        )
-        record.post_init()
-        session.add(record)
-        session.commit()
-
-        # Create any ports associated with this object
-        port_entities, port_reprs = create_port_representations(index, record.Id, data['diagram'], session, dm)
-        record_dict = record.asdict()
-        record_dict['_entity'] = model_record.asdict()
-        record_dict['children'] = [p.asdict() for p in port_reprs]
-        for e, p in zip(port_entities, record_dict['children']):
-            p['_entity'] = e.asdict()
-        return flask.make_response(json.dumps(record_dict, cls=dm.ExtendibleJsonEncoder), 201)
 
 @app.route("/data/<path:path>/<int:index>", methods=['DELETE'])
 def delete_entity_data(path, index):

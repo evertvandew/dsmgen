@@ -15,6 +15,8 @@
   - For now, except the sequence diagram because it requires laneing support.
 
 # Refactoring
+* Refactor the typing system in the specification files, so that it is class-based for all types with
+  simple functions to determine concrete types in various contexts, conversions between them and default values.
 * Make parts in the model definition that are used in generating the tool, parts of the decorator call
   instead of the dataclass part.
 * Check if the various entities in the model_definition still need to be dataclasses.

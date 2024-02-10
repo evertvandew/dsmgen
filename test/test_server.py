@@ -260,7 +260,8 @@ def test_server():
         load_db([
             sm.Note(Id=1, description="Don't mind me"),
             sm.BlockDefinitionDiagram(Id=2, name="Test diagram"),
-            sm.Block(Id=3, name="Block 1", description="Dit is een test", parent=2, order=1),
+            sm.SubProgramDefinition(Id=3, name="Block 1", description="Dit is een test", parent=2, order=1,
+                                    parameters='limit:int,factor:float'),
             sm.FlowPort(Id=4, name='output', parent=3),
             sm.FlowPort(Id=5, name='input', parent=3)
         ])
@@ -282,10 +283,12 @@ def test_server():
         assert results['_entity']['Id'] == 6
         assert results['_entity']['parent'] == 2    # The Instance block is created under the diagram
         assert results['_entity']['definition'] == 3
-        assert results['_definition']['__classname__'] == 'Block'
+        assert results['_entity']['parameters'] == {'parameters': {'factor': 0.0, 'limit': 0}}
+        assert results['_definition']['__classname__'] == 'SubProgramDefinition'
         assert results['_definition']['Id'] == 3
         assert results['_definition']['name'] == 'Block 1'
         assert results['_definition']['description'] == 'Dit is een test'
+        assert results['_definition']['parameters'] == 'limit:int,factor:float'
 
         for i, p in enumerate(results['children']):
             assert p['block_cls'] == 'FlowPortRepresentation'

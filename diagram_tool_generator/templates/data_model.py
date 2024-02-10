@@ -303,11 +303,7 @@ class AWrapper:
         return d
 
     @classmethod
-    def retrieve(cls, Id, session=None):
-        if session is None:
-            with session_context() as session:
-                return cls.retrieve(Id, session=session)
-        record = session.query(cls.get_db_table()).filter_by(Id=Id).first()
+    def decode(cls, record):
         if record is None:
             raise NotFound()
         if record.subtype != cls.__name__:
@@ -317,6 +313,15 @@ class AWrapper:
         assert data_dict['__classname__'] == cls.__name__
         del data_dict['__classname__']
         return cls(**data_dict)
+
+
+    @classmethod
+    def retrieve(cls, Id, session=None):
+        if session is None:
+            with session_context() as session:
+                return cls.retrieve(Id, session=session)
+        record = session.query(cls.get_db_table()).filter_by(Id=Id).first()
+        return cls.decode(record)
 
     def update(self):
         with session_context() as session:
@@ -356,7 +361,9 @@ class ABlock(AWrapper):
             'order': self.order
         }
 
+@dataclass
 class AInstance(ABlock):
+    parameters: str = '{}'
     @classmethod
     def get_entity_type(cls):
         return EntityType.Instance
