@@ -378,7 +378,17 @@ def simulated_diagram_tests():
             'y': 500,
             'width': 64,
             'height': 40,
-            'children': [],
+            'children': [
+                {
+                    'Id': 401,
+                    'block': 124,
+                    'parent': 400,
+                    'diagram': 5,
+                    '__classname__': '_BlockRepresentation',
+                    'block_cls': 'FlowPortRepresentation',
+                    '_entity': {'name': 'Output', 'parent': 123, 'Id': 124, '__classname__': 'FlowPort'}
+                }
+            ],
             'block_cls': 'BlockInstanceRepresentation',
             '_entity': {'name': 'One', 'parent': 3, 'Id': 123, 'parameters': 'limit:int,factor:float',  '__classname__': 'BlockInstance'},
             '_definition': {'__classname__': 'SubProgramDefinition', 'Id': 3, 'name': 'Block 1', 'description': 'Dit is een test', 'parameters': 'limit:int,factor:float'}
@@ -393,6 +403,7 @@ def simulated_diagram_tests():
         assert repr.block == 123
         assert repr.Id == 400
         assert not unexpected_requests
+        # TODO: Check the parameters are presented in the details editor.
 
 
 

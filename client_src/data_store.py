@@ -355,6 +355,7 @@ class DataStore(EventDispatcher):
         if children := ddict.get('children', False):
             ddict['children'] = [self.decode_representation(c) for c in children]
         entity = dc_from_dict(cls, ddict)
+        console.log(f"DATA: {data}")
         entity.logical_class = self.all_classes[data['_entity']['__classname__']]
         entity = self.update_cache(entity)
         return entity

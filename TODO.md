@@ -15,6 +15,7 @@
   - For now, except the sequence diagram because it requires laneing support.
 
 # Refactoring
+* Check if the `__classname__` element in an Entity is still necessary. Isn't it equal to `subtype`?
 * Refactor the typing system in the specification files, so that it is class-based for all types with
   simple functions to determine concrete types in various contexts, conversions between them and default values.
 * Make parts in the model definition that are used in generating the tool, parts of the decorator call
@@ -22,6 +23,7 @@
 * Check if the various entities in the model_definition still need to be dataclasses.
 
 # Future enhancements
+* Make it possible for library blocks to create inputs based on configuration.
 * Make transactions of what happens in an event handler, so that if an exception occurs, the system stays in a known 
   state.
 * Allow extra details to be shown around a relationship.

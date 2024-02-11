@@ -71,14 +71,18 @@ def my_get_mime(path):
 def get_parameters_defaults(spec: dm.parameter_spec):
     """ Parse a parameter specification string into default parameters values string. """
     parameter_defaults = {'int': 0, 'float': 0.0, 'str': ''}
-    return {k.strip():parameter_defaults[v.strip()] for k,v in [part.split(':') for part in spec.split(',')]}
+    print("Determining the defaults for parameters:", repr(spec))
+    if isinstance(spec, str):
+        spec = json.loads(spec)
+    return {k: parameter_defaults[v] for k, v in spec.items()}
+    #return {k.strip():parameter_defaults[v.strip()] for k,v in [part.split(':') for part in spec.split(',')]}
 
 
 def create_port_representations(definition_id, representation_id, diagram, session, dm):
     # Find all direct children of this block
     children = session.query(dm._Entity).filter(dm._Entity.parent==definition_id).all()
     # Select only the ports
-    port_entities = [p for p in children if p.type == dm.EntityType.Port]
+    port_entities = [dm.AWrapper.load_from_db(p) for p in children if p.type == dm.EntityType.Port]
     port_reprs = [dm._BlockRepresentation(
             diagram=diagram,
             block=ch.Id,
@@ -89,7 +93,7 @@ def create_port_representations(definition_id, representation_id, diagram, sessi
             width=0,
             height=0,
             styling='',
-            block_cls=ch.subtype + 'Representation',
+            block_cls=type(ch).__name__ + 'Representation',
         ) for ch in port_entities]
     for p in port_reprs:
         session.add(p)

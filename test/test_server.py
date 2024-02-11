@@ -261,7 +261,7 @@ def test_server():
             sm.Note(Id=1, description="Don't mind me"),
             sm.BlockDefinitionDiagram(Id=2, name="Test diagram"),
             sm.SubProgramDefinition(Id=3, name="Block 1", description="Dit is een test", parent=2, order=1,
-                                    parameters='limit:int,factor:float'),
+                                    parameters='{"limit":"int","factor":"float"}'),
             sm.FlowPort(Id=4, name='output', parent=3),
             sm.FlowPort(Id=5, name='input', parent=3)
         ])
@@ -288,13 +288,14 @@ def test_server():
         assert results['_definition']['Id'] == 3
         assert results['_definition']['name'] == 'Block 1'
         assert results['_definition']['description'] == 'Dit is een test'
-        assert results['_definition']['parameters'] == 'limit:int,factor:float'
+        assert results['_definition']['parameters'] == '{"limit":"int","factor":"float"}'
 
         for i, p in enumerate(results['children']):
             assert p['block_cls'] == 'FlowPortRepresentation'
             assert p['block'] == 4 + i
             assert p['diagram'] == 2
             assert p['parent'] == 1
+            assert p['_entity']['__classname__'] == 'FlowPort'
         # Check the underlying Instance can be accessed
         r = requests.get(base_url + '/data/BlockInstance/6')
         assert r.status_code == 200
