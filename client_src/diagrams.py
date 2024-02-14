@@ -409,25 +409,13 @@ class Diagram(OwnerInterface):
     ConnectionModeEvent = 'ConnectionMode'
     NormalModeEvent = 'NormalMode'
 
-    def __init__(self, config: DiagramConfiguration, widgets, datastore: DataStore=None, diagram_id=None):
+    def __init__(self, config: DiagramConfiguration, widgets):
         self.selection = None
         self.mouse_events_fsm = None
         self.children = []
         self.connections = []
         self.widgets = widgets
-        self.datastore = datastore               # Interface for getting and storing diagram state
-        self.diagram_id = diagram_id
         self.config = config
-
-        def representationAction(event, source, ds, details):
-            action, clsname, Id = event.split('/')
-            item = details['item']
-            if item.diagram != diagram_id:
-                return
-            item.updateShape(item.shape)
-
-
-        datastore and datastore.subscribe('*/*Representation/*', self, representationAction)
 
     def close(self):
         # Release the resources of this diagram and delete references to it.
@@ -435,20 +423,6 @@ class Diagram(OwnerInterface):
         self.connections = []
         if self in diagrams:
             diagrams.remove(self)
-
-    def load_diagram(self):
-        self.datastore and self.datastore.get_diagram_data(self.diagram_id, self.mass_update)
-
-    def mass_update(self, data):
-        """ Callback for loading an existing diagram """
-        # Ensure blocks are drawn before the connections.
-        for d in data:
-            if isinstance(d, shapes.Shape):
-                d.load(self)
-        # Now draw the connections
-        for d in data:
-            if isinstance(d, shapes.Relationship):
-                d.load(self)
 
     def getCanvas(self):
         return self.canvas
@@ -473,12 +447,10 @@ class Diagram(OwnerInterface):
 
     def deleteConnection(self, connection):
         if connection in self.connections:
-            self.datastore and self.datastore.delete(connection)
             connection.delete()
             self.connections.remove(connection)
 
     def deleteBlock(self, block):
-        self.datastore and self.datastore.delete(block)
         block.delete()
         if owner := block.owner():
             owner.children.remove(block)
@@ -491,7 +463,6 @@ class Diagram(OwnerInterface):
                 to_remove.append(c)
         for c in to_remove:
             self.deleteConnection(c)
-            self.datastore and self.datastore.delete(c)
 
     def allowsConnection(self, a, b):
         return True
@@ -500,9 +471,8 @@ class Diagram(OwnerInterface):
         # Find the associated representation
         repr_cls = self.config.get_repr_for_connection(cls)
         connection = repr_cls(start=a, finish=b, waypoints=[], diagram=self.diagram_id)
-        #connection = repr_cls(start=a, finish=b, waypoints=[], routing_method=RoutingMethod.CenterTCenter)
-        self.datastore and self.datastore.add(connection)
         self.addConnection(connection)
+        return connection
 
     def connect(self, a, b):
         ta, tb = a.getEntityForConnection(), b.getEntityForConnection()
@@ -558,17 +528,18 @@ class Diagram(OwnerInterface):
         self.takeOwnership(widget, pos, self)
 
 
-    def mouseDownChild(self, widget, ev):
+    def mouseDownChild(self, widget, ev, update_func=None):
         if not self.mouse_events_fsm:
             self.mouse_events_fsm = ResizeFSM(self)
         self.mouse_events_fsm.mouseDownShape(self, widget, ev)
 
-        def update_func(new_data):
+        def uf(new_data):
             # Store the existing values to see if anything actually changed.
             old_values = asdict(widget)
             widget.update(new_data)
-            # Inform the datastore of any change
-            self.datastore and self.datastore.update(widget)
+
+        if update_func is None:
+            update_func = uf
 
 
         # Also notify any listeners that an object was selected
@@ -578,35 +549,33 @@ class Diagram(OwnerInterface):
             "update": update_func,
             "object": widget
         }
-        self.datastore and self.datastore.trigger_event('shape_selected', widget, **event_detail)
-        self.canvas.dispatchEvent(window.CustomEvent.new("shape_selected", {
+        self.trigger_event(widget, 'shape_selected', event_detail)
+
+    def trigger_event(self, widget, event_name, event_detail):
+        self.canvas.dispatchEvent(window.CustomEvent.new(event_name, {
             "bubbles":True,
             "detail": event_detail
         }))
 
 
-    def mouseDownConnection(self, connection, ev):
+    def mouseDownConnection(self, connection, ev, update_function=None):
         if not self.mouse_events_fsm:
             self.mouse_events_fsm = RerouteStates(self)
         self.mouse_events_fsm.mouseDownConnection(self, connection, ev)
 
         # Also notify any listeners that an object was selected
-        def update_func(new_data):
+        def uf(new_data):
             # Store the existing values to see if anything actually changed.
             connection.update(new_data)
-            # Inform the datastore of any change
-            self.datastore and self.datastore.update(connection)
+
+        update_function = update_function or uf
         details = json.dumps(connection, cls=ExtendibleJsonEncoder)
         event_detail = {
             "values": details,
-            "update": update_func,
+            "update": update_function,
             "object": connection
         }
-        self.datastore and self.datastore.trigger_event('shape_selected', connection, **event_detail)
-        self.canvas.dispatchEvent(window.CustomEvent.new("shape_selected", {
-            "bubbles":True,
-            "detail": event_detail
-        }))
+        self.trigger_event(connection, 'shape_selected', event_detail)
 
     def takeOwnership(self, widget, pos, ex_owner):
         pass
@@ -636,38 +605,11 @@ class Diagram(OwnerInterface):
         pass
 
     def onDrop(self, ev):
-        """ """
-        assert ev.dataTransfer
-        json_string = ev.dataTransfer.getData('entity')
-        if not json_string:
-            console.log('No data was submitted in the drop')
-            return
-        data = json.loads(json_string)
-        loc = getMousePos(ev)
-
-        # Create a representation for this block
-        cls_name = data['__classname__']
-        allowed_blocks = self.get_allowed_blocks(for_drop=True)
-        if cls_name not in allowed_blocks:
-            InfoDialog("Not allowed", f"A {cls_name} can not be used in this diagram.", ok="Got it")
-            return
-
-        block_cls = allowed_blocks[data['__classname__']]
-        repr_cls = self.config.get_repr_for_drop(block_cls)
-        default_style = repr_cls.getDefaultStyle()
-        drop_details = dict(
-            x=loc.x, y=loc.y,
-            width=int(default_style.get('width', 64)), height=int(default_style.get('height', 40)),
-            diagram=self.diagram_id,
-            block=data['Id']
-        )
-        if self.datastore:
-            block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details)
-            if not block:
-                return
-
-            # Add the block to the diagram
-            self.addBlock(block)
+        """ Handler for the 'drop' event.
+            Without having a modelling context, a "drop" is meaningless.
+            Child classes can implement this function.
+        """
+        pass
 
 
     def serialize(self):
@@ -698,203 +640,6 @@ class Diagram(OwnerInterface):
         for cls in clss:
             l <= add_option(cls)
         d.panel <= l
-
-
-
-###############################################################################
-## Diagrams and shapes
-@dataclass
-class Note(Shape):
-    description: str = ''
-    default_style = dict(blockcolor='#FFFBD6')
-    TextWidget = shapes.Text('description')
-
-    def getShape(self):
-        # This shape consists of two parts: the text and the outline.
-        shape_type = self.getShapeDescriptor()
-        g = svg.g()
-        g <= shape_type.getShape(self)
-        g <= self.TextWidget.getShape(self)
-        return g
-
-    def updateShape(self, shape):
-        shape_type = self.getShapeDescriptor()
-        shape_type.updateShape(shape.children[0], self)
-        self.TextWidget.updateShape(shape.children[1], self)
-
-    @classmethod
-    def getDefaultStyle(cls):
-        style = {}
-        shape_type = cls.getShapeDescriptor()
-        style.update(shape_type.getDefaultStyle())
-        style.update(cls.TextWidget.getDefaultStyle())
-        style.update(cls.default_style.copy())
-        return style
-
-    @classmethod
-    def is_instance_of(cls):
-        return False
-
-    @classmethod
-    def getShapeDescriptor(cls) -> shapes.BasicShape:
-        return shapes.BasicShape.getDescriptor('Note')
-
-@dataclass
-class Constraint(Note):
-    pass
-
-@dataclass
-class Anchor(Relationship):
-    source: (Note, Constraint) = None
-    dest: Any = None
-    name: str = ''
-
-
-@dataclass
-class FlowPort(CP):
-    name: str = ''
-
-    def getShape(self):
-        p = self.pos
-        shape = svg.rect(x=p.x-5, y=p.y-5, width=10, height=10, stroke_width=1, stroke='black', fill='lightgreen')
-        shape.attrs['data-class'] = type(self).__name__
-        return shape
-    def updateShape(self, shape):
-        p = self.pos
-        shape['x'], shape['y'], shape['width'], shape['height'] = int(p.x-5), int(p.y-5), 10, 10
-
-    def getPos(self):
-        return self.pos
-    def getSize(self):
-        return Point(1,1)
-
-    def getLogicalClass(self):
-        return getattr(self, 'logical_class', None)
-
-@dataclass
-class FlowPortIn(FlowPort):
-    pass
-
-@dataclass
-class FlowPortOut(FlowPort):
-    pass
-
-@dataclass
-class FullPort(FlowPort):
-    pass
-
-@dataclass
-class Block(Shape):
-    description: str = ''
-    ports: [FlowPort, FullPort] = field(default_factory=list)
-    children: [Self] = field(default_factory=list)
-
-    default_style = dict(blockcolor='#ffffff')
-    TextWidget = shapes.Text('name')
-
-    @classmethod
-    def getShapeDescriptor(cls):
-        return shapes.BasicShape.getDescriptor("rect")
-
-    def getPointPosFunc(self, orientation, ports):
-        match orientation:
-            case Orientations.LEFT:
-                return lambda i: Point(x=self.x, y=self.y + self.height / len(ports) / 2 * (2 * i + 1))
-            case Orientations.RIGHT:
-                return lambda i: Point(x=self.x + self.width,
-                                                y=self.y + self.height / len(ports) / 2 * (2 * i + 1))
-            case Orientations.TOP:
-                return lambda i: Point(x=self.x + self.width / len(ports) / 2 * (2 * i + 1), y=self.y)
-            case Orientations.BOTTOM:
-                return lambda i: Point(x=self.x + self.width / len(ports) / 2 * (2 * i + 1), y=self.y + self.height)
-
-    def getShape(self):
-        g = svg.g()
-        # Add the core rectangle
-        shape_type = self.getShapeDescriptor()
-        console.log(f'Getting shape for {shape_type} {self}')
-        g <= shape_type.getShape(self)
-        # Add the text
-        g <= self.TextWidget.getShape(self)
-        # Add the ports
-        port_shape_lookup = {}      # A lookup for when the port is clicked.
-        sorted_ports = {orientation: sorted([p for p in self.ports if p.orientation == orientation], key=lambda x: x.order) \
-                       for orientation in Orientations}
-        for orientation in [Orientations.LEFT, Orientations.RIGHT, Orientations.BOTTOM, Orientations.TOP]:
-            ports = sorted_ports[orientation]
-            pos_func = self.getPointPosFunc(orientation, ports)
-
-            for i, p in enumerate(ports):
-                p.pos = pos_func(i)
-                s = p.getShape()
-                g <= s
-                port_shape_lookup[s] = p
-        self.port_shape_lookup = port_shape_lookup
-
-        # Return the group of objects
-        return g
-
-    def updateShape(self, shape):
-        # Update the rect
-        rect = shape.children[0]
-        shape_type = self.getShapeDescriptor()
-        shape_type.updateShape(rect, self)
-        text = shape.children[1]
-        self.TextWidget.updateShape(text, self)
-
-        # Update the ports
-        sorted_ports = {orientation: sorted([p for p in self.ports if p.orientation == orientation], key=lambda x: x.order) \
-                       for orientation in Orientations}
-
-        # Delete any ports no longer used
-        deleted = [s for s, p in self.port_shape_lookup.items() if p not in self.ports]
-        for s in deleted:
-            s.remove()
-        shape_lookup = {p.id: s for s, p in self.port_shape_lookup.items()}
-
-        for orientation in [Orientations.LEFT, Orientations.RIGHT, Orientations.BOTTOM, Orientations.TOP]:
-            ports = sorted_ports[orientation]
-            pos_func = self.getPointPosFunc(orientation, ports)
-            for i, p in enumerate(ports):
-                p.pos = pos_func(i)
-                if p.id in shape_lookup:
-                    p.updateShape(shape_lookup[p.id])
-                else:
-                    s = p.getShape()
-                    shape <= s
-                    self.port_shape_lookup[s] = p
-
-    def getConnectionTarget(self, ev):
-        # Determine if one of the ports was clicked on.
-        port = self.port_shape_lookup.get(ev.target, None)
-        if port is None:
-            return self
-        return port
-
-    def isConnected(self, target):
-        return (target == self) or target in self.ports
-
-    @classmethod
-    def getDefaultStyle(cls):
-        defaults = Note.getDefaultStyle()
-        defaults.update(cls.default_style)
-        return defaults
-
-    @classmethod
-    def is_instance_of(cls):
-        return False
-
-
-@dataclass
-class FullPortConnection(Relationship):
-    name: str = ''
-    source: (FlowPort, FlowPortOut) = field(default_factory=list)
-    Dest: (FlowPort, FlowPortIn) = field(default_factory=list)
-
-class BlockDefinitionDiagram(Diagram):
-    @classmethod
-    def get_allowed_blocks(cls, for_drop=False):
-        return {'Note': Note, 'Block': Block}
 
 
 diagrams = []

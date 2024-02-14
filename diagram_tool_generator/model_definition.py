@@ -70,7 +70,7 @@ class ModelDefinition:
     def __post_init__(self):
         self.add_type_conversion(longstr, TypeDefault('String', '""'), TypeDefault('str', '""'), TypeDefault('str', '""'))
         self.add_type_conversion(parameter_spec, TypeDefault('String', '""'), TypeDefault('dict', 'field(default_factory=dict)'),
-                            TypeDefault('dict', 'field(default_factory=dict)'))
+                            TypeDefault('parameter_spec', 'field(default_factory=dict)'))
         self.add_type_conversion(parameter_values, TypeDefault('String', '""'),
                             TypeDefault('dict', 'field(default_factory=dict)'),
                             TypeDefault('dict', 'field(default_factory=dict)'))

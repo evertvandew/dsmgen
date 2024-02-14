@@ -7,26 +7,12 @@ from typing import Hashable, Dict, Any
 import json
 from svg_shapes import HAlign, VAlign
 from shapes import HIDDEN
-from data_store import DataStore, ExtendibleJsonEncoder
+from data_store import DataStore, ExtendibleJsonEncoder, parameter_spec, parameter_values
 
 #diagrams.createDiagram("canvas");
 
 
 class longstr(str): pass
-
-class parameter_spec(str):
-    """ A parameter spec is represented in the REST api as a string with this structure:
-        "key1: type1, key2: type2".
-        When live in the application, the spec is represented as a dict of str:type pairs.
-    """
-    pass
-
-class parameter_values(str):
-    """ A set of parameter values is represented in the REST api as a string with this structure:
-        "Key1: value1, key2: value2".
-        When live in the application, it is a simple key:value dictionary.
-    """
-    pass
 
 class OptionalRef:
     def __init__(self, t):
@@ -45,7 +31,8 @@ type2HtmlInput = {
         str: {'type': 'text'},
         int: {'type': 'number', 'step': 1},
         Dict[str, str]: {'type': 'text'},
-        HIDDEN: {'type': 'hidden'}
+        HIDDEN: {'type': 'hidden'},
+        parameter_spec: {'type': 'text'}
     }
 
 type2default = {
@@ -80,14 +67,16 @@ value_formatter = {
     int: int,
     longstr: str,
     Dict[str, str]: lambda v: '; '.join(f'{k}:{i}' for k, i in v.items()) if v else '',
-    HIDDEN: str
+    HIDDEN: str,
+    parameter_spec: str
 }
 
 def isEditable(field):
     """ Return true if a user is allowed to directly edit this value. """
     if field.type is HIDDEN:
         return False
-    return (isinstance(field.type, type) and issubclass(field.type, enum.IntEnum)) or field.type==longstr or (isinstance(field.type, Hashable) and field.type in type2HtmlInput)
+    return ((isinstance(field.type, type) and issubclass(field.type, enum.IntEnum)) or field.type==longstr
+            or (isinstance(field.type, Hashable) and field.type in type2HtmlInput) or field.type==parameter_spec)
 
 def isPortCollection(field):
     """ Return true if the field a collection of ports. """
@@ -98,34 +87,38 @@ def isPortCollection(field):
 def isStylable(objecttype):
     return hasattr(objecttype, 'getStyleKeys')
 
-def getInputForField(o: dataclass, field: Field):
-    """ Determine the right edit widget to use for a specific field description.
-        The field is an instance of
-    """
-    if isinstance(field.type, type) and issubclass(field.type, enum.IntEnum):
-        input = html.SELECT(id=f"edit_{field.name}", name=field.name)
-        value = getattr(o, field.name) if o else ''
-        for option in field.type:
+def getInputForValue(name: str, field_type: type, value: Any):
+    if isinstance(field_type, type) and issubclass(field_type, enum.IntEnum):
+        input = html.SELECT(id=f"edit_{name}", name=name)
+        for option in field_type:
             if value == option:
                 input <= html.OPTION(option.name, value=option.value, selected=1)
             else:
                 input <= html.OPTION(option.name, value=option.value)
         return input
-    if field.type == longstr:
-        value = value_formatter[field.type](getattr(o, field.name) if o else '')
-        input = html.TEXTAREA(id=f"edit_{field.name}", name=field.name)
+    if field_type == longstr:
+        value = value_formatter[field_type](getattr(o, name) if o else '')
+        input = html.TEXTAREA(id=f"edit_{name}", name=name)
         input <= value
         input.className = 'form-control'
         return input
-    if field.type in type2HtmlInput:
-        stored_value = getattr(o, field.name) if o else type2default[field.type]
-        if stored_value is None:
+    if field_type in type2HtmlInput:
+        stored_value = value if value is not None else type2default[field_type]
+        if stored_value is None or value == '':
             value = ''
         else:
-            value = value_formatter[field.type](stored_value)
-        input = html.INPUT(id=f"edit_{field.name}", name=field.name, value=value, **type2HtmlInput[field.type])
+            value = value_formatter[field_type](stored_value)
+        input = html.INPUT(id=f"edit_{name}", name=name, value=value, **type2HtmlInput[field_type])
         input.className = 'form-control'
         return input
+    console.log(f"Could not determine input for {field_type}")
+
+def getInputForField(o: dataclass, field: Field):
+    """ Determine the right edit widget to use for a specific field description.
+        The field is an instance of
+    """
+    return getInputForValue(field.name, field.type, getattr(o, field.name, None) if o else '')
+
 
 def getInputForStyle(o: Any, key, value):
     """ Determine an appropriate edit widget for a specific style item. """
@@ -176,8 +169,6 @@ def createDefault(dcls):
             default[f.name] = ''
 
     return dcls(**default)
-
-
 
 
 def createPortEditor(o, field, port_types, data_store: DataStore):
@@ -307,6 +298,20 @@ def dataClassEditorForm(o: Any, objecttype: type, data_store: DataStore, default
         form <= label
         form <= getInputForField(o, field)
         form <= html.BR()
+
+    # Instances of other blocks need to go to the definition to determine what parameters to edit
+    # Determine which parameters to edit and what types they have.
+    result = data_store.get_instance_parameters(o)
+    if result:
+        # In an Instance we can not edit the ports
+        edit_ports = False
+        names, types, values = result
+        for n, t, v in zip(names, types, values):
+            label = html.LABEL(n)
+            label.className = "col-sm-3 col-form-label"
+            form <= label
+            form <= getInputForValue(n, t, v)
+            form <= html.BR()
 
     if edit_ports:
         port_fields = [f for f in fields(objecttype) if isPortCollection(f)]

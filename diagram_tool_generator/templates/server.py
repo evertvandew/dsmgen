@@ -73,7 +73,10 @@ def get_parameters_defaults(spec: dm.parameter_spec):
     parameter_defaults = {'int': 0, 'float': 0.0, 'str': ''}
     print("Determining the defaults for parameters:", repr(spec))
     if isinstance(spec, str):
-        spec = json.loads(spec)
+        try:
+            spec = json.loads(spec)
+        except json.JSONDecodeError:
+            spec = {k.strip():v.strip() for k,v in [part.split(':') for part in spec.split(',')]}
     return {k: parameter_defaults[v] for k, v in spec.items()}
     #return {k.strip():parameter_defaults[v.strip()] for k,v in [part.split(':') for part in spec.split(',')]}
 

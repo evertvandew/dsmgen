@@ -15,12 +15,12 @@
   - For now, except the sequence diagram because it requires laneing support.
 
 # Refactoring
-* Check if the `__classname__` element in an Entity is still necessary. Isn't it equal to `subtype`?
 * Refactor the typing system in the specification files, so that it is class-based for all types with
   simple functions to determine concrete types in various contexts, conversions between them and default values.
 * Make parts in the model definition that are used in generating the tool, parts of the decorator call
   instead of the dataclass part.
 * Check if the various entities in the model_definition still need to be dataclasses.
+* Get rid of mechanisms where the presence of an attribute decides actions. Replace these with (member) functions.
 
 # Future enhancements
 * Make it possible for library blocks to create inputs based on configuration.

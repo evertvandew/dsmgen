@@ -107,6 +107,17 @@ port2port = [
 
 ]
 
+
+diagram_w_instance = [
+    {"Id": 1, "diagram": 3, "block": 7, "parent": None, "x": 358.0, "y": 235.0, "z": 0.0, "width": 64.0, "height": 40.0, "styling": {}, "block_cls": "BlockInstanceRepresentation", "__classname__": "_BlockRepresentation",
+     "_entity": {"order": 0, "parameters": {"parameters": {"factor": 41, "gain": 3.1415}}, "Id": 7, "parent": 3, "definition": 4, "__classname__": "BlockInstance"},
+     "_definition": {"order": 0, "Id": 4, "parent": 1, "name": "test block", "implementation": "", "parameters": {"factor": "int", "gain": "float"}, "__classname__": "SubProgramDefinition"}},
+    {"Id": 2, "diagram": 3, "block": 5, "parent": 1, "x": 0.0, "y": 0.0, "z": 0.0, "width": 0.0, "height": 0.0, "styling": {}, "block_cls": "FlowPortRepresentation", "__classname__": "_BlockRepresentation",
+     "_entity": {"order": 0, "orientation": 8, "Id": 5, "name": "in", "parent": 4, "__classname__": "FlowPort"}},
+    {"Id": 3, "diagram": 3, "block": 6, "parent": 1, "x": 0.0, "y": 0.0, "z": 0.0, "width": 0.0, "height": 0.0, "styling": {}, "block_cls": "FlowPortRepresentation", "__classname__": "_BlockRepresentation",
+     "_entity": {"order": 0, "orientation": 4, "Id": 6, "name": "out", "parent": 4, "__classname__": "FlowPort"}}
+]
+
 @prepare
 def simulated_diagram_tests():
     # Set the context for the diagram editor. Normally this is in the HTML file.
@@ -405,7 +416,36 @@ def simulated_diagram_tests():
         assert not unexpected_requests
         # TODO: Check the parameters are presented in the details editor.
 
+    @test
+    def block_properties_editor_instance():
+        """ Load a diagram with a single block: an instance with ports """
+        import public.sysml_client as client
+        ds = mk_ds()
 
+        add_expected_response('/data/diagram_contents/3', 'get', Response(
+            200,
+            json=diagram_w_instance))
+        diagram, rest = new_diagram(3, ds)
+        ds.subscribe('shape_selected', diagram, client.on_diagram_selection)
+        block = diagram.children[0]
+        block.shape.dispatchEvent(events.MouseDown())
+        block.shape.dispatchEvent(events.MouseUp())
+        assert not unexpected_requests
+        nonlocal d
+        form = d.select('form')
+        assert len(form) == 1
+        html_form = str(form)
+        assert len(d.select('#edit_gain')) == 0
+        assert 'factor' in html_form
+        assert 'TR' not in html_form            # There must be no editor for ports.
+        # Check there is no editing of the fields in the Definition
+        assert len(d.select('#edit_parameters')) == 0
+        assert len(d.select('#edit_description')) == 0
+        assert len(d.select('#edit_name')) == 0
+        assert 'blockcolor' in html_form
+
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
 
 
 @prepare
@@ -513,6 +553,46 @@ def simulated_explorer_tests():
         assert len(expected_responses) == 0
         assert len(unexpected_requests) == 0
         assert ds.get(Collection.hierarchy, 2).name == 'blablablabla'
+
+    @test
+    def editing_parameter_spec():
+        """ Test the editor for a parameter spec. """
+        # The SubProgramDefinition has a parameter spec.
+        reset_document()
+        ds = DataStore(config)
+
+        clear_expected_response()
+        add_expected_response('/data/hierarchy', 'get', Response(
+            200,
+            json=[
+                {"order": 0, "Id": 1, "name": "Test block", "description": "", "parent": None,
+              "__classname__": "SubProgramDefinition"},
+            ]))
+        make_explorer(d['explorer'], ds, client.allowed_children)
+        blank = d['explorer']
+        ds.subscribe('click', blank, client.on_explorer_click)
+
+        # Get the first line in the explorer and left-click it.
+        lines = d.get(selector='.eline [draggable="true"]')
+        assert len(lines) == 1
+        # Check the details editor is empty
+        assert len(d.select('#details *')) == 0
+        l = [l for l in lines if 'Test block' in str(l)][0]
+        l.dispatchEvent(events.Click())
+        # Check the details editor is not empty
+        assert len(d.select('#details *')) > 0
+        for expected in ['edit_name', 'edit_description', 'edit_parameters']:
+            assert len(d.select(f'#{expected}')) > 0, f"Expected edit {expected} not found"
+
+        # Set the parameters field and submit the changes.
+        input = d.select('#edit_parameters')[0]
+        input.value = 'gain:float,factor:int'
+        add_expected_response('/data/StructuralModel/2', 'post', Response(200))
+        btn = d.select_one('#details button')
+        btn.dispatchEvent(events.Click())
+        assert len(expected_responses) == 0
+        assert len(unexpected_requests) == 0
+
 
     @test
     def drag_drop():

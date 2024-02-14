@@ -6,7 +6,7 @@ It has a buffer for all data items that are used in the application.
 import json
 from copy import deepcopy
 from dataclasses import dataclass, is_dataclass, asdict, fields
-from typing import Dict, Callable, List, Any, Iterable, Tuple
+from typing import Dict, Callable, List, Any, Iterable, Tuple, Optional
 from enum import Enum
 from dispatcher import EventDispatcher
 from point import load_waypoints
@@ -35,6 +35,21 @@ class Collection(Enum):
             cls.relation: cls.relation_repr,
             cls.relation_repr: cls.relation,
         }[c]
+
+
+class parameter_spec(str):
+    """ A parameter spec is represented in the REST api as a string with this structure:
+        "key1: type1, key2: type2".
+        When live in the application, the spec is represented as a dict of str:type pairs.
+    """
+    pass
+
+class parameter_values(str):
+    """ A set of parameter values is represented in the REST api as a string with this structure:
+        "Key1: value1, key2: value2".
+        When live in the application, it is a simple key:value dictionary.
+    """
+    pass
 
 @dataclass
 class DataConfiguration:
@@ -283,6 +298,12 @@ class DataStore(EventDispatcher):
                     model_cls = self.all_classes[model_details['__classname__']]
                     model_item = dc_from_dict(model_cls, model_details)
                     self.update_cache(model_item)
+                    if model_cls.is_instance_of():
+                        # For Instance representations, handle the definition.
+                        definition_details = e['_definition']
+                        definition_cls = self.all_classes[definition_details['__classname__']]
+                        definition_item = dc_from_dict(definition_cls, definition_details)
+                        self.update_cache(definition_item)
 
                 representations = []
                 # Reconstruct all representations and cache them.
@@ -470,3 +491,26 @@ class DataStore(EventDispatcher):
         else:
             raise NotImplementedError()
         return repr, model
+
+    def get_instance_parameters(self, instance_representation: Any) -> Optional[Tuple[str, type, Any]]:
+        """ Inspect the definition object being instantiated by the argument, to determine the parameters it needs.
+            Returns either None (if the object isn't an Instance),
+            or a tuple of argument names, argument types and current argument values.
+        """
+        if instance_representation is None or not instance_representation.is_instance_of():
+            return None
+        definition = self.get(Collection.block, instance_representation.get_definition())
+        param_fields = [f for f in fields(definition) if f.type == parameter_spec]
+        names = []
+        types = []
+        values = []
+        for p in param_fields:
+            spec = getattr(definition, p.name)
+            if isinstance(spec, str):
+                type_lu = {'int': int, 'str': str, 'float': float}
+                spec = {k.strip():type_lu[v.strip()] for k,v in [part.split(':') for part in spec.split(',')]}
+            for k, t in spec.items():
+                names.append(k)
+                types.append(t)
+                values.append(getattr(instance_representation, k, ''))
+        return (names, types, values)

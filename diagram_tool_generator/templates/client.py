@@ -27,6 +27,7 @@ import typing
 import types
 from enum import IntEnum
 from inspect import getmro
+import modelled_shape
 import diagrams
 import shapes
 from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, parameter_values
@@ -57,13 +58,16 @@ class ${entity.__name__}:
     % if not generator.md.is_relationship(entity):
     order: shapes.HIDDEN = 0
     children: shapes.HIDDEN = field(default_factory=list)
+    % if generator.md.is_instance_of(entity):
+    parameters: parameter_values = field(default_factory=dict)
+    % endif
 
     def get_icon(self):
         return "${generator.md.get_style(entity, 'icon', 'folder')}"
     % endif
 
     % if generator.md.is_diagram(entity):
-    class Diagram(diagrams.Diagram):
+    class Diagram(modelled_shape.ModelledDiagram):
         allowed_drops_blocks = {${", ".join(generator.get_allowed_drops(entity))}}
         allowed_create_blocks = {${", ".join(generator.get_allowed_creates(entity))}}
         @classmethod
@@ -80,6 +84,9 @@ class ${entity.__name__}:
     def is_instance_of(cls):
         % if generator.md.is_instance_of(entity):
         return True
+
+    def get_definition(self) -> int:
+        return self.definition
         %else:
         return False
         %endif
@@ -89,62 +96,68 @@ class ${entity.__name__}:
 
 ## Create the representations of the various blocks and relationships
 # Representations of the various graphical elements
-% for cls in [c for c in generator.md.representables if not generator.md.is_relationship(c)]:
+% for entity in [c for c in generator.md.representables if not generator.md.is_relationship(c)]:
     <%
         # Determine the base class of the Representation
-        if generator.md.is_port(cls):
-            base_class = 'FlowPort'
+        if generator.md.is_port(entity):
+            base_class = 'Port'
         else:
-            base_class = generator.md.get_style(cls, 'structure', 'Block')
+            base_class = {
+                'Note': 'ShapeWithText',
+                'Block': 'ShapeWithTextAndPorts'
+            }[generator.md.get_style(entity, 'structure', 'Block')]
     %>
 @dataclass
-class ${cls.__name__}Representation(diagrams.${base_class}):
+class ${entity.__name__}Representation(modelled_shape.${base_class}):
     Id: shapes.HIDDEN = 0
     block: shapes.HIDDEN = 0
     parent: shapes.HIDDEN = None
     diagram: shapes.HIDDEN = 0
-    % if cls.__name__ in generator.get_allowed_ports():
+    % if entity.__name__ in generator.get_allowed_ports():
     ports: [diagrams.CP] = field(default_factory=list)
     % endif
-    % if generator.md.is_instance_of(cls):
+    % if generator.md.is_instance_of(entity):
     _definition: Dict[str, Any] = field(default_factory=dict)
     % endif
-    % for attr in generator.get_diagram_attributes(cls):
+    % for attr in generator.get_diagram_attributes(entity):
     ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
     % endfor
 
-    logical_class = ${cls.__name__}
+    logical_class = ${entity.__name__}
 
     def getEntityForConnection(self):
         return self.logical_class
 
     @classmethod
     def getShapeDescriptor(cls):
-        return shapes.BasicShape.getDescriptor("${generator.md.get_style(cls, 'shape', 'rect')}")
+        return shapes.BasicShape.getDescriptor("${generator.md.get_style(entity, 'shape', 'rect')}")
 
     @classmethod
     def repr_category(cls):
-        %if generator.md.is_port(cls):
+        %if generator.md.is_port(entity):
         return 'port'
         %else:
         return 'block'
         %endif
 
-    % if cls.__name__ in generator.get_allowed_ports():
+    % if entity.__name__ in generator.get_allowed_ports():
     @classmethod
     def get_allowed_ports(cls):
-        return [${", ".join(f'{c}Representation' for c in generator.get_allowed_ports()[cls.__name__])}]
+        return [${", ".join(f'{c}Representation' for c in generator.get_allowed_ports()[entity.__name__])}]
     % endif
 
     @classmethod
     def is_instance_of(cls):
-        % if generator.md.is_instance_of(cls):
+        % if generator.md.is_instance_of(entity):
         return True
+
+    def get_definition(self) -> int:
+        return self._definition['Id']
         %else:
         return False
         %endif
 
-    % for name, value in generator.get_derived_values(cls).items():
+    % for name, value in generator.get_derived_values(entity).items():
     @property
     def ${name}(self):
         return f"${value}"
@@ -154,7 +167,7 @@ class ${cls.__name__}Representation(diagrams.${base_class}):
 
 
 @dataclass
-class PortLabel(diagrams.Note):
+class PortLabel(modelled_shape.ShapeWithText):
     Id: shapes.HIDDEN = 0
     block: shapes.HIDDEN = None
     parent: shapes.HIDDEN = None
@@ -170,6 +183,10 @@ class PortLabel(diagrams.Note):
     @classmethod
     def getShapeDescriptor(cls):
         return shapes.BasicShape.getDescriptor("label")
+
+    @classmethod
+    def is_instance_of(cls):
+        return False
 
 
 <%
@@ -201,6 +218,10 @@ class ${cls.__name__}Representation(diagrams.Relationship):
     @classmethod
     def repr_category(cls):
         return 'relationship'
+
+    @classmethod
+    def is_instance_of(cls):
+        return False
 
 % endfor
 
