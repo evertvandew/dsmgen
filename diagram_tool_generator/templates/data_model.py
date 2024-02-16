@@ -176,6 +176,8 @@ class _BlockRepresentation(Base):
     z: float = Column(Float)  # For placing blocks etc on top of each other
     width: float = Column(Float)
     height: float = Column(Float)
+    order: int = Column(Integer)
+    orientation: int = Column(Integer)
     styling: str = Column(String)
     block_cls: str = Column(String)
 

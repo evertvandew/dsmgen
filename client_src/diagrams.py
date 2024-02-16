@@ -393,8 +393,6 @@ class DiagramConfiguration:
     repr_lu: Dict[str, type]
     connections_from: Dict[type, Dict[type, List[type]]]
 
-    def get_repr_for_connection(self, cls) -> type:
-        return self.repr_lu[cls.__name__]
     def get_repr_for_drop(self, cls) -> type:
         return self.repr_lu[cls.__name__]
     def get_repr_for_create(self, cls) -> type:

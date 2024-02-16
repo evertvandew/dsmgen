@@ -1,11 +1,12 @@
 
-from typing import Any, Self, List, Dict, Callable
+from typing import Any, Self, List, Dict, Optional, Self
 from dataclasses import dataclass, field, asdict
 import json
 from browser import svg, console
 from browser.widgets.dialog import Dialog, InfoDialog
 from diagrams import shapes, Shape, Relationship, CP, Point, Orientations, Diagram, getMousePos, DiagramConfiguration
-from data_store import DataStore
+from data_store import DataStore, StorableElement, Collection, ReprCategory, from_dict
+from point import load_waypoints
 
 
 
@@ -37,15 +38,13 @@ class ModelEntity:
         return 1
     def get_editable_parameters(self) -> List[EditableParameterDetails]:
         return []
-    def represent_as_shape(self) -> Shape:
+    @classmethod
+    def supports_ports(cls) -> bool:
+        return False
+
+    def representation_cls(self) -> Shape | CP | Relationship:
         """ Create a shape representing this model item. """
-        return ShapeWithTextAndPorts(self)
-    def represent_as_connection_point(self) -> CP:
-        """ Create a shape representing this model item. """
-        return Port(self)
-    def represent_as_relationship(self) -> Relationship:
-        """ Create a shape representing this model item. """
-        return Relationship(self)
+        raise NotImplementedError()
 
 
 ###############################################################################
@@ -80,8 +79,14 @@ class ModelledDiagram(Diagram):
                 d.load(self)
 
     def connect_specific(self, a, b, cls):
-        connection = super().connect_specific(a, b, cls)
-        self.datastore and self.datastore.add(connection)
+        """ Use the information stored in the ModellingEntities to create the connection. """
+        # First create the model_entity for the connection.
+        connection = cls(source=a.model_entity, target=b.model_entity)
+        # Create the representation of the connection.
+        representation = ModeledRelationship(model_entity=connection, start=a, finish=b)
+        # Add the connection to the diagram & database
+        self.datastore and self.datastore.add(representation)
+        super().addConnection(representation)
 
     def deleteConnection(self, connection):
         if connection in self.connections:
@@ -117,10 +122,9 @@ class ModelledDiagram(Diagram):
             diagram=self.diagram_id,
             block=data['Id']
         )
-        if self.datastore:
-            block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details)
-            if not block:
-                return
+        block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details)
+        if not block:
+            return
 
         # Add the block to the diagram
         self.addBlock(block)
@@ -153,11 +157,19 @@ class ModelledDiagram(Diagram):
         self.datastore and self.datastore.trigger_event(event_name, widget, **event_detail)
 
 
+@dataclass
+class ShapeWithText(Shape, StorableElement):
+    model_entity: ModelEntity = None
+    diagram: int = 0
+    parent: Optional[int] = None
 
-class ShapeWithText(Shape):
-    model_entity: ModelEntity
     default_style = dict(blockcolor='#FFFBD6')
     TextWidget = shapes.Text('description')
+
+    def asdict(self) -> Dict[str, Any]:
+        details = StorableElement.asdict(self)
+        details['block'] = self.model_entity.Id
+        return details
 
     def getShape(self):
         # This shape consists of two parts: the text and the outline.
@@ -181,17 +193,27 @@ class ShapeWithText(Shape):
         style.update(cls.default_style.copy())
         return style
 
+    def repr_category(cls) -> ReprCategory:
+        return ReprCategory.block
+
     @classmethod
-    def is_instance_of(cls):
+    def is_instance_of(cls) -> bool:
         return False
 
     @classmethod
     def getShapeDescriptor(cls) -> shapes.BasicShape:
         return shapes.BasicShape.getDescriptor('Note')
 
+    @classmethod
+    def get_collection(cls) -> Collection:
+        return Collection.block_repr
+
 @dataclass
-class Port(CP):
-    name: str = ''
+class Port(CP, StorableElement):
+    block: int = 0
+    parent: Optional[int] = None
+    diagram: int = 0
+    model_entity: StorableElement = None
 
     def getShape(self):
         p = self.pos
@@ -209,6 +231,14 @@ class Port(CP):
 
     def getLogicalClass(self):
         return getattr(self, 'logical_class', None)
+
+    @classmethod
+    def get_collection(cls) -> Collection:
+        return Collection.block_repr
+
+    @classmethod
+    def repr_category(cls) -> ReprCategory:
+        return ReprCategory.port
 
 @dataclass
 class ShapeWithTextAndPorts(ShapeWithText):
@@ -306,3 +336,35 @@ class ShapeWithTextAndPorts(ShapeWithText):
     @classmethod
     def is_instance_of(cls):
         return False
+
+    def get_allowed_ports(self):
+        return self.model_entity.get_allowed_ports()
+
+@dataclass
+class ModeledRelationship(Relationship, StorableElement):
+    model_entity: Optional[ModelEntity] = None
+    diagram: int = 0
+
+    @staticmethod
+    def from_dict(**details) -> Self:
+        self = from_dict(ModeledRelationship, **details)
+        self.start = details['source_repr_id']  # Needs to be replaced with the actual object later
+        self.finish = details['target_repr_id']  # Needs to be replaced with the actual object later
+        self.waypoints = load_waypoints(details['routing'])
+        return self
+
+    def asdict(self) -> Dict[str, Any]:
+        details = StorableElement.asdict(self)
+        details['relationship'] = self.model_entity.Id
+        details['source_repr_id'] = self.start.Id
+        details['target_repr_id'] = self.finish.Id
+        details['routing'] = json.dumps(self.waypoints, cls=ExtendibleJsonEncoder)
+        return details
+
+    @classmethod
+    def get_collection(cls) -> Collection:
+        return Collection.relation_repr
+
+    @classmethod
+    def repr_category(cls) -> ReprCategory:
+        return ReprCategory.relationship

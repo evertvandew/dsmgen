@@ -1,14 +1,11 @@
 
-import os, subprocess
-from copy import deepcopy
 import json
-
-import diagrams
 from test_frame import prepare, test, run_tests
 from data_store import DataConfiguration, DataStore, Collection, ExtendibleJsonEncoder
 import generate_project     # Ensures the client is built up to date
 from unittest.mock import Mock
 from build import sysml_data as sm
+from modelled_shape import ShapeWithTextAndPorts, ModeledRelationship, Port
 
 @prepare
 def data_store_tests():
@@ -20,9 +17,6 @@ def data_store_tests():
         block_entities=client.block_entities,
         relation_entities=client.relation_classes,
         port_entities=client.port_classes,
-        block_representations=client.block_representations,
-        relation_representations=client.relation_representations,
-        port_representations=client.port_representations,
         base_url='/data'
     )
 
@@ -107,13 +101,13 @@ def data_store_tests():
             # Check the overall structure, and some elements
             assert len(result) == 4
             for i, name in enumerate(['Test1', 'Test2']):
-                assert result[i].name == name
-            for i, cls in enumerate([client.BlockRepresentation, client.BlockRepresentation, client.NoteRepresentation,
-                                     client.BlockReferenceRepresentation]):
-                assert isinstance(result[i], cls), f"i={i}, expected={cls.__name__} -- actual={result[i]}"
+                assert result[i].model_entity.name == name
+            for i, cls in enumerate([client.Block, client.Block, client.Note,
+                                     client.BlockReference]):
+                assert isinstance(result[i].model_entity, cls), f"i={i}, expected={cls.__name__} -- actual={result[i]}"
             b1 = result[0]
-            assert b1.name == 'Test1'
-            assert b1.description == 'This is a test block'
+            assert b1.model_entity.name == 'Test1'
+            assert b1.model_entity.description == 'This is a test block'
             assert b1.x == 401.0
             assert b1.y == 104.0
             assert b1.width == 64.0
@@ -144,8 +138,8 @@ def data_store_tests():
     @test
     def add_repr_new_model():
         ds = DataStore(config)
-        item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456,
-              name='Test1', description='This is a test block')
+        model = client.Block(name="Test1", description="This is a test block")
+        item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
         def check_request_model(url, method, kwargs):
             assert kwargs['data'] == '''{"Id": 0, "parent": 456, "name": "Test1", "description": "This is a test block", "order": 0, "children": [], "__classname__": "Block"}'''
             return Response(201, json={'Id': 123})
@@ -169,7 +163,7 @@ def data_store_tests():
     @test
     def add_repr_new_repr():
         ds = DataStore(config)
-        item = client.BlockReferenceRepresentation(diagram=456, stereotype=2, start=Mock(Id=1, block=101), finish=Mock(Id=2, block=102), waypoints=[])
+        item = ModeledRelationship(model_entity=client.BlockReference(stereotype=2), diagram=456, start=Mock(Id=1, block=101), finish=Mock(Id=2, block=102), waypoints=[])
 
         def check_request_model(url, method, kwargs):
             assert kwargs['data'] == '{"Id": 0, "stereotype": 2, "source": 101, "target": 102, "source_multiplicity": 1, "target_multiplicity": 1, "__classname__": "BlockReference"}'
@@ -194,10 +188,14 @@ def data_store_tests():
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block')
         ds.update_cache(model)
-        item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
-              name='Test1', description='This is a test block')
+        item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
         def check_request_repr(url, method, kwargs):
-            assert kwargs['data'] == '''{"diagram": 456, "block": 123, "parent": null, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
+            details = json.loads(kwargs['data'])
+            expected = dict(Id=0, diagram=456, block=123, parent=None, x=100, y=150, z=0.0, width=64, height=40,
+                            styling={}, __classname__='ShapeWithTextAndPorts')
+            for k in expected.keys():
+                assert details[k] == expected[k], f"Values not equal for key {k}: {details[k]} != {expected[k]}"
+            #assert kwargs['data'] == '''{"diagram": 456, "block": 123, "parent": null, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/_BlockRepresentation', 'post', get_response=check_request_repr)
@@ -214,8 +212,8 @@ def data_store_tests():
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block')
         ds.update_cache(model)
-        item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
-              name='Test1', description='This is a test block', Id=121)
+        item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456,
+                                     Id=121)
         ds.update_cache(item)
         add_expected_response('/data/_BlockRepresentation/121', 'delete', Response(204))
         ds.delete(item)
@@ -229,7 +227,7 @@ def data_store_tests():
         ds = DataStore(config)
         model = client.BlockReference(Id=123)
         ds.update_cache(model)
-        item = client.BlockReferenceRepresentation(Id=121, start=1, finish=2, waypoints=[])
+        item = ModeledRelationship(model_entity=model, Id=121, start=1, finish=2, waypoints=[])
         ds.update_cache(item)
         add_expected_response('/data/_RelationshipRepresentation/121', 'delete', Response(204))
         ds.delete(item)
@@ -242,8 +240,8 @@ def data_store_tests():
     def update_repr():
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block', parent=456)
-        item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
-              name='Test1', description='This is a test block', Id=121)
+        item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={},
+             diagram=456, Id=121)
         ds.update_cache(model)
         ds.update_cache(item)
 
@@ -292,13 +290,13 @@ def data_store_tests():
         # Ports are never created without a pre-existing block.
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block', parent=456)
-        item = client.BlockRepresentation(x=100, y=150, width=64, height=40, styling={}, diagram=456, block=123,
-              name='Test1', description='This is a test block', Id=121)
+        item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456,
+                                     Id=121)
         ds.update_cache(model)
         ds.update_cache(item)
 
         # Now add a port and try to save it.
-        p1 = client.FlowPortRepresentation()
+        p1 = Port(model_entity=client.FlowPort())
         ds.update_cache(p1)
         item.ports.append(p1)
         add_expected_response('/data/FlowPort', 'post', Response(201, json={'Id': 155}),
@@ -316,7 +314,7 @@ def data_store_tests():
         assert p1.block == 155
         assert p1.parent == 121
         assert len(ds.shadow_copy[Collection.block_repr][121].ports) == 1
-        for k in ['diagram', 'parent', 'block', 'name', 'orientation']:
+        for k in ['diagram', 'parent', 'block', 'orientation']:
             assert getattr(ds.shadow_copy[Collection.block_repr][121].ports[0], k) == getattr(p1, k)
         assert not unexpected_requests
         assert len(expected_responses) == 0
@@ -334,7 +332,7 @@ def data_store_tests():
         assert ds.shadow_copy[Collection.block_repr][65].styling == {'color': 'yellow'}
 
         # Update the model part of the port
-        p1.name = 'Output'
+        p1.model_entity.name = 'Output'
         add_expected_response('/data/FlowPort/155', 'post', Response(201))
         ds.update(item)
         assert not unexpected_requests

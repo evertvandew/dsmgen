@@ -3,13 +3,12 @@
 It interfaces with the REST interface of the server.
 It has a buffer for all data items that are used in the application.
 """
+from enum import Enum, IntEnum, auto
 import json
 from copy import deepcopy
-from dataclasses import dataclass, is_dataclass, asdict, fields
-from typing import Dict, Callable, List, Any, Iterable, Tuple, Optional
-from enum import Enum
+from dataclasses import dataclass, is_dataclass, asdict, fields, field, Field
+from typing import Dict, Callable, List, Any, Iterable, Tuple, Optional, Self
 from dispatcher import EventDispatcher
-from point import load_waypoints
 from math import inf         # Used when evaluating waypoint strings
 from contextlib import contextmanager
 
@@ -21,6 +20,7 @@ class Collection(Enum):
     relation = 'relation'
     block_repr = 'block_repr'
     relation_repr = 'relation_repr'
+    not_storable = ''
 
     @classmethod
     def representations(cls):
@@ -35,6 +35,48 @@ class Collection(Enum):
             cls.relation: cls.relation_repr,
             cls.relation_repr: cls.relation,
         }[c]
+
+class ReprCategory(IntEnum):
+    no_repr = auto()
+    block = auto()
+    port = auto()
+    relationship = auto()
+
+
+def from_dict(cls, **details) -> Self:
+    """ Construct an instance of this class from a dictionary of key:value pairs. """
+    # Use only elements accepted by this dataclass.
+    keys = [f.name for f in fields(cls)]
+    kwargs = {k:v for k, v in details.items() if k in keys}
+    return cls(**kwargs)
+
+@dataclass
+class StorableElement:
+    Id: int = 0
+    @classmethod
+    def get_collection(cls):
+        raise NotImplementedError()
+    @classmethod
+    def from_dict(cls, **details) -> Self:
+        """ Construct an instance of this class from a dictionary of key:value pairs. """
+        return from_dict(cls, **details)
+    @classmethod
+    def fields(cls) -> Tuple[Field, ...]:
+        """ Return the dataclasses.Field instances for each element that needs to be stored in the DB """
+        # The default implementation uses dataclasses.fields
+        return fields(cls)
+    def asdict(self) -> Dict[str, Any]:
+        result = {k.name: self.__dict__[k.name] for k in fields(self)}
+        result['__classname__'] = type(self).__name__
+        return result
+
+    @classmethod
+    def repr_category(cls) -> ReprCategory:
+        return ReprCategory.no_repr
+
+    @classmethod
+    def is_instance_of(cls) -> bool:
+        return False
 
 
 class parameter_spec(str):
@@ -53,40 +95,18 @@ class parameter_values(str):
 
 @dataclass
 class DataConfiguration:
-    hierarchy_elements: Dict[str, type]
-    block_entities: Dict[str, type]
-    relation_entities: Dict[str, type]
-    port_entities: Dict[str, type]
-    block_representations: Dict[str, type]
-    relation_representations: Dict[str, type]
-    port_representations: Dict[str, type]
+    hierarchy_elements: Dict[str, StorableElement]
+    block_entities: Dict[str, StorableElement]
+    relation_entities: Dict[str, StorableElement]
+    port_entities: Dict[str, StorableElement]
     base_url: str
+    all_classes: Dict[str, StorableElement] = field(default_factory=dict)
 
     def __post_init__(self):
         result = {}
         result.update(self.hierarchy_elements)
         result.update(self.relation_entities)
-        result.update(self.block_representations)
-        result.update(self.relation_representations)
-        result.update(self.port_representations)
         self.all_classes = result
-
-    def get_collection(self, name):
-        # Ports are categorized as blocks, to allow connections to be made to them.
-        if not isinstance(name, str):
-            name = type(name).__name__
-        if name in self.block_entities or name in self.port_entities:
-            return Collection.block
-        if name in self.relation_entities:
-            return Collection.relation
-        if name in self.block_representations or name in self.port_representations:
-            return Collection.block_repr
-        if name in self.relation_representations:
-            return Collection.relation_repr
-        # Hierarchy already contains block + relations + ports, only diagrams + modelitems are new
-        # Because there is overlap with other collections, do this one last.
-        if name in self.hierarchy_elements:
-            return Collection.hierarchy
 
 
 class ExtendibleJsonEncoder(json.JSONEncoder):
@@ -95,21 +115,34 @@ class ExtendibleJsonEncoder(json.JSONEncoder):
     """
     def default(self, o):
         """ We have three tricks to jsonify objects that are not normally supported by JSON.
+            * For objects with an `asdict` function, that is called, and the dict serialized.
             * Dataclass instances are serialised as dicts.
-            * For objects that define a __json__ method, that method is called for serialisation.
+            * For objects that define a `__json__` method, that method is called for serialisation.
             * For other objects, the str() protocol is used, i.e. the __str__ method is called.
         """
-        if hasattr(o, '__json__'):
+        if hasattr(o, 'asdict'):
+            return o.asdict()
+        elif hasattr(o, '__json__'):
             return o.__json__()
-        if is_dataclass(o):
+        elif is_dataclass(o):
             result = {k.name: o.__dict__[k.name] for k in fields(o)}
             result['__classname__'] = type(o).__name__
             return result
-        if isinstance(o, Enum):
+        elif isinstance(o, Enum):
             return int(o)
-        if isinstance(o, bytes):
+        elif isinstance(o, bytes):
             return o.decode('utf8')
         return str(o)
+
+@dataclass
+class JsonResponse:
+    """ Brython doesn't document the exact type of the Response object, so we make one here
+        to help the IDE flag wrong usage.
+    """
+    status: int
+    text: str
+    json: Any
+
 
 def dc_from_dict(cls, ddict):
     keys = [f.name for f in fields(cls)]
@@ -120,8 +153,8 @@ class DataStore(EventDispatcher):
     def __init__(self, configuration: DataConfiguration):
         super().__init__()
         self.configuration = configuration
-        self.shadow_copy: Dict[Collection, Dict[int: Any]] = {k: {} for k in Collection}
-        self.live_instances: Dict[Collection, Dict[int: Any]] = {k: {} for k in Collection}
+        self.shadow_copy: Dict[Collection, Dict[int: StorableElement]] = {k: {} for k in Collection}
+        self.live_instances: Dict[Collection, Dict[int: StorableElement]] = {k: {} for k in Collection}
         self.all_classes = configuration.all_classes
         self.repr_collection_urls = {
             Collection.relation_repr: '_RelationshipRepresentation',
@@ -148,7 +181,7 @@ class DataStore(EventDispatcher):
 
     def add(self, record: Any) -> Any:
         """ Persist a new element """
-        collection = self.configuration.get_collection(type(record).__name__)
+        collection = record.get_collection()
         if collection in Collection.representations():
             # Representations are to be broken up into two objects:
             # Pure representation details, and the underlying model item
@@ -167,7 +200,7 @@ class DataStore(EventDispatcher):
                     repr['relationship'] = model.Id
             collection_url = self.repr_collection_urls[collection]
 
-            def on_complete(update):
+            def on_complete(update: JsonResponse):
                 if update.status > 299:
                     console.alert("Block could not be created")
                 else:
@@ -189,7 +222,7 @@ class DataStore(EventDispatcher):
             return record
 
     def update(self, record):
-        collection = self.configuration.get_collection(record)
+        collection = record.get_collection()
 
         def on_complete(update):
             if update.status < 300:
@@ -246,8 +279,8 @@ class DataStore(EventDispatcher):
 
 
     def delete(self, record):
-        collection = self.configuration.get_collection(record)
-        def on_complete(update):
+        collection = record.get_collection()
+        def on_complete(update: JsonResponse):
             if update.status < 300:
                 del self.shadow_copy[collection][record.Id]
                 del self.live_instances[collection][record.Id]
@@ -257,7 +290,7 @@ class DataStore(EventDispatcher):
 
     def get(self, collection: Collection | str, Id: int):
         if isinstance(collection, str):
-            collection = self.configuration.get_collection(collection)
+            collection = self.configuration.all_classes[collection].get_collection()
         # Check if the record is in the cache
         if r:=self.live_instances[collection].get(Id, False):
             return r
@@ -265,7 +298,7 @@ class DataStore(EventDispatcher):
         raise NotImplementedError()
 
     def get_hierarchy(self, cb: Callable):
-        def on_data(data):
+        def on_data(data: JsonResponse):
             records = self.make_objects(data)
             records = self.update_cache(records)
             # Determine the actual hierarchy.
@@ -289,7 +322,7 @@ class DataStore(EventDispatcher):
             For the diagram, these are combined in one.
         """
 
-        def on_data(response):
+        def on_data(response: JsonResponse):
             if response.status >= 200 and response.status < 300:
                 records = []
                 # Reconstruct the entities the diagram refers to and cache them
@@ -312,7 +345,7 @@ class DataStore(EventDispatcher):
                     representations.append(entity)
 
                 # All blocks are yielded to the diagram
-                records.extend(r for r in representations if r.repr_category() == 'block')
+                records.extend(r for r in representations if r.repr_category() == ReprCategory.block)
                 # A lookup of connection points is make for connecting them.
                 # Ports and Blocks are stored in the same table, so Id's are unique.
                 # The cache is not used for lookup, as those hold COPIES of the connection points for
@@ -320,13 +353,13 @@ class DataStore(EventDispatcher):
                 cp_lu = {r.Id: r for r in records}
 
                 # Ports are not yielded directly to the diagram, they are added to the block that owns them.
-                for p in [r for r in representations if r.repr_category() == 'port']:
+                for p in [r for r in representations if r.repr_category() == ReprCategory.port]:
                     block = cp_lu[p.parent]
                     block.ports.append(p)
                     cp_lu[p.Id] = p
 
                 # Then handle the relationships
-                for d in [r for r in representations if r.repr_category() == 'relationship']:
+                for d in [r for r in representations if r.repr_category() == ReprCategory.relationship]:
                     # Some underlying data needs to be reconstructed
                     # The connection expects actual blocks as start and finish, not their ID.
                     # First check they actually exist.
@@ -347,13 +380,13 @@ class DataStore(EventDispatcher):
 
     def create_representation(self, block_cls, block_id, drop_details):
         result = None
-        def on_complete(update):
+        def on_complete(update: JsonResponse):
             nonlocal result
             if update.status > 299:
                 console.alert("Representation could not be created")
             else:
                 result = self.decode_representation(update.json)
-                result.ports = [ch for ch in result.children if ch.repr_category() == 'port']
+                result.ports = [ch for ch in result.children if ch.repr_category() == ReprCategory.port]
 
         data = json.dumps(drop_details)
         ajax.post(f'{self.configuration.base_url}/{block_cls}/{block_id}/create_representation', blocking=True,
@@ -362,41 +395,28 @@ class DataStore(EventDispatcher):
 
     def decode_representation(self, data: dict):
         """ Create a representation object out of a data dictionary """
-        if 'block_cls' in data:
-            cls = self.all_classes[data['block_cls']]
-        else:
-            cls = self.all_classes[data['rel_cls']]
-            data['start'] = data['source_repr_id']  # Needs to be replaced with the actual object later
-            data['finish'] = data['target_repr_id']  # Needs to be replaced with the actual object later
-            data['waypoints'] = load_waypoints(data['routing'])
-        # The representation needs stuff from both model and repr parts, combine them
-        ddict = data['_entity'].copy()
-        ddict.update(data)
-        # If the object has children, process them as well.
-        if children := ddict.get('children', False):
-            ddict['children'] = [self.decode_representation(c) for c in children]
-        entity = dc_from_dict(cls, ddict)
-        console.log(f"DATA: {data}")
-        entity.logical_class = self.all_classes[data['_entity']['__classname__']]
-        entity = self.update_cache(entity)
-        return entity
+        model_cls = self.all_classes[data['_entity']['__classname__']]
+        details = data['_entity'].copy()
+        model_instance = self.update_cache(model_cls.from_dict(**details))
 
-    def make_objects(self, data: List[Any]):
+        representation_cls = model_instance.representation_cls()
+        return representation_cls.from_dict(model_entity=model_instance, **data)
+
+    def make_objects(self, data: JsonResponse) -> List[StorableElement]:
         """ Turn a set of data into objects, ensuring all the types are correct """
         records = []
         for d in data.json:
             cls = self.all_classes[d['__classname__']]
-            ddict = {k: v for k, v in d.items() if k != '__classname__'}
-            records.append(cls(**ddict))
+            records.append(cls.from_dict(**d))
         return records
 
-    def update_cache(self, records: List[Any]|Any):
+    def update_cache(self, records: List[StorableElement] | StorableElement):
         if isinstance(records, Iterable):
             return [self.update_cache(record) for record in records]
         else:
             record = records
-            cls_name = type(records).__name__
-            collection = self.configuration.get_collection(cls_name)
+            cls_name = type(record).__name__
+            collection = record.get_collection()
             self.shadow_copy[collection][record.Id] = deepcopy(record)
 
             # Check if we already have an instance of this record. If so, reuse it.
@@ -407,90 +427,17 @@ class DataStore(EventDispatcher):
                     return record
                 # Update the existing record
                 live_instance = collection_records[record.Id]
-                for f in fields(record):
+                for f in record.fields():
                     setattr(live_instance, f.name, getattr(record, f.name))
                 return live_instance
 
             self.live_instances[collection][record.Id] = record
             return record
 
-    def split_representation_item(self, collection, record) -> (Dict, Any):
-        model_cls = record.getLogicalClass()
-        if model_cls is None:
-            # Obtain the model class from the block or reference this representation points to
-            if hasattr(record, 'block'):
-                if model_id := record.block:
-                    mdl = self.get(Collection.block, model_id)
-                    model_cls = type(mdl)
-            else:
-                model_id = record.relationship
-                mdl = self.get(Collection.relation, model_id)
-                model_cls = type(mdl)
-        if collection == Collection.block_repr:
-            if record.block:
-                model = self.get(Collection.oppose(collection), record.block)
-            else:
-                model = model_cls()
-            console.log(f"getting fields from {model_cls} {record} {collection}")
-            keys = {f.name for f in fields(model_cls) if hasattr(record, f.name) and f.name not in ['Id', 'parent']}
-            for k in keys:
-                if (v := getattr(record, k)) != getattr(model, k):
-                    setattr(model, k, v)
-            if record.parent:
-                repr_parent = self.live_instances[Collection.block_repr][record.parent]
-                model.parent = repr_parent.block
-            if not model.parent:
-                model.parent = record.diagram
-            if record.repr_category() == 'port':
-                repr = dict(
-                    diagram=record.diagram,
-                    parent=record.parent,
-                    block=record.block,
-                    styling=record.styling,
-                    block_cls=type(record).__name__
-                )
-            else:
-                repr = dict(
-                    diagram=record.diagram,
-                    block=record.block,
-                    parent=record.parent,
-                    x=record.x,
-                    y=record.y,
-                    z=record.z,
-                    width=record.width,
-                    height=record.height,
-                    styling=record.styling,
-                    block_cls=type(record).__name__
-                )
-
-        elif collection == Collection.relation_repr:
-            # We work with a copy of the original to be able to check for modifications.
-            # The cache can only be changed when it is actually persisted.
-            if record.relationship:
-                model = self.get(Collection.oppose(collection), record.relationship)
-            else:
-                model = model_cls()
-            keys = {f.name for f in fields(model_cls) if hasattr(record, f.name) and f.name != 'Id'}
-            # Some keys get special treatment
-            keys -= {'source', 'target'}
-            for k in keys:
-                if (v := getattr(record, k)) != getattr(model, k):
-                    setattr(model, k, v)
-            model.source = record.start.block
-            model.target = record.finish.block
-            repr = dict(
-                diagram = record.diagram,
-                relationship = record.relationship,
-                source_repr_id = record.start.Id,
-                target_repr_id = record.finish.Id,
-                routing = json.dumps(record.waypoints, cls=ExtendibleJsonEncoder),
-                z = record.z,
-                styling = record.styling,
-                rel_cls = type(record).__name__
-            )
-        else:
-            raise NotImplementedError()
-        return repr, model
+    def split_representation_item(self, collection, record) -> (Dict, StorableElement):
+        repr = record.asdict()
+        del repr['model_entity']
+        return repr, record.model_entity
 
     def get_instance_parameters(self, instance_representation: Any) -> Optional[Tuple[str, type, Any]]:
         """ Inspect the definition object being instantiated by the argument, to determine the parameters it needs.
@@ -513,4 +460,4 @@ class DataStore(EventDispatcher):
                 names.append(k)
                 types.append(t)
                 values.append(getattr(instance_representation, k, ''))
-        return (names, types, values)
+        return names, types, values

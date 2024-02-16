@@ -27,11 +27,11 @@ import typing
 import types
 from enum import IntEnum
 from inspect import getmro
-import modelled_shape
+import modelled_shape as ms
 import diagrams
 import shapes
 from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, parameter_values
-from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder
+from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder, Collection, StorableElement
 from svg_shapes import getMarkerDefinitions
 from tab_view import TabView
 
@@ -46,8 +46,8 @@ def resolve(name):
 # Modelling 'Entities:'
 % for entity in generator.ordered_items:
 @dataclass
-class ${entity.__name__}:
-    Id: shapes.HIDDEN = 0
+class ${entity.__name__}(ms.ModelEntity, StorableElement):
+    order: int = 0
     % for f in fields(entity):
     ## All elements must have a default value so they can be created from scratch
     ${f.name}: ${generator.get_html_type(f.type)} = ${generator.get_default(f.type)}
@@ -67,7 +67,7 @@ class ${entity.__name__}:
     % endif
 
     % if generator.md.is_diagram(entity):
-    class Diagram(modelled_shape.ModelledDiagram):
+    class Diagram(ms.ModelledDiagram):
         allowed_drops_blocks = {${", ".join(generator.get_allowed_drops(entity))}}
         allowed_create_blocks = {${", ".join(generator.get_allowed_creates(entity))}}
         @classmethod
@@ -91,83 +91,42 @@ class ${entity.__name__}:
         return False
         %endif
 
-% endfor
-
-
-## Create the representations of the various blocks and relationships
-# Representations of the various graphical elements
-% for entity in [c for c in generator.md.representables if not generator.md.is_relationship(c)]:
-    <%
-        # Determine the base class of the Representation
-        if generator.md.is_port(entity):
-            base_class = 'Port'
-        else:
-            base_class = {
-                'Note': 'ShapeWithText',
-                'Block': 'ShapeWithTextAndPorts'
-            }[generator.md.get_style(entity, 'structure', 'Block')]
-    %>
-@dataclass
-class ${entity.__name__}Representation(modelled_shape.${base_class}):
-    Id: shapes.HIDDEN = 0
-    block: shapes.HIDDEN = 0
-    parent: shapes.HIDDEN = None
-    diagram: shapes.HIDDEN = 0
-    % if entity.__name__ in generator.get_allowed_ports():
-    ports: [diagrams.CP] = field(default_factory=list)
-    % endif
-    % if generator.md.is_instance_of(entity):
-    _definition: Dict[str, Any] = field(default_factory=dict)
-    % endif
-    % for attr in generator.get_diagram_attributes(entity):
-    ${attr.name}: ${generator.get_html_type(attr.type)} = ${generator.get_default(attr.type)}
-    % endfor
-
-    logical_class = ${entity.__name__}
-
-    def getEntityForConnection(self):
-        return self.logical_class
+    @classmethod
+    def get_allowed_ports(cls) -> List[str]:
+        return [${', '.join(generator.get_allowed_ports().get(entity.__name__, []))}]
 
     @classmethod
-    def getShapeDescriptor(cls):
-        return shapes.BasicShape.getDescriptor("${generator.md.get_style(entity, 'shape', 'rect')}")
+    def get_collection(cls) -> Collection:
+    %if generator.md.is_relationship(entity):
+        return Collection.relation
+    %elif generator.md.is_representable(entity):
+        return Collection.block
+    %elif generator.md.is_explorable(entity):
+        return Collection.hierarchy
+    %else:
+        return Collection.not_storable
+    %endif
 
+    %if generator.md.is_representable(entity):
     @classmethod
-    def repr_category(cls):
-        %if generator.md.is_port(entity):
-        return 'port'
-        %else:
-        return 'block'
-        %endif
+    def representation_cls(cls) -> ms.ShapeWithText | ms.ShapeWithTextAndPorts | ms.Port | ms.ModeledRelationship:
+    %if generator.md.is_relationship(entity):
+        return ms.ModeledRelationship
+    %elif generator.md.is_port(entity):
+        return ms.Port
+    %elif generator.get_allowed_ports().get(entity.__name__, []):
+        return ms.ShapeWithTextAndPorts
+    %else:
+        return ms.ShapeWithText
+    %endif
 
-    % if entity.__name__ in generator.get_allowed_ports():
-    @classmethod
-    def get_allowed_ports(cls):
-        return [${", ".join(f'{c}Representation' for c in generator.get_allowed_ports()[entity.__name__])}]
-    % endif
-
-    @classmethod
-    def is_instance_of(cls):
-        % if generator.md.is_instance_of(entity):
-        return True
-
-    def get_definition(self) -> int:
-        return self._definition['Id']
-        %else:
-        return False
-        %endif
-
-    % for name, value in generator.get_derived_values(entity).items():
-    @property
-    def ${name}(self):
-        return f"${value}"
-    % endfor
+    %endif
 
 % endfor
 
 
 @dataclass
-class PortLabel(modelled_shape.ShapeWithText):
+class PortLabel(ms.ShapeWithText):
     Id: shapes.HIDDEN = 0
     block: shapes.HIDDEN = None
     parent: shapes.HIDDEN = None
@@ -189,43 +148,6 @@ class PortLabel(modelled_shape.ShapeWithText):
         return False
 
 
-<%
-    def get_relationship_type(field_type):
-        if is_dataclass(field_type):
-            return field_type.__name__ + 'Representation'
-        if isinstance(field_type, mdef.XRef):
-            types = [t for t in field_type.types if not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation))]
-            type_names = ', '.join(get_relationship_type(t) for t in types)
-            return f"[{type_names}]"
-        result = generator.get_html_type(field_type)
-        if result == 'Entity':
-            return 'diagrams.Shape'
-        return result
-%>
-% for cls in generator.md.relationship:
-@dataclass
-class ${cls.__name__}Representation(diagrams.Relationship):
-    Id: shapes.HIDDEN = 0
-    diagram: shapes.HIDDEN = 0
-    relationship: shapes.HIDDEN = 0
-
-    % for attr in fields(cls):
-    ${attr.name}: ${get_relationship_type(attr.type)} = ${generator.get_default(attr.type)}
-    % endfor
-
-    logical_class = ${cls.__name__}
-
-    @classmethod
-    def repr_category(cls):
-        return 'relationship'
-
-    @classmethod
-    def is_instance_of(cls):
-        return False
-
-% endfor
-
-
 allowed_children = {
     % for name in generator.all_names.keys():
     ${name}: [${', '.join(generator.children[name])}],
@@ -234,7 +156,7 @@ allowed_children = {
 
 allowed_ports = {
     % for name, clss in generator.get_allowed_ports().items():
-    "${name}": [${', '.join(f'{c}Representation' for c in clss)}],
+    "${name}": [${', '.join(f'{c}' for c in clss)}],
     % endfor
 }
 
@@ -242,7 +164,7 @@ diagram_definitions = {
     % for cls in generator.md.diagrams:
     "${cls.__name__}": ${cls.__name__}.Diagram,
     % if generator.md.is_representable(cls):
-    "${cls.__name__}Representation": ${cls.__name__}.Diagram,
+    "${cls.__name__}": ${cls.__name__}.Diagram,
     % endif
     % endfor
 }
@@ -267,31 +189,6 @@ port_classes = {
 }
 instance_classes = {
     <% lines = [f'"{c.__name__}": {c.__name__}' for c in generator.md.instance_of] %>
-    ${',\n    '.join(lines)}
-}
-block_representations = {
-    <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.blocks] %>
-    "PortLabel": PortLabel,
-    ${',\n    '.join(lines)}
-}
-relation_representations = {
-    <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.relationship] %>
-    ${',\n    '.join(lines)}
-}
-port_representations = {
-    <% lines = [f'"{c.__name__}Representation": {c.__name__}Representation' for c in generator.md.port] %>
-    ${',\n    '.join(lines)}
-}
-
-representation_classes = {
-    <%  lines = [f'"{c.__name__}Representation": {c.__name__}Representation'
-        for c in generator.md.representables] %>
-    ${',\n    '.join(lines)}
-}
-
-representation_lookup = {
-    <%  lines = [f'"{c.__name__}": {c.__name__}Representation'
-        for c in generator.md.representables] %>
     ${',\n    '.join(lines)}
 }
 
@@ -386,7 +283,7 @@ def run(explorer, canvas, details):
             svg_tag.classList.add('diagram')
             # container <= svg_tag
             ## In future: subscribe to events in the diagram api.
-            config = DiagramConfig(representation_lookup, connections_from)
+            config = DiagramConfig({}, connections_from)
             diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], config, data_store, svg_tag)
             diagram_details = data_store.get(target_type, target_dbid)
             console.log(f'DETAILS: {details}')

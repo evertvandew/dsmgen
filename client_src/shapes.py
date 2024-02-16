@@ -160,13 +160,13 @@ class Stylable:
 
 @dataclass
 class Shape(Stylable):
-    x: float
-    y: float
-    height: float
-    width: float
+    x: float = 0.0
+    y: float = 0.0
+    height: float = 0.0
+    width: float = 0.0
     z: float = 0.0
+    order: int = 0
     styling: Dict[str, str] = field(default_factory=dict)
-    id: HIDDEN(int) = field(default_factory=getId)
 
     default_style = dict()
     owner = None
@@ -301,7 +301,6 @@ class Shape(Stylable):
 class CP:
     orientation: BlockOrientations = BlockOrientations.RIGHT
     order: int = 0
-    id: HIDDEN(int) = field(default_factory=getId)
     styling: Dict[str, str] = field(default_factory=dict)
 
     def onHover(self):
@@ -514,9 +513,9 @@ router_classes = {'center2center': RouteCenterToCenter, 'square': RouteSquare}
 
 @dataclass
 class Relationship(Stylable):
-    start: Shape
-    finish: Shape
-    waypoints: List[Point]
+    start: Shape = None
+    finish: Shape = None
+    waypoints: List[Point] = field(default_factory=list)
     id: HIDDEN(int) = field(default_factory=getId)
     z: float = 0.0
     styling: dict = field(default_factory=dict)

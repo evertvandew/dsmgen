@@ -119,6 +119,8 @@ class ModelDefinition:
         return RepresentableElement in cls.categories
     def is_instance_of(self, cls):
         return InstanceOf in cls.categories
+    def is_explorable(self, cls):
+        return ExplorableElement in cls.categories
 
 
     def get_conversions(self, cls: Any) -> Optional[TypeConversion]:

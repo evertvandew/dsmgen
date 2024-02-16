@@ -472,9 +472,6 @@ def simulated_explorer_tests():
         block_entities=client.block_entities,
         relation_entities=client.relation_classes,
         port_entities=client.port_classes,
-        block_representations=client.block_representations,
-        relation_representations=client.relation_representations,
-        port_representations=client.port_representations,
         base_url='/data'
     )
 
