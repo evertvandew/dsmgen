@@ -189,6 +189,8 @@ class DataStore(EventDispatcher):
             repr, model = self.split_representation_item(collection, record)
             # Check if this is a new model item (they can be created inside a diagram)
             if not model.Id:
+                # Insert this model item as a child of the diagram (diagrams are also folders in the explorer).
+                model.parent = record.diagram
                 # Add the model item
                 self.add(model)
                 # Take out the new Id of the model item

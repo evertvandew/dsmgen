@@ -5,7 +5,7 @@ import json
 from browser import svg, console
 from browser.widgets.dialog import Dialog, InfoDialog
 from diagrams import shapes, Shape, Relationship, CP, Point, Orientations, Diagram, getMousePos, DiagramConfiguration
-from data_store import DataStore, StorableElement, Collection, ReprCategory, from_dict
+from data_store import DataStore, StorableElement, Collection, ReprCategory, from_dict, ExtendibleJsonEncoder
 from point import load_waypoints
 
 
@@ -169,6 +169,7 @@ class ShapeWithText(Shape, StorableElement):
     def asdict(self) -> Dict[str, Any]:
         details = StorableElement.asdict(self)
         details['block'] = self.model_entity.Id
+        del details['children']
         return details
 
     def getShape(self):
@@ -244,6 +245,11 @@ class Port(CP, StorableElement):
 class ShapeWithTextAndPorts(ShapeWithText):
     ports: List[Port] = field(default_factory=list)
     children: [Self] = field(default_factory=list)
+
+    def asdict(self) -> Dict[str, Any]:
+        details = super().asdict()
+        del details['ports']
+        return details
 
     @classmethod
     def getShapeDescriptor(cls):
@@ -359,6 +365,10 @@ class ModeledRelationship(Relationship, StorableElement):
         details['source_repr_id'] = self.start.Id
         details['target_repr_id'] = self.finish.Id
         details['routing'] = json.dumps(self.waypoints, cls=ExtendibleJsonEncoder)
+        del details['start']
+        del details['finish']
+        del details['waypoints']
+        del details['id']
         return details
 
     @classmethod

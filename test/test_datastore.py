@@ -9,7 +9,7 @@ from modelled_shape import ShapeWithTextAndPorts, ModeledRelationship, Port
 
 @prepare
 def data_store_tests():
-    from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses
+    from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses, clear_expected_response
     import public.sysml_client as client
 
     config = DataConfiguration(
@@ -36,6 +36,7 @@ def data_store_tests():
 
     @test
     def test_get_hierarchy():
+        clear_expected_response()
         add_expected_response('/data/hierarchy', 'get', Response(
             200,
             json=[
@@ -68,6 +69,7 @@ def data_store_tests():
 
     @test
     def test_get_diagram():
+        clear_expected_response()
         add_expected_response('/data/diagram_contents/3', 'get', Response(
             200,
             json=[{"Id": 1, "diagram": 3, "block": 4, "x": 401.0, "y": 104.0, "z": 0.0, "width": 64.0, "height": 40.0,
@@ -120,12 +122,13 @@ def data_store_tests():
 
     @test
     def add_modelitem():
+        clear_expected_response()
         ds = DataStore(config)
         item = client.Block(name='Test1', description='This is a test block')
         ok = False
         def check_request(url, method, kwargs):
             nonlocal ok
-            assert kwargs['data'] == '''{"Id": 0, "parent": null, "name": "Test1", "description": "This is a test block", "order": 0, "children": [], "__classname__": "Block"}'''
+            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "parent": None, "name": "Test1", "description": "This is a test block", "children": [], "__classname__": "Block"}
             ok = True
             return Response(201, json={'Id': 123})
 
@@ -137,15 +140,16 @@ def data_store_tests():
 
     @test
     def add_repr_new_model():
+        clear_expected_response()
         ds = DataStore(config)
         model = client.Block(name="Test1", description="This is a test block")
         item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
         def check_request_model(url, method, kwargs):
-            assert kwargs['data'] == '''{"Id": 0, "parent": 456, "name": "Test1", "description": "This is a test block", "order": 0, "children": [], "__classname__": "Block"}'''
+            assert json.loads(kwargs['data']) == {"Id": 0, "parent": 456, "name": "Test1", "description": "This is a test block", "order": 0, "children": [], "__classname__": "Block"}
             return Response(201, json={'Id': 123})
 
         def check_request_repr(url, method, kwargs):
-            assert kwargs['data'] == '''{"diagram": 456, "block": 123, "parent": null, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
+            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "diagram": 456, "block": 123, "parent": None, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "__classname__": "ShapeWithTextAndPorts"}
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/Block', 'post', get_response=check_request_model)
@@ -162,15 +166,32 @@ def data_store_tests():
 
     @test
     def add_repr_new_repr():
+        clear_expected_response()
         ds = DataStore(config)
-        item = ModeledRelationship(model_entity=client.BlockReference(stereotype=2), diagram=456, start=Mock(Id=1, block=101), finish=Mock(Id=2, block=102), waypoints=[])
+        a = client.Block(Id=101)
+        b = client.Block(Id=102)
+        item = ModeledRelationship(
+            model_entity=client.BlockReference(
+                stereotype=2,
+                source=a,
+                target=b
+            ),
+            diagram=456,
+            start=ShapeWithTextAndPorts(Id=1, model_entity=a),
+            finish=ShapeWithTextAndPorts(Id=2, model_entity=b),
+            waypoints=[]
+        )
 
         def check_request_model(url, method, kwargs):
-            assert kwargs['data'] == '{"Id": 0, "stereotype": 2, "source": 101, "target": 102, "source_multiplicity": 1, "target_multiplicity": 1, "__classname__": "BlockReference"}'
+            data = json.loads(kwargs['data'])
+            assert data["stereotype"] == 2
+            assert data["source_id"] == 101
+            assert data["target_id"] == 102
+            assert data["__classname__"] == "BlockReference"
             return Response(201, json={'Id': 123})
 
         def check_request_repr(url, method, kwargs):
-            assert kwargs['data'] == '{"diagram": 456, "relationship": 123, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]", "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation"}'
+            assert json.loads(kwargs['data']) == {'Id': 0, "diagram": 456, "relationship": 123, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]", "z": 0.0, "styling": {}, '__classname__': 'ModeledRelationship'}
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/BlockReference', 'post', get_response=check_request_model)
@@ -185,6 +206,9 @@ def data_store_tests():
 
     @test
     def add_repr_existing_model():
+        clear_expected_response()
+        assert len(expected_responses) == 0
+        assert not unexpected_requests
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block')
         ds.update_cache(model)
@@ -209,6 +233,7 @@ def data_store_tests():
 
     @test
     def delete_block():
+        clear_expected_response()
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block')
         ds.update_cache(model)
@@ -224,6 +249,7 @@ def data_store_tests():
 
     @test
     def delete_relationship():
+        clear_expected_response()
         ds = DataStore(config)
         model = client.BlockReference(Id=123)
         ds.update_cache(model)
@@ -238,6 +264,7 @@ def data_store_tests():
 
     @test
     def update_repr():
+        clear_expected_response()
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block', parent=456)
         item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={},
@@ -262,14 +289,14 @@ def data_store_tests():
         assert id(ds.shadow_copy[Collection.block_repr][121]) != id(item), "The shadow_copy must store a copy of the submitted object"
 
         # Update the model
-        item.name = 'Test123'
+        item.model_entity.name = 'Test123'
         add_expected_response('/data/Block/123', 'post', Response(201))
         ds.update(item)
         ds.update(item)
         assert len(expected_responses) == 0
         assert not unexpected_requests
         # Check the shadow_copy is also updated.
-        assert ds.shadow_copy[Collection.block][123].name == item.name
+        assert ds.shadow_copy[Collection.block][123].name == item.model_entity.name
         assert isinstance(ds.shadow_copy[Collection.block][123], client.Block)
 
         # Update both representation and model
@@ -285,6 +312,7 @@ def data_store_tests():
 
     @test
     def test_ports():
+        clear_expected_response()
         # Test adding, updating, loading and deleting ports.
         # First create the block and model they belong to.
         # Ports are never created without a pre-existing block.
@@ -363,4 +391,5 @@ def json_encoder_tests():
 
 
 if __name__ == '__main__':
+    #run_tests('*.add_repr_existing_model')
     run_tests()

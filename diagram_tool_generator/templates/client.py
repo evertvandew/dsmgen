@@ -122,6 +122,19 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
     %endif
 
+    %if generator.md.is_relationship(entity):
+    def asdict(self) -> Dict[str, Any]:
+        """ Relationships need to serialize only the ID's of the target and source,
+            not the source or target themselves.
+        """
+        details = StorableElement.asdict(self)
+        details['source_id'] = self.source.Id if self.source else None
+        details['target_id'] = self.target.Id if self.target else None
+        del details['source']
+        del details['target']
+        return details
+    %endif
+
 % endfor
 
 
