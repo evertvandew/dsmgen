@@ -21,22 +21,23 @@ from browser import document, console, html, svg, bind, ajax
 import json
 from explorer import Element, make_explorer, context_menu_name
 from dataclasses import dataclass, field, is_dataclass, asdict, fields
-from typing import Self, List, Dict, Any, Callable
+from typing import Self, List, Dict, Any, Callable, Type
 from collections.abc import Iterable
 import typing
 import types
 from enum import IntEnum
 from inspect import getmro
-import modelled_shape as ms
+from modeled_diagram import ModeledDiagram
+import modeled_shape as ms
 import diagrams
 import shapes
-from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, parameter_values
+from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, parameter_values, stylingEditorForm
 from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder, Collection, StorableElement
 from svg_shapes import getMarkerDefinitions
 from tab_view import TabView
 
 
-def resolve(name):
+def resolve(name: str) -> Type[ms.ModelEntity]:
     r, *parts = name.split('.')
     var = globals()[r]
     for p in parts:
@@ -47,7 +48,6 @@ def resolve(name):
 % for entity in generator.ordered_items:
 @dataclass
 class ${entity.__name__}(ms.ModelEntity, StorableElement):
-    order: int = 0
     % for f in fields(entity):
     ## All elements must have a default value so they can be created from scratch
     ${f.name}: ${generator.get_html_type(f.type)} = ${generator.get_default(f.type)}
@@ -61,17 +61,20 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     % if generator.md.is_instance_of(entity):
     parameters: parameter_values = field(default_factory=dict)
     % endif
+    % if generator.get_allowed_ports().get(entity.__name__, []):
+    ports: List[ms.ModelEntity] = field(default_factory=list)
+    %endif
 
     def get_icon(self):
         return "${generator.md.get_style(entity, 'icon', 'folder')}"
     % endif
 
     % if generator.md.is_diagram(entity):
-    class Diagram(ms.ModelledDiagram):
+    class Diagram(ModeledDiagram):
         allowed_drops_blocks = {${", ".join(generator.get_allowed_drops(entity))}}
         allowed_create_blocks = {${", ".join(generator.get_allowed_creates(entity))}}
         @classmethod
-        def get_allowed_blocks(cls, for_drop=False) -> Dict[str, Any]:
+        def get_allowed_blocks(cls, for_drop=False) -> Dict[str, Type[ms.ModelEntity]]:
             # The allowed blocks are given as a Dict[str, str]. Here we replace the str references to classes
             # by actual classes.
             if for_drop:
@@ -109,18 +112,25 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
     %if generator.md.is_representable(entity):
     @classmethod
-    def representation_cls(cls) -> ms.ShapeWithText | ms.ShapeWithTextAndPorts | ms.Port | ms.ModeledRelationship:
+    def representation_cls(cls) -> ms.ModeledShape | ms.ModeledShapeAndPorts | ms.Port | ms.ModeledRelationship:
     %if generator.md.is_relationship(entity):
         return ms.ModeledRelationship
     %elif generator.md.is_port(entity):
         return ms.Port
-    %elif generator.get_allowed_ports().get(entity.__name__, []):
-        return ms.ShapeWithTextAndPorts
+    %elif generator.get_allowed_ports().get(entity.__name__, []) or generator.md.is_instance_of(entity):
+        return ms.ModeledShapeAndPorts
     %else:
-        return ms.ShapeWithText
+        return ms.ModeledShape
     %endif
 
     %endif
+
+    def get_editable_parameters(self) -> List[ms.EditableParameterDetails]:
+        return [
+        %for f in [f for f in fields(entity) if f.name not in ['parent', 'Id', 'ports', 'children']]:
+            ms.EditableParameterDetails("${f.name}", ${generator.get_html_type(f.type)}, self.${f.name}, ${generator.get_html_type(f.type)}),
+        %endfor
+        ]
 
     %if generator.md.is_relationship(entity):
     def asdict(self) -> Dict[str, Any]:
@@ -139,7 +149,7 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
 
 @dataclass
-class PortLabel(ms.ShapeWithText):
+class PortLabel(ms.ModeledShape):
     Id: shapes.HIDDEN = 0
     block: shapes.HIDDEN = None
     parent: shapes.HIDDEN = None
@@ -237,12 +247,15 @@ def on_diagram_selection(_e_name, _e_source, data_store, details):
     """ An item in a diagram has been selected: create a detail-editor for it. """
     values = details['values']
     update = details['update']
-    object = details['object']
+    repr: ms.ModeledShape = details['object']
+    model: ms.ModelEntity = repr.model_entity
+
     properties_div = document['details']
     for e in properties_div.children:
         e.remove()
-    edit_ports = type(object).__name__ in block_entities or type(object).__name__ in block_representations
-    properties_div <= dataClassEditor(object, data_store, update=update, edit_ports=edit_ports)
+    _ = properties_div <= dataClassEditor(model, data_store, update=update)
+    _ = properties_div <= stylingEditorForm(repr)
+
 
 def on_explorer_click(_event_name, _event_source, data_store, details):
     """ Called when an element was left-clicked. """

@@ -8,6 +8,7 @@ import json
 from svg_shapes import HAlign, VAlign
 from shapes import HIDDEN
 from data_store import DataStore, ExtendibleJsonEncoder, parameter_spec, parameter_values
+from modeled_shape import ModeledShape, ModelEntity
 
 #diagrams.createDiagram("canvas");
 
@@ -54,9 +55,11 @@ def type2Constructor(t: type):
     elif t == HIDDEN:
         return str
     elif isinstance(t, enum.EnumType):
-        return lambda v: t(int(v))
+        return lambda v: t(int(v if v else 0))
     elif t == longstr:
         return str
+    elif t == int:
+        return lambda v: int(v) if v else 0
     return t
 
 
@@ -273,35 +276,27 @@ def createPortEditor(o, field, port_types, data_store: DataStore):
     fillTable()
     addb = html.BUTTON("+", type="button")
     addb.bind("click", onAdd)
-    div <= addb
+    _ = div <= addb
     return div
 
 
-def select_editable_fields(objecttype):
-    edit_fields = [f for f in fields(objecttype) if f.name not in ['x', 'y', 'z', 'height', 'width', 'styling', 'shape_type'] and isEditable(f)]
-    return edit_fields
-
-def select_port_fields(objecttype):
-    return [f for f in fields(objecttype) if isPortCollection(f)]
-
-
-def dataClassEditorForm(o: Any, objecttype: type, data_store: DataStore, default=None, update=None, edit_ports=False):
+def dataClassEditorForm(o: ModelEntity, data_store: DataStore, default=None, update=None):
     """ Return a form for editing the values in a data object, without buttons. """
     # Use the annotations to create the properties editor
     form = html.FORM()
 
-    editable_fields = select_editable_fields(objecttype)
+    editable_fields = o.get_editable_parameters()
 
     for field in editable_fields:
         label = html.LABEL(field.name)
         label.className ="col-sm-3 col-form-label"
-        form <= label
-        form <= getInputForField(o, field)
-        form <= html.BR()
+        _ = form <= label
+        _ = form <= getInputForField(o, field)
+        _ = form <= html.BR()
 
     # Instances of other blocks need to go to the definition to determine what parameters to edit
     # Determine which parameters to edit and what types they have.
-    result = data_store.get_instance_parameters(o)
+    result = o.get_instance_parameters()
     if result:
         # In an Instance we can not edit the ports
         edit_ports = False
@@ -309,26 +304,28 @@ def dataClassEditorForm(o: Any, objecttype: type, data_store: DataStore, default
         for n, t, v in zip(names, types, values):
             label = html.LABEL(n)
             label.className = "col-sm-3 col-form-label"
-            form <= label
-            form <= getInputForValue(n, t, v)
-            form <= html.BR()
+            _ = form <= label
+            _ = form <= getInputForValue(n, t, v)
+            _ = form <= html.BR()
 
-    if edit_ports:
-        port_fields = [f for f in fields(objecttype) if isPortCollection(f)]
-        port_types = objecttype.get_allowed_ports() if hasattr(objecttype, 'get_allowed_ports') else field.type
-        for field in port_fields:
-            form <= createPortEditor(o, field, port_types, data_store)
+    port_types = o.get_allowed_ports()
+    if port_types:
+        f = [f for f in fields(o) if f.name == 'ports'][0]
+        _ = form <= createPortEditor(o, f, port_types, data_store)
+    return form
 
+def stylingEditorForm(o: ModeledShape):
     # Add an editor for style elements
-    if isStylable(objecttype):
-        form <= html.H3("Styling")
+    form = html.FORM()
+    if isStylable(o):
+        _ = form <= html.H3("Styling")
         style_keys = o.getStyleKeys()
         for key in style_keys:
             label = html.LABEL(key)
             label.className = "col-sm-3 col-form-label"
-            form <= label
-            form <= getInputForStyle(o, key, o.getStyle(key, ''))
-            form <= html.BR()
+            _ = form <= label
+            _ = form <= getInputForStyle(o, key, o.getStyle(key, ''))
+            _ = form <= html.BR()
     return form
 
 def getFormValues(form, objecttype):
@@ -351,10 +348,10 @@ def getFormValues(form, objecttype):
 
 # Add the logic to edit parameters
 # When a block is selected, the canvas throws an event with the details
-def dataClassEditor(objecttype, data_store: DataStore, defaults=None, update=None, edit_ports=False):
+def dataClassEditor(objecttype, data_store: DataStore, defaults=None, update=None):
     o = None if isinstance(objecttype, type) else objecttype
     objecttype = objecttype if isinstance(objecttype, type) else type(objecttype)
-    form = dataClassEditorForm(o, objecttype, data_store, default=defaults, update=update, edit_ports=edit_ports)
+    form = dataClassEditorForm(o, data_store, default=defaults, update=update)
     # Add a SAVE button
     def onSave(_):
         # Because this is a Closure, we can use the captured variables

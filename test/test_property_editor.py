@@ -14,7 +14,7 @@ import diagrams
 import explorer
 from data_store import ExtendibleJsonEncoder
 import generate_project     # Ensures the client is built up to date
-from modelled_shape import Port, ShapeWithTextAndPorts
+from modeled_shape import Port, ModeledShapeAndPorts
 
 
 @prepare
@@ -24,7 +24,7 @@ def test_port_editor():
     ds = Mock()
     @test
     def create():
-        block_repr = ShapeWithTextAndPorts(
+        block_repr = ModeledShapeAndPorts(
             model_entity = client.Block(),
             x=100, y=100, width=64, height=40,
             ports=[Port()]

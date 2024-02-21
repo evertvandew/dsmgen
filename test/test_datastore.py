@@ -5,7 +5,7 @@ from data_store import DataConfiguration, DataStore, Collection, ExtendibleJsonE
 import generate_project     # Ensures the client is built up to date
 from unittest.mock import Mock
 from build import sysml_data as sm
-from modelled_shape import ShapeWithTextAndPorts, ModeledRelationship, Port
+from modeled_shape import ModeledShapeAndPorts, ModeledRelationship, Port
 
 @prepare
 def data_store_tests():
@@ -143,7 +143,7 @@ def data_store_tests():
         clear_expected_response()
         ds = DataStore(config)
         model = client.Block(name="Test1", description="This is a test block")
-        item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
+        item = ModeledShapeAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
         def check_request_model(url, method, kwargs):
             assert json.loads(kwargs['data']) == {"Id": 0, "parent": 456, "name": "Test1", "description": "This is a test block", "order": 0, "children": [], "__classname__": "Block"}
             return Response(201, json={'Id': 123})
@@ -177,8 +177,8 @@ def data_store_tests():
                 target=b
             ),
             diagram=456,
-            start=ShapeWithTextAndPorts(Id=1, model_entity=a),
-            finish=ShapeWithTextAndPorts(Id=2, model_entity=b),
+            start=ModeledShapeAndPorts(Id=1, model_entity=a),
+            finish=ModeledShapeAndPorts(Id=2, model_entity=b),
             waypoints=[]
         )
 
@@ -212,7 +212,7 @@ def data_store_tests():
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block')
         ds.update_cache(model)
-        item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
+        item = ModeledShapeAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
         def check_request_repr(url, method, kwargs):
             details = json.loads(kwargs['data'])
             expected = dict(Id=0, diagram=456, block=123, parent=None, x=100, y=150, z=0.0, width=64, height=40,
@@ -237,8 +237,8 @@ def data_store_tests():
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block')
         ds.update_cache(model)
-        item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456,
-                                     Id=121)
+        item = ModeledShapeAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456,
+                                    Id=121)
         ds.update_cache(item)
         add_expected_response('/data/_BlockRepresentation/121', 'delete', Response(204))
         ds.delete(item)
@@ -267,8 +267,8 @@ def data_store_tests():
         clear_expected_response()
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block', parent=456)
-        item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={},
-             diagram=456, Id=121)
+        item = ModeledShapeAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={},
+                                    diagram=456, Id=121)
         ds.update_cache(model)
         ds.update_cache(item)
 
@@ -318,8 +318,8 @@ def data_store_tests():
         # Ports are never created without a pre-existing block.
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block', parent=456)
-        item = ShapeWithTextAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456,
-                                     Id=121)
+        item = ModeledShapeAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456,
+                                    Id=121)
         ds.update_cache(model)
         ds.update_cache(item)
 

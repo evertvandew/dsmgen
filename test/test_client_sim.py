@@ -12,7 +12,7 @@ from inspect import signature
 from typing import List, Dict, Any
 from shapes import Shape, Relationship, Point, HIDDEN
 from browser import events
-from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses
+from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses, clear_expected_response
 from unittest.mock import Mock, MagicMock
 import diagrams
 import explorer
@@ -35,9 +35,6 @@ def mk_ds():
         block_entities=client.block_entities,
         relation_entities=client.relation_classes,
         port_entities=client.port_classes,
-        block_representations=client.block_representations,
-        relation_representations=client.relation_representations,
-        port_representations=client.port_representations,
         base_url='/data'
     )
 
@@ -76,32 +73,32 @@ example_diagram = [
 
 port2port = [
     {"Id": 1, "diagram": 3, "block": 4, "x": 401.0, "y": 104.0, "z": 0.0, "width": 64.0, "height": 40.0,
-     "styling": {"color": "yellow"}, "block_cls": "BlockRepresentation", "parent": None,
+     "styling": {"color": "yellow"}, "block_cls": "ModeledShapeAndPorts", "parent": None,
      "__classname__": "_BlockRepresentation",
      "_entity": {"order": 0, "Id": 4, "parent": None, "name": "Test1",
                  "description": "This is a test block",
                  "__classname__": "Block"}},
     {"Id": 2, "diagram": 3, "block": 5, "x": 369.0, "y": 345.0, "z": 0.0, "width": 64.0, "height": 40.0,
-     "styling": {}, "block_cls": "BlockRepresentation", "__classname__": "_BlockRepresentation", "parent": None,
+     "styling": {}, "block_cls": "ModeledShapeAndPorts", "__classname__": "_BlockRepresentation", "parent": None,
      "_entity": {"order": 0, "Id": 5, "parent": 2, "name": "Test2", "description": "",
                  "__classname__": "Block"}},
     {"Id": 3, "diagram": 3, "block": 7, "x": 101.0, "y": 360.0, "z": 0.0, "width": 110.0, "height": 65.0,
      "styling": {"bordercolor": "#000000", "bordersize": "2", "blockcolor": "#fffbd6", "fold_size": "10",
                  "font": "Arial", "fontsize": "16", "textcolor": "#000000", "xmargin": 2, "ymargin": 2,
-                 "halign": 11, "valign": 2}, "block_cls": "BlockRepresentation",
+                 "halign": 11, "valign": 2}, "block_cls": "ModeledShapeAndPorts",
      "__classname__": "_BlockRepresentation", "parent": None,
      "_entity": {"order": 0, "Id": 7, "name": "Test 3", "description": "Dit is een commentaar", "parent": 2,
                  "__classname__": "Block"}},
     {"Id": 51, "diagram": 3, "block": 10, "parent": 2, "__classname__": "_BlockRepresentation",
-     "block_cls": "FlowPortRepresentation",
+     "block_cls": "Port",
      "_entity": {"Id": 10, "parent": 5, "__classname__": "FlowPort"}
      },
     {"Id": 52, "diagram": 3, "block": 11, "parent": 3, "__classname__": "_BlockRepresentation",
-     "block_cls": "FlowPortRepresentation",
+     "block_cls": "Port",
      "_entity": {"Id": 10, "parent": 7, "__classname__": "FlowPort"}
      },
     {"Id": 1, "diagram": 3, "relationship": 1, "source_repr_id": 51, "target_repr_id": 52, "routing": "[]",
-     "z": 0.0, "styling": {}, "rel_cls": "FlowPortConnectionRepresentation",
+     "z": 0.0, "styling": {}, "rel_cls": "ModeledRelationship",
      "_entity": {"Id": 1, "stereotype": 1, "source": 10, "target": 11, "source_multiplicity": 1,
                  "target_multiplicity": 1, "__classname__": "FlowPortConnection"}},
 
@@ -135,7 +132,6 @@ def simulated_diagram_tests():
         svg.classList.add('diagram')
         container <= svg
         config = diagrams.DiagramConfiguration(
-            client.representation_lookup,
             client.connections_from
         )
         diagram = diagrams.load_diagram(
@@ -353,12 +349,12 @@ def simulated_diagram_tests():
         assert not unexpected_requests
         nonlocal d
         form = d.select('form')
-        assert len(form) == 1
-        html_form = str(form)
-        assert 'name' in html_form
-        assert 'description' in html_form
-        assert 'TR' in html_form            # the editor for the port
-        assert 'blockcolor' in html_form
+        assert len(form) == 2
+        assert d.select('#edit_name')
+        assert d.select('#edit_description')
+        assert d.select('.porttable TR')           # the editor for the port
+        # There should be a style editor in the second form.
+        assert d.select('#styling_blockcolor')
 
         assert not unexpected_requests
         assert len(expected_responses) == 0
@@ -461,6 +457,7 @@ def simulated_explorer_tests():
     from browser import html
 
     def reset_document():
+        clear_expected_response()
         d.clear()
         d <= html.DIV(id='explorer')
         d <= html.DIV(id='canvas')
@@ -502,7 +499,7 @@ def simulated_explorer_tests():
         option.dispatchEvent(events.Click())
         # There should be a form to enter the name for the new diagram.
         # Enter a name and click OK
-        input = d.select(".brython-dialog-main input")[0]
+        input = d.select("#edit_name")[0]
         input.value = 'My Diagram'
         button = [b for b in d.select(".brython-dialog-main button") if b.text.lower() == 'ok'][0]
         add_expected_response('/data/BlockDefinitionDiagram', 'post', Response(201, json={'Id': 3}))
@@ -644,4 +641,4 @@ def simulated_explorer_tests():
 
 
 if __name__ == '__main__':
-    run_tests()
+    run_tests('*.block_property_editor')

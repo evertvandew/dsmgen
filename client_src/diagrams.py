@@ -2,7 +2,7 @@ from browser import document, svg, console, window, bind, html
 from browser.widgets.dialog import Dialog, InfoDialog
 
 
-from typing import Any, Self, List, Dict
+from typing import Any, Self, List, Dict, Type
 from dataclasses import dataclass, field, asdict, is_dataclass, fields
 from weakref import ref
 import enum
@@ -390,13 +390,8 @@ class ConnectionEditor(BehaviourFSM):
 
 @dataclass
 class DiagramConfiguration:
-    repr_lu: Dict[str, type]
     connections_from: Dict[type, Dict[type, List[type]]]
 
-    def get_repr_for_drop(self, cls) -> type:
-        return self.repr_lu[cls.__name__]
-    def get_repr_for_create(self, cls) -> type:
-        return self.repr_lu[cls.__name__]
     def get_allowed_connections(self, blocka_cls, blockb_cls) -> List[type]:
         console.log(f"getting connections for {blocka_cls} -> {blockb_cls}")
         return self.connections_from.get(blocka_cls, {}).get(blockb_cls, [])
@@ -430,6 +425,8 @@ class Diagram(OwnerInterface):
             "bubbles": True
         }))
 
+    def get_allowed_blocks(cls, block_cls_name: str, for_drop=False) -> Dict[str, Type[Shape]]:
+        raise NotImplementedError()
 
     def addBlock(self, block):
         if self.mouse_events_fsm is not None:
@@ -639,53 +636,11 @@ class Diagram(OwnerInterface):
             l <= add_option(cls)
         d.panel <= l
 
-
 diagrams = []
 
 
 def nop(ev):
     return
-
-class BlockCreateWidget:
-    height = 40
-    margin = 10
-    def __init__(self, diagram):
-        def bindFunc(index, representation):
-            """ Create a lambda function for creating a specific block type """
-            return lambda ev: self.onMouseDown(ev, index, representation)
-
-        self.diagram = ref(diagram)
-        self.diagram_id = diagram.diagram_id
-        blocks = {k:b for k, b in diagram.get_allowed_blocks().items() if not b.is_instance_of()}
-
-        g = svg.g()
-        # Draw the border of the widget
-        g <= svg.rect(x=0, width=2*self.margin+1.6*self.height, y=0, height=len(blocks)*(self.height+self.margin)+self.margin,
-                      fill='white', stroke='black', stroke_width="2")
-        for i, (name, block_cls) in enumerate(blocks.items()):
-            repr_cls = diagram.config.get_repr_for_create(block_cls)
-            console.log(f"Creating element of type {repr_cls.__name__} -- shape: {repr_cls.getShapeDescriptor()}")
-            representation = repr_cls(x=self.margin, y=i*(self.height+self.margin)+self.margin,
-                         height=self.height, width=1.6*self.height)
-            representation.logical_class = block_cls
-            shape = representation.getShape()
-            g <= shape
-            g <= svg.text(name, x=self.margin+5, y=i*(self.height+self.margin)+self.margin + self.height/1.5,
-                font_size=12, font_family='arial')
-
-            shape.bind('mousedown', bindFunc(i, representation))
-        diagram.canvas <= g
-
-    def onMouseDown(self, ev, index, representation):
-        diagram = self.diagram()
-        if diagram is None:
-            return
-        # Simply create a new block at the default position.
-        cls = type(representation)
-        instance = cls(x=300, y=300, height=self.height, width=int(1.6*self.height), diagram=self.diagram_id)
-        instance.logical_class = representation.logical_class
-        diagram.datastore.add(instance)
-        diagram.addBlock(instance)
 
 def createSvgButtonBar(canvas, icons, callbacks, hover_texts=None, x=0, y=0):
     # Count the buttons
@@ -717,6 +672,48 @@ class EditingModeWidget:
         self.diagram().changeFSM(None)
     def onConnectMode(self, ev):
         self.diagram().changeFSM(ConnectionEditor())
+
+
+class BlockCreateWidget:
+    height = 40
+    margin = 10
+    def __init__(self, diagram):
+        def bindFunc(index, representation):
+            """ Create a lambda function for creating a specific block type """
+            return lambda ev: self.onMouseDown(ev, index, representation)
+
+        self.diagram = ref(diagram)
+        self.diagram_id = diagram.diagram_id
+        blocks = {k: b for k, b in diagram.get_allowed_blocks().items() if not b.is_instance_of()}
+
+        g = svg.g()
+        # Draw the border of the widget
+        _ = g <= svg.rect(x=0, width=2*self.margin+1.6*self.height, y=0, height=len(blocks)*(self.height+self.margin)+self.margin,
+                      fill='white', stroke='black', stroke_width="2")
+        for i, (name, block_cls) in enumerate(blocks.items()):
+            repr_cls = block_cls.representation_cls()
+            console.log(f"Creating element of type {repr_cls.__name__} -- shape: {repr_cls.getShapeDescriptor()}")
+            representation = repr_cls(x=self.margin, y=i*(self.height+self.margin)+self.margin,
+                         height=self.height, width=1.6*self.height)
+            representation.logical_class = block_cls
+            shape = representation.getShape()
+            _ = g <= shape
+            _ = g <= svg.text(name, x=self.margin+5, y=i*(self.height+self.margin)+self.margin + self.height/1.5,
+                font_size=12, font_family='arial')
+
+            shape.bind('mousedown', bindFunc(i, representation))
+        _ = diagram.canvas <= g
+
+    def onMouseDown(self, ev, index, representation):
+        diagram = self.diagram()
+        if diagram is None:
+            return
+        # Simply create a new block at the default position.
+        cls = type(representation)
+        instance = cls(x=300, y=300, height=self.height, width=int(1.6*self.height), diagram=self.diagram_id)
+        instance.logical_class = representation.logical_class
+        diagram.datastore.add(instance)
+        diagram.addBlock(instance)
 
 
 def load_diagram(diagram_id, diagram_cls, config: DiagramConfiguration, datastore, canvas):

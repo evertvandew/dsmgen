@@ -1,11 +1,10 @@
 
-from typing import Any, Self, List, Dict, Optional, Self
-from dataclasses import dataclass, field, asdict
+from typing import Any, Self, List, Dict, Optional
+from dataclasses import dataclass, field
 import json
 from browser import svg, console
-from browser.widgets.dialog import Dialog, InfoDialog
-from diagrams import shapes, Shape, Relationship, CP, Point, Orientations, Diagram, getMousePos, DiagramConfiguration
-from data_store import DataStore, StorableElement, Collection, ReprCategory, from_dict, ExtendibleJsonEncoder
+from diagrams import shapes, Shape, Relationship, CP, Point, Orientations
+from data_store import StorableElement, Collection, ReprCategory, from_dict, ExtendibleJsonEncoder
 from point import load_waypoints
 
 
@@ -23,7 +22,7 @@ class DataConvertor:
 class EditableParameterDetails:
     """ Description for a parameter that can be edited for an element in a model item. """
     name: str
-    input_details: Dict[str, str]
+    type: type   # Key: value pairs used by the property_editor to create input fields.
     current_value: Any
     convertor: DataConvertor
 
@@ -42,123 +41,22 @@ class ModelEntity:
     def supports_ports(cls) -> bool:
         return False
 
-    def representation_cls(self) -> Shape | CP | Relationship:
+    def representation_cls(self) -> Optional[Shape | CP | Relationship]:
         """ Create a shape representing this model item. """
-        raise NotImplementedError()
+        return None
+
+    @classmethod
+    def get_allowed_ports(cls) -> List[Self]:
+        """ Determine which ports are allowed to be attached to a model entity """
+        return []
+
+    def get_instance_parameters(self) -> List[EditableParameterDetails]:
+        return []
 
 
 ###############################################################################
-## Diagrams and shapes
-class ModelledDiagram(Diagram):
-    def __init__(self, config: DiagramConfiguration, widgets, datastore: DataStore, diagram_id: int):
-        super().__init__(config, widgets)
-        self.datastore = datastore               # Interface for getting and storing diagram state
-        self.diagram_id = diagram_id
-
-        def representationAction(event, source, ds, details):
-            action, clsname, Id = event.split('/')
-            item = details['item']
-            if item.diagram != diagram_id:
-                return
-            item.updateShape(item.shape)
-
-        datastore and datastore.subscribe('*/*Representation/*', self, representationAction)
-
-    def load_diagram(self):
-        self.datastore.get_diagram_data(self.diagram_id, self.mass_update)
-
-    def mass_update(self, data):
-        """ Callback for loading an existing diagram """
-        # Ensure blocks are drawn before the connections.
-        for d in data:
-            if isinstance(d, shapes.Shape):
-                d.load(self)
-        # Now draw the connections
-        for d in data:
-            if isinstance(d, shapes.Relationship):
-                d.load(self)
-
-    def connect_specific(self, a, b, cls):
-        """ Use the information stored in the ModellingEntities to create the connection. """
-        # First create the model_entity for the connection.
-        connection = cls(source=a.model_entity, target=b.model_entity)
-        # Create the representation of the connection.
-        representation = ModeledRelationship(model_entity=connection, start=a, finish=b)
-        # Add the connection to the diagram & database
-        self.datastore and self.datastore.add(representation)
-        super().addConnection(representation)
-
-    def deleteConnection(self, connection):
-        if connection in self.connections:
-            self.datastore.delete(connection)
-            super().deleteConnection(connection)
-
-    def onDrop(self, ev):
-        """ Handler for the 'drop' event.
-            This function does some checks the block is valid and allowed to be dropped, then lets the
-            `addBlock` function do the rest of the work.
-        """
-        assert ev.dataTransfer
-        json_string = ev.dataTransfer.getData('entity')
-        if not json_string:
-            console.log('No data was submitted in the drop')
-            return
-        data = json.loads(json_string)
-        loc = getMousePos(ev)
-
-        # Create a representation for this block
-        cls_name = data['__classname__']
-        allowed_blocks = self.get_allowed_blocks(for_drop=True)
-        if cls_name not in allowed_blocks:
-            InfoDialog("Not allowed", f"A {cls_name} can not be used in this diagram.", ok="Got it")
-            return
-
-        block_cls = allowed_blocks[data['__classname__']]
-        repr_cls = self.config.get_repr_for_drop(block_cls)
-        default_style = repr_cls.getDefaultStyle()
-        drop_details = dict(
-            x=loc.x, y=loc.y,
-            width=int(default_style.get('width', 64)), height=int(default_style.get('height', 40)),
-            diagram=self.diagram_id,
-            block=data['Id']
-        )
-        block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details)
-        if not block:
-            return
-
-        # Add the block to the diagram
-        self.addBlock(block)
-
-
-    def deleteBlock(self, block):
-        self.datastore.delete(block)
-        super().deleteBlock(block)
-
-    def mouseDownChild(self, widget, ev):
-        def uf(new_data):
-            # Store the existing values to see if anything actually changed.
-            old_values = asdict(widget)
-            widget.update(new_data)
-            # Inform the datastore of any change
-            self.datastore and self.datastore.update(widget)
-
-        super().mouseDownChild(widget, ev, uf)
-
-    def mouseDownConnection(self, connection, ev):
-        def uf(new_data):
-            # Store the existing values to see if anything actually changed.
-            connection.update(new_data)
-            # Inform the datastore of any change
-            self.datastore and self.datastore.update(connection)
-        super().mouseDownConnection(connection, ev, uf)
-
-    def trigger_event(self, widget, event_name, event_detail):
-        super().trigger_event(widget, event_name, event_detail)
-        self.datastore and self.datastore.trigger_event(event_name, widget, **event_detail)
-
-
 @dataclass
-class ShapeWithText(Shape, StorableElement):
+class ModeledShape(Shape, StorableElement):
     model_entity: ModelEntity = None
     diagram: int = 0
     parent: Optional[int] = None
@@ -176,8 +74,8 @@ class ShapeWithText(Shape, StorableElement):
         # This shape consists of two parts: the text and the outline.
         shape_type = self.getShapeDescriptor()
         g = svg.g()
-        g <= shape_type.getShape(self)
-        g <= self.TextWidget.getShape(self)
+        _ = g <= shape_type.getShape(self)
+        _ = g <= self.TextWidget.getShape(self)
         return g
 
     def updateShape(self, shape):
@@ -208,6 +106,9 @@ class ShapeWithText(Shape, StorableElement):
     @classmethod
     def get_collection(cls) -> Collection:
         return Collection.block_repr
+
+    def get_editable_parameters(self):
+        return self.model_entity.get_editable_parameters()
 
 @dataclass
 class Port(CP, StorableElement):
@@ -242,7 +143,7 @@ class Port(CP, StorableElement):
         return ReprCategory.port
 
 @dataclass
-class ShapeWithTextAndPorts(ShapeWithText):
+class ModeledShapeAndPorts(ModeledShape):
     ports: List[Port] = field(default_factory=list)
     children: [Self] = field(default_factory=list)
 
@@ -272,9 +173,9 @@ class ShapeWithTextAndPorts(ShapeWithText):
         # Add the core rectangle
         shape_type = self.getShapeDescriptor()
         console.log(f'Getting shape for {shape_type} {self}')
-        g <= shape_type.getShape(self)
+        _ = g <= shape_type.getShape(self)
         # Add the text
-        g <= self.TextWidget.getShape(self)
+        _ = g <= self.TextWidget.getShape(self)
         # Add the ports
         port_shape_lookup = {}      # A lookup for when the port is clicked.
         sorted_ports = {orientation: sorted([p for p in self.ports if p.orientation == orientation], key=lambda x: x.order) \
@@ -286,7 +187,7 @@ class ShapeWithTextAndPorts(ShapeWithText):
             for i, p in enumerate(ports):
                 p.pos = pos_func(i)
                 s = p.getShape()
-                g <= s
+                _ = g <= s
                 port_shape_lookup[s] = p
         self.port_shape_lookup = port_shape_lookup
 
@@ -320,7 +221,7 @@ class ShapeWithTextAndPorts(ShapeWithText):
                     p.updateShape(shape_lookup[p.id])
                 else:
                     s = p.getShape()
-                    shape <= s
+                    _ = shape <= s
                     self.port_shape_lookup[s] = p
 
     def getConnectionTarget(self, ev):
@@ -348,6 +249,8 @@ class ShapeWithTextAndPorts(ShapeWithText):
 
 @dataclass
 class ModeledRelationship(Relationship, StorableElement):
+    start: ModeledShape = None
+    finish: ModeledShape = None
     model_entity: Optional[ModelEntity] = None
     diagram: int = 0
 

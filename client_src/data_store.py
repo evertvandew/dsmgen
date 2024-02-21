@@ -358,6 +358,8 @@ class DataStore(EventDispatcher):
                 for p in [r for r in representations if r.repr_category() == ReprCategory.port]:
                     block = cp_lu[p.parent]
                     block.ports.append(p)
+                    block.model_entity.ports.append(p.model_entity)
+                    self.update_cache(block.model_entity)
                     cp_lu[p.Id] = p
 
                 # Then handle the relationships
