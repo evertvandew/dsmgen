@@ -3,12 +3,12 @@ from browser.widgets.dialog import Dialog, EntryDialog, InfoDialog
 import enum
 import diagrams
 from dataclasses import fields, MISSING, dataclass, Field
-from typing import Hashable, Dict, Any
+from typing import Hashable, Dict, Any, List, Optional
 import json
 from svg_shapes import HAlign, VAlign
 from shapes import HIDDEN
 from data_store import DataStore, ExtendibleJsonEncoder, parameter_spec, parameter_values
-from modeled_shape import ModeledShape, ModelEntity
+from modeled_shape import ModeledShape, ModelEntity, EditableParameterDetails
 
 #diagrams.createDiagram("canvas");
 
@@ -280,12 +280,10 @@ def createPortEditor(o, field, port_types, data_store: DataStore):
     return div
 
 
-def dataClassEditorForm(o: ModelEntity, data_store: DataStore, default=None, update=None):
+def dataClassEditorForm(o: ModelEntity, editable_fields: List[EditableParameterDetails], data_store: DataStore):
     """ Return a form for editing the values in a data object, without buttons. """
     # Use the annotations to create the properties editor
     form = html.FORM()
-
-    editable_fields = o.get_editable_parameters()
 
     for field in editable_fields:
         label = html.LABEL(field.name)
@@ -293,20 +291,6 @@ def dataClassEditorForm(o: ModelEntity, data_store: DataStore, default=None, upd
         _ = form <= label
         _ = form <= getInputForField(o, field)
         _ = form <= html.BR()
-
-    # Instances of other blocks need to go to the definition to determine what parameters to edit
-    # Determine which parameters to edit and what types they have.
-    result = o.get_instance_parameters()
-    if result:
-        # In an Instance we can not edit the ports
-        edit_ports = False
-        names, types, values = result
-        for n, t, v in zip(names, types, values):
-            label = html.LABEL(n)
-            label.className = "col-sm-3 col-form-label"
-            _ = form <= label
-            _ = form <= getInputForValue(n, t, v)
-            _ = form <= html.BR()
 
     port_types = o.get_allowed_ports()
     if port_types:
@@ -328,18 +312,17 @@ def stylingEditorForm(o: ModeledShape):
             _ = form <= html.BR()
     return form
 
-def getFormValues(form, objecttype):
+def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[EditableParameterDetails]):
     """ Returns a dictionary with the current values in the form edits. """
     console.log(f"Form: {form}")
-    editable_fields = select_editable_fields(objecttype)
     update_data = {}
     for field in editable_fields:
         # Use the standard constructor for the type to do the conversion
         constructor = type2Constructor(field.type)
         update_data[field.name] = constructor(form.select_one(f'#edit_{field.name}').value)
 
-    if isStylable(objecttype):
-        defaults = objecttype.getDefaultStyle()
+    if isStylable(o):
+        defaults = o.getDefaultStyle()
         new_style = {key: createFromValue(type(default))(document[f'styling_{key}'].value) for key, default in defaults.items()}
         update_data['styling'] = new_style
 
@@ -348,15 +331,18 @@ def getFormValues(form, objecttype):
 
 # Add the logic to edit parameters
 # When a block is selected, the canvas throws an event with the details
-def dataClassEditor(objecttype, data_store: DataStore, defaults=None, update=None):
-    o = None if isinstance(objecttype, type) else objecttype
-    objecttype = objecttype if isinstance(objecttype, type) else type(objecttype)
-    form = dataClassEditorForm(o, data_store, default=defaults, update=update)
+def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameterDetails], data_store: DataStore, update=None):
+    """ Create a detail-editor, with a save button for the user to click..
+        o: Optional object with the current values of the fields.
+        parameters: List of descriptors of all the fields.
+        data_store: REST api client that persists the object being edited / created.
+    """
+    form = dataClassEditorForm(o, parameters, data_store)
     # Add a SAVE button
     def onSave(_):
         # Because this is a Closure, we can use the captured variables
         # Get the new values for the editable fields
-        update_data = getFormValues(form, objecttype)
+        update_data = getFormValues(form, o, parameters)
         if callable(update):
             update(json.dumps(update_data, cls=ExtendibleJsonEncoder))
 

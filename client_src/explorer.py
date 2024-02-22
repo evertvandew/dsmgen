@@ -2,12 +2,13 @@
 from browser import html, console, bind, document
 from browser.widgets.dialog import Dialog, EntryDialog, InfoDialog
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Type
 from dataclasses import asdict
 from data_store import DataStore, ExtendibleJsonEncoder
 import json
 
 from property_editor import dataClassEditorForm, getFormValues
+from modeled_shape import ModelEntity
 
 line_cls = 'eline'
 name_cls = 'ename'
@@ -125,12 +126,13 @@ def make_explorer(holder, api: DataStore, allowed_children):
                     span.html = format_name(data)
                 d.close()
 
-        def on_add(ev, etype, parent):
+        def on_add(ev, etype: Type[ModelEntity], parent):
             ev.stopPropagation()
             ev.preventDefault()
             document[context_menu_name].close()
+            default_obj = etype()
             d = Dialog(f'Add {etype.__name__}', ok_cancel=True)
-            d.panel <= dataClassEditorForm(None, etype, api)
+            d.panel <= dataClassEditorForm(None, default_obj.get_editable_parameters(), api)
 
             @bind(d.ok_button, 'click')
             def on_ok(ev):

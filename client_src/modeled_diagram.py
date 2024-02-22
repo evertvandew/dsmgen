@@ -2,6 +2,8 @@
 import json
 from typing import Dict, Type
 from weakref import ref
+
+import data_store
 from browser import console, svg
 from browser.widgets.dialog import InfoDialog
 from diagrams import Diagram, getMousePos, DiagramConfiguration
@@ -72,19 +74,18 @@ class ModeledDiagram(Diagram):
 
         # Create a representation for this block
         cls_name = data['__classname__']
-        allowed_blocks = self.get_allowed_blocks(cls_name, for_drop=True)
+        allowed_blocks = self.get_allowed_blocks(for_drop=True)
         if cls_name not in allowed_blocks:
             InfoDialog("Not allowed", f"A {cls_name} can not be used in this diagram.", ok="Got it")
             return
 
         block_cls = allowed_blocks[data['__classname__']]
-        repr_cls = block_cls.representation_cls()
+        repr_cls = block_cls.get_representation_cls()
         default_style = repr_cls.getDefaultStyle()
         drop_details = dict(
             x=loc.x, y=loc.y,
             width=int(default_style.get('width', 64)), height=int(default_style.get('height', 40)),
             diagram=self.diagram_id,
-            block=data['Id']
         )
         block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details)
         if not block:
@@ -111,7 +112,8 @@ class ModeledDiagram(Diagram):
     def mouseDownConnection(self, connection, ev):
         def uf(new_data):
             # Store the existing values to see if anything actually changed.
-            connection.update(new_data)
+            data = json.loads(new_data)
+            connection.model_entity.update(data)
             # Inform the datastore of any change
             self.datastore and self.datastore.update(connection)
         super().mouseDownConnection(connection, ev, uf)

@@ -470,7 +470,7 @@ class Diagram(OwnerInterface):
         return connection
 
     def connect(self, a, b):
-        ta, tb = a.getEntityForConnection(), b.getEntityForConnection()
+        ta, tb = type(a.model_entity), type(b.model_entity)
         clss = self.config.get_allowed_connections(ta, tb) + self.config.get_allowed_connections(ta, Any)
         if not clss:
             d = InfoDialog('Can not connect', f"A {type(a).__name__} can not be connected to a {type(b).__name__}")
@@ -691,7 +691,8 @@ class BlockCreateWidget:
         _ = g <= svg.rect(x=0, width=2*self.margin+1.6*self.height, y=0, height=len(blocks)*(self.height+self.margin)+self.margin,
                       fill='white', stroke='black', stroke_width="2")
         for i, (name, block_cls) in enumerate(blocks.items()):
-            repr_cls = block_cls.representation_cls()
+            entity = block_cls()
+            repr_cls = entity.get_representation_cls()
             console.log(f"Creating element of type {repr_cls.__name__} -- shape: {repr_cls.getShapeDescriptor()}")
             representation = repr_cls(x=self.margin, y=i*(self.height+self.margin)+self.margin,
                          height=self.height, width=1.6*self.height)

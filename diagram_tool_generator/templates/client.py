@@ -21,7 +21,7 @@ from browser import document, console, html, svg, bind, ajax
 import json
 from explorer import Element, make_explorer, context_menu_name
 from dataclasses import dataclass, field, is_dataclass, asdict, fields
-from typing import Self, List, Dict, Any, Callable, Type
+from typing import Self, List, Dict, Any, Callable, Type, Optional
 from collections.abc import Iterable
 import typing
 import types
@@ -32,9 +32,10 @@ import modeled_shape as ms
 import diagrams
 import shapes
 from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, parameter_values, stylingEditorForm
-from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder, Collection, StorableElement
+from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder, Collection, StorableElement, from_dict
 from svg_shapes import getMarkerDefinitions
 from tab_view import TabView
+from point import load_waypoints
 
 
 def resolve(name: str) -> Type[ms.ModelEntity]:
@@ -61,9 +62,28 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     % if generator.md.is_instance_of(entity):
     parameters: parameter_values = field(default_factory=dict)
     % endif
-    % if generator.get_allowed_ports().get(entity.__name__, []):
+    % if generator.get_allowed_ports().get(entity.__name__, []) or generator.md.is_instance_of(entity):
     ports: List[ms.ModelEntity] = field(default_factory=list)
     %endif
+
+    def __eq__(self, other) -> bool:
+        if type(self) != type(other):
+            return False
+        return (
+        %for f in fields(entity):
+            self.${f.name} == other.${f.name} and
+        %endfor
+        %if generator.md.is_port(entity):
+            self.orientation == other.orientation and
+        %endif
+        %if not generator.md.is_relationship(entity):
+            self.order == other.order and
+        %endif
+        %if generator.md.is_instance_of(entity):
+            self.parameters == other.parameters and
+        %endif
+            self.Id == other.Id
+        )
 
     def get_icon(self):
         return "${generator.md.get_style(entity, 'icon', 'folder')}"
@@ -112,7 +132,7 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
     %if generator.md.is_representable(entity):
     @classmethod
-    def representation_cls(cls) -> ms.ModeledShape | ms.ModeledShapeAndPorts | ms.Port | ms.ModeledRelationship:
+    def get_representation_cls(cls) -> Optional[ms.ModeledShape | ms.ModeledShapeAndPorts | ms.Port | ms.ModeledRelationship]:
     %if generator.md.is_relationship(entity):
         return ms.ModeledRelationship
     %elif generator.md.is_port(entity):
@@ -127,7 +147,7 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
     def get_editable_parameters(self) -> List[ms.EditableParameterDetails]:
         return [
-        %for f in [f for f in fields(entity) if f.name not in ['parent', 'Id', 'ports', 'children']]:
+        %for f in [f for f in fields(entity) if f.name not in ['parent', 'Id', 'ports', 'children', 'source', 'target']]:
             ms.EditableParameterDetails("${f.name}", ${generator.get_html_type(f.type)}, self.${f.name}, ${generator.get_html_type(f.type)}),
         %endfor
         ]
@@ -143,6 +163,14 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         del details['source']
         del details['target']
         return details
+
+    @classmethod
+    def from_dict(cls, data_store: DataStore, **details) -> Self:
+        self = from_dict(cls, **details)
+        # Connections always connect to two blocks. Ports are also represented as blocks for this exact purpose.
+        self.source = data_store.get(Collection.block, details['source'])
+        self.target = data_store.get(Collection.block, details['target'])
+        return self
     %endif
 
 % endfor
@@ -169,6 +197,9 @@ class PortLabel(ms.ModeledShape):
     @classmethod
     def is_instance_of(cls):
         return False
+
+    def get_representation_cls(self) -> Optional[ms.ModeledShape | ms.ModeledShapeAndPorts | ms.Port | ms.ModeledRelationship]:
+        return ms.ModeledShape
 
 
 allowed_children = {
@@ -253,7 +284,7 @@ def on_diagram_selection(_e_name, _e_source, data_store, details):
     properties_div = document['details']
     for e in properties_div.children:
         e.remove()
-    _ = properties_div <= dataClassEditor(model, data_store, update=update)
+    _ = properties_div <= dataClassEditor(model, model.get_editable_parameters(), data_store, update=update)
     _ = properties_div <= stylingEditorForm(repr)
 
 
@@ -266,13 +297,13 @@ def on_explorer_click(_event_name, _event_source, data_store, details):
 
     target_dbid = details['target_dbid']
     target_type: str = details['target_type']
-    data_element = details['data_element']
+    data_element: ms.ModelEntity = details['data_element']
     update = details.get('update', False) or datastore_update
     console.log(f"Clicked on element {target_dbid}")
     properties_div = document['details']
     for e in properties_div.children:
         e.remove()
-    properties_div <= dataClassEditor(data_element, data_store, update=update)
+    properties_div <= dataClassEditor(data_element, data_element.get_editable_parameters(), data_store, update=update)
 
 
 

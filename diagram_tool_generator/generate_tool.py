@@ -109,7 +109,7 @@ class Generator:
             for p in self.get_inner_types(cls, e.__annotations__['definition']):
                 allowed_blocks[p] = e.__name__
 
-        block_names = [f'"{e.__name__}": {s}' for e, s in allowed_blocks.items()]
+        block_names = [f'"{e.__name__}": "{s}"' for e, s in allowed_blocks.items()]
         return block_names
 
     def get_allowed_creates(self, cls):

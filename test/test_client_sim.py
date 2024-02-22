@@ -95,7 +95,7 @@ port2port = [
      },
     {"Id": 52, "diagram": 3, "block": 11, "parent": 3, "__classname__": "_BlockRepresentation",
      "block_cls": "Port",
-     "_entity": {"Id": 10, "parent": 7, "__classname__": "FlowPort"}
+     "_entity": {"Id": 11, "parent": 7, "__classname__": "FlowPort"}
      },
     {"Id": 1, "diagram": 3, "relationship": 1, "source_repr_id": 51, "target_repr_id": 52, "routing": "[]",
      "z": 0.0, "styling": {}, "rel_cls": "ModeledRelationship",
@@ -145,7 +145,8 @@ def simulated_diagram_tests():
 
     @test
     def create_and_move_block():
-        def create_and_move(instance):
+        def create_and_move(model_entity: client.ms.ModelEntity, **repr_details):
+            instance = model_entity.get_representation_cls()(model_entity=model_entity, **repr_details)
             old_nr_children = len(diagram.children)
             diagram.addBlock(instance)
             assert len(diagram.children) == old_nr_children + 1
@@ -160,22 +161,24 @@ def simulated_diagram_tests():
 
         # Do a normal block
         diagram, rest = new_diagram(1, MagicMock())
-        create_and_move(client.BlockRepresentation(name='', x=300, y=300, height=64, width=100, block=1, Id=1))
+        create_and_move(client.Block(name='', Id=1), x=300, y=300, height=64, width=100, Id=1)
 
         # Add a port label representation
-        create_and_move(client.PortLabel(name='', x=300, y=300, height=64, width=100, block=1, Id=1))
+        create_and_move(client.PortLabel(name='', Id=1), x=300, y=300, height=64, width=100, Id=1)
 
         # Add a SubprogramDefinition
-        create_and_move(client.SubProgramDefinitionRepresentation(name='', x=300, y=300, height=64, width=100, block=1, Id=1))
+        create_and_move(client.SubProgramDefinition(name='', Id=1), x=300, y=300, height=64, width=100, Id=1)
 
     @test
     def create_connect_blocks():
         # Connect two PortLabels: an input and an output.
         diagram, rest = new_diagram(1, MagicMock())
-        input = client.PortLabel(name='Input', x=100, y=300, height=64, width=100, block=1, Id=1)
-        output = client.PortLabel(name='Output', x=400, y=300, height=64, width=100, block=1, Id=1)
-        input.logical_class = client.FlowPort
-        output.logical_class = client.FlowPort
+        entity = client.Block(Id=1, name='block')
+        p1 = client.FlowPort(Id=2, parent=1, name='Input')
+        p2 = client.FlowPort(Id=3, parent=1, name='Output')
+        input = client.PortLabel(model_entity=p1, x=100, y=300, height=64, width=100, Id=10)
+        output =client.PortLabel(model_entity=p2, x=400, y=300, height=64, width=100, Id=11)
+
         diagram.addBlock(input)
         diagram.addBlock(output)
         diagram.changeFSM(diagrams.ConnectionEditor())
@@ -185,9 +188,9 @@ def simulated_diagram_tests():
         output.shape.dispatchEvent(events.MouseUp())
         assert len(diagram.connections) == 1
         conn = diagram.connections[0]
-        assert type(conn).__name__ == 'FlowPortConnectionRepresentation'
-        assert conn.start.id == 10
-        assert conn.finish.id == 11
+        assert type(conn.model_entity).__name__ == 'FlowPortConnection'
+        assert conn.start.Id == 10
+        assert conn.finish.Id == 11
 
 
     @test
@@ -224,9 +227,9 @@ def simulated_diagram_tests():
         diagram.canvas.dispatchEvent(events.DragEnd(dataTransfer=ev.dataTransfer))
         assert diagram.children
         repr = diagram.children[0]
-        assert repr.name == 'One'
+        assert repr.model_entity.name == 'One'
         assert repr.diagram == 5
-        assert repr.block == 123
+        assert repr.model_entity.Id == 123
         assert repr.Id == 400
         assert not unexpected_requests
 
@@ -295,9 +298,9 @@ def simulated_diagram_tests():
 
         # Check the various elements were rendered to the DOM
         nonlocal d
-        assert len(d['canvas'].select('[data-class="NoteRepresentation"]')) == 1
-        assert len(d['canvas'].select('[data-class="BlockRepresentation"]')) == 2
-        assert len(d['canvas'].select('[data-class="FlowPortRepresentation"]')) == 1
+        assert len(d['canvas'].select('[data-class="ModeledShapeAndPorts"]')) == 2
+        assert len(d['canvas'].select('[data-class="ModeledShape"]')) == 1
+        assert len(d['canvas'].select('[data-class="Port"]')) == 1
 
     @test
     def connection_property_editor():
@@ -315,16 +318,15 @@ def simulated_diagram_tests():
         assert not unexpected_requests
         nonlocal d
         form = d.select('form')
-        assert len(form) == 1
+        assert len(form) == 2
         html_form = str(form)
-        assert 'name' in html_form
-        assert 'linecolor' in html_form
+        assert d.select('#edit_name')
+        assert d.select('#styling_linecolor')
         edit = d.select_one('form #edit_name')
         edit.value = 'Connection'
         btn = d.select_one('#details .btn-primary')
 
         add_expected_response('/data/FlowPortConnection/1', 'post', Response(200, json={}))
-        add_expected_response('/data/_RelationshipRepresentation/1', 'post', Response(200, json={}))
         btn.dispatchEvent(events.Click())
 
         live_instance = ds.get(Collection.relation, 1)
@@ -407,7 +409,7 @@ def simulated_diagram_tests():
         assert diagram.children
         repr = diagram.children[0]
         assert repr.diagram == 5
-        assert repr.block == 123
+        assert repr.model_entity.Id == 123
         assert repr.Id == 400
         assert not unexpected_requests
         # TODO: Check the parameters are presented in the details editor.
@@ -429,16 +431,18 @@ def simulated_diagram_tests():
         assert not unexpected_requests
         nonlocal d
         form = d.select('form')
-        assert len(form) == 1
+        assert len(form) == 2
         html_form = str(form)
-        assert len(d.select('#edit_gain')) == 0
-        assert 'factor' in html_form
-        assert 'TR' not in html_form            # There must be no editor for ports.
+        # There should be edit fields for the gain and the factor parameters, as specified in the parameter definitions.
+        assert d.select('#edit_gain')
+        assert d.select('#edit_factor')
+        assert not d.select('form TR')            # There must be no editor for ports.
         # Check there is no editing of the fields in the Definition
         assert len(d.select('#edit_parameters')) == 0
         assert len(d.select('#edit_description')) == 0
         assert len(d.select('#edit_name')) == 0
-        assert 'blockcolor' in html_form
+        # It should be possible to edit the styling of the block.
+        assert d.select('#styling_blockcolor')
 
         assert not unexpected_requests
         assert len(expected_responses) == 0
@@ -641,4 +645,5 @@ def simulated_explorer_tests():
 
 
 if __name__ == '__main__':
-    run_tests('*.block_property_editor')
+    run_tests('*.block_properties_editor_instance')
+    run_tests()

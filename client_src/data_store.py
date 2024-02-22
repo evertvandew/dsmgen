@@ -57,7 +57,7 @@ class StorableElement:
     def get_collection(cls):
         raise NotImplementedError()
     @classmethod
-    def from_dict(cls, **details) -> Self:
+    def from_dict(cls, data_store: "DataStore", **details) -> Self:
         """ Construct an instance of this class from a dictionary of key:value pairs. """
         return from_dict(cls, **details)
     @classmethod
@@ -65,8 +65,10 @@ class StorableElement:
         """ Return the dataclasses.Field instances for each element that needs to be stored in the DB """
         # The default implementation uses dataclasses.fields
         return fields(cls)
-    def asdict(self) -> Dict[str, Any]:
-        result = {k.name: self.__dict__[k.name] for k in fields(self)}
+    def asdict(self, ignore: List[str]=None) -> Dict[str, Any]:
+        ignore = ignore or []   # Use a safe default value for the ignore argument
+        keys = [f.name for f in fields(self) if f.name not in ignore]
+        result = {k: self.__dict__[k] for k in keys}
         result['__classname__'] = type(self).__name__
         return result
 
@@ -237,7 +239,7 @@ class DataStore(EventDispatcher):
             org_model = self.shadow_copy[Collection.oppose(collection)][model.Id]
             if model != org_model:
                 self.update(model)
-            changed = any(getattr(org_repr, k) != v for k, v in repr.items() if hasattr(org_repr, k) and k != 'ports')
+            changed = any(getattr(org_repr, k) != v for k, v in repr.items() if hasattr(org_repr, k) and k not in ['ports', 'model_entity'])
             if collection == Collection.relation_repr:
                 changed = changed or org_repr.waypoints != record.waypoints
             if changed:
@@ -342,42 +344,42 @@ class DataStore(EventDispatcher):
 
                 representations = []
                 # Reconstruct all representations and cache them.
-                for d in response.json:
-                    entity = self.decode_representation(d)
-                    representations.append(entity)
+                # Do blocks first, then ports, then represations.
+                class repr_class(IntEnum):
+                    block = auto()
+                    port = auto()
+                    rel = auto()
+
+                def classify_representation(data: Dict[str, Any]) -> repr_class:
+                    if 'rel_cls' in data:
+                        return repr_class.rel
+                    elif data.get('block_cls', '') == 'Port':
+                        return repr_class.port
+                    return repr_class.block
+                def filter_reprs(reprs, c: repr_class):
+                    for r in reprs:
+                        if classify_representation(r) == c:
+                            yield r
+
+                for filter in [repr_class.block, repr_class.port, repr_class.rel]:
+                    for d in filter_reprs(response.json, filter):
+                        entity = self.decode_representation(d)
+                        representations.append(entity)
 
                 # All blocks are yielded to the diagram
                 records.extend(r for r in representations if r.repr_category() == ReprCategory.block)
-                # A lookup of connection points is make for connecting them.
-                # Ports and Blocks are stored in the same table, so Id's are unique.
-                # The cache is not used for lookup, as those hold COPIES of the connection points for
-                # detecting changes.
-                cp_lu = {r.Id: r for r in records}
 
                 # Ports are not yielded directly to the diagram, they are added to the block that owns them.
                 for p in [r for r in representations if r.repr_category() == ReprCategory.port]:
-                    block = cp_lu[p.parent]
+                    block = self.get(Collection.block_repr, p.parent)
                     block.ports.append(p)
                     block.model_entity.ports.append(p.model_entity)
-                    self.update_cache(block.model_entity)
-                    cp_lu[p.Id] = p
+                    self.update_cache([block, block.model_entity])
 
                 # Then handle the relationships
                 for d in [r for r in representations if r.repr_category() == ReprCategory.relationship]:
-                    # Some underlying data needs to be reconstructed
-                    # The connection expects actual blocks as start and finish, not their ID.
-                    # First check they actually exist.
-                    if d.start not in cp_lu or d.finish not in cp_lu:
-                        console.log(f"Could not find the blocks for connection {d}")
-                        # Delete the faulty connection.
-                        self.delete(d)
-                        continue
-                    d.start = cp_lu[d.start]
-                    d.finish = cp_lu[d.finish]
                     records.append(d)
 
-                for r in records:
-                    self.update_cache(r)
                 cb(records)
 
         ajax.get(f'/data/diagram_contents/{diagram_id}', mode='json', oncomplete=on_data)
@@ -401,17 +403,20 @@ class DataStore(EventDispatcher):
         """ Create a representation object out of a data dictionary """
         model_cls = self.all_classes[data['_entity']['__classname__']]
         details = data['_entity'].copy()
-        model_instance = self.update_cache(model_cls.from_dict(**details))
-
-        representation_cls = model_instance.representation_cls()
-        return representation_cls.from_dict(model_entity=model_instance, **data)
+        model_instance = self.update_cache(model_cls.from_dict(self, **details))
+        if 'children' in data:
+            data['children'] = [self.decode_representation(ch) for ch in data.get('children', [])]
+        representation_cls = model_instance.get_representation_cls()
+        repr = representation_cls.from_dict(self, model_entity=model_instance, **data)
+        self.update_cache(repr)
+        return repr
 
     def make_objects(self, data: JsonResponse) -> List[StorableElement]:
         """ Turn a set of data into objects, ensuring all the types are correct """
         records = []
         for d in data.json:
             cls = self.all_classes[d['__classname__']]
-            records.append(cls.from_dict(**d))
+            records.append(cls.from_dict(self, **d))
         return records
 
     def update_cache(self, records: List[StorableElement] | StorableElement):
@@ -440,7 +445,6 @@ class DataStore(EventDispatcher):
 
     def split_representation_item(self, collection, record) -> (Dict, StorableElement):
         repr = record.asdict()
-        del repr['model_entity']
         return repr, record.model_entity
 
     def get_instance_parameters(self, instance_representation: Any) -> Optional[Tuple[str, type, Any]]:

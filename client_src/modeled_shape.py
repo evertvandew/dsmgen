@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import json
 from browser import svg, console
 from diagrams import shapes, Shape, Relationship, CP, Point, Orientations
-from data_store import StorableElement, Collection, ReprCategory, from_dict, ExtendibleJsonEncoder
+from data_store import StorableElement, Collection, ReprCategory, from_dict, ExtendibleJsonEncoder, DataStore
 from point import load_waypoints
 
 
@@ -35,13 +35,15 @@ class ModelEntity:
     def get_nr_texts(self) -> int:
         """ Ask how many texts this item wants to display """
         return 1
+
     def get_editable_parameters(self) -> List[EditableParameterDetails]:
         return []
     @classmethod
     def supports_ports(cls) -> bool:
         return False
 
-    def representation_cls(self) -> Optional[Shape | CP | Relationship]:
+    @classmethod
+    def get_representation_cls(cls) -> Optional[Shape | CP | Relationship]:
         """ Create a shape representing this model item. """
         return None
 
@@ -52,6 +54,10 @@ class ModelEntity:
 
     def get_instance_parameters(self) -> List[EditableParameterDetails]:
         return []
+
+    def update(self, data: Dict[str, Any]):
+        for k, v in data.items():
+            setattr(self, k, v)
 
 
 ###############################################################################
@@ -65,9 +71,10 @@ class ModeledShape(Shape, StorableElement):
     TextWidget = shapes.Text('description')
 
     def asdict(self) -> Dict[str, Any]:
-        details = StorableElement.asdict(self)
+        details = StorableElement.asdict(self, ignore=['model_entity', 'ports'])
         details['block'] = self.model_entity.Id
-        del details['children']
+        if 'children' in details:
+            del details['children']
         return details
 
     def getShape(self):
@@ -149,7 +156,6 @@ class ModeledShapeAndPorts(ModeledShape):
 
     def asdict(self) -> Dict[str, Any]:
         details = super().asdict()
-        del details['ports']
         return details
 
     @classmethod
@@ -255,10 +261,10 @@ class ModeledRelationship(Relationship, StorableElement):
     diagram: int = 0
 
     @staticmethod
-    def from_dict(**details) -> Self:
+    def from_dict(data_store: DataStore, **details) -> Self:
         self = from_dict(ModeledRelationship, **details)
-        self.start = details['source_repr_id']  # Needs to be replaced with the actual object later
-        self.finish = details['target_repr_id']  # Needs to be replaced with the actual object later
+        self.start = data_store.get(Collection.block_repr, details['source_repr_id'])
+        self.finish = data_store.get(Collection.block_repr, details['target_repr_id'])
         self.waypoints = load_waypoints(details['routing'])
         return self
 
