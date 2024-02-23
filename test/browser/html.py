@@ -333,7 +333,8 @@ class tag:
     def remove(self):
         # Unlink this element from the document DOM.
         if self.parent:
-            self.parent.children.remove(self)
+            while self in self.parent.children:
+                self.parent.children.remove(self)
 
     def select(self, key):
         return self.get(selector=key)

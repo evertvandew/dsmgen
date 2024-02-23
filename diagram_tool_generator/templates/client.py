@@ -13,7 +13,7 @@ import svg_shapes
 """
 
 import model_definition as mdef
-from model_definition import fields, is_dataclass
+from model_definition import fields, is_dataclass, parameter_spec
 
 %>
 
@@ -108,8 +108,13 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         % if generator.md.is_instance_of(entity):
         return True
 
-    def get_definition(self) -> int:
-        return self.definition
+    @classmethod
+    def from_dict(cls, data_store: DataStore, **details) -> Self:
+        self = from_dict(cls, **details)
+        if self.definition:
+            self.definition = data_store.get(Collection.block, self.definition)
+        return self
+
         %else:
         return False
         %endif
@@ -145,12 +150,31 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
     %endif
 
+
+    def get_parameter_spec_fields(self) -> Dict[str, type]:
+        return getattr(self, "${generator.get_spec_fields(entity)}")
+
     def get_editable_parameters(self) -> List[ms.EditableParameterDetails]:
-        return [
-        %for f in [f for f in fields(entity) if f.name not in ['parent', 'Id', 'ports', 'children', 'source', 'target']]:
+        regular_parameters = [
+        %for f in [f for f in fields(entity) if f.name not in ['parent', 'Id', 'ports', 'children', 'source', 'target', 'definition']]:
             ms.EditableParameterDetails("${f.name}", ${generator.get_html_type(f.type)}, self.${f.name}, ${generator.get_html_type(f.type)}),
         %endfor
         ]
+        %if generator.md.is_instance_of(entity):
+        if not self.definition:
+            return regular_parameters
+        field_specs = self.definition.get_parameter_spec_fields()
+        if not field_specs:
+            return regular_parameters
+        if isinstance(field_specs, str):
+            field_specs = dict(name_type.split(':') for name_type in field_specs.split(','))
+        keys_types = [(k, eval(t)) for k, t in field_specs.items()]
+        regular_parameters += [
+            ms.EditableParameterDetails(key, type_, self.parameters.get(key, ''), type_)
+            for key, type_ in keys_types
+        ]
+        %endif
+        return regular_parameters
 
     %if generator.md.is_relationship(entity):
     def asdict(self) -> Dict[str, Any]:
@@ -282,8 +306,7 @@ def on_diagram_selection(_e_name, _e_source, data_store, details):
     model: ms.ModelEntity = repr.model_entity
 
     properties_div = document['details']
-    for e in properties_div.children:
-        e.remove()
+    properties_div.children = []
     _ = properties_div <= dataClassEditor(model, model.get_editable_parameters(), data_store, update=update)
     _ = properties_div <= stylingEditorForm(repr)
 

@@ -15,6 +15,7 @@
   - For now, except the sequence diagram because it requires laneing support.
 
 # Refactoring
+* Rename fields used for internal purposes with underscores so there can be no clashes with user-named fields.
 * Refactor the typing system in the specification files, so that it is class-based for all types with
   simple functions to determine concrete types in various contexts, conversions between them and default values.
 * Make parts in the model definition that are used in generating the tool, parts of the decorator call

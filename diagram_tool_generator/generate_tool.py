@@ -202,6 +202,13 @@ class Generator:
 
         return [get_type(field_type)]
 
+    def get_spec_fields(self, entity):
+        spec_fields = [f.name for f in fields(entity) if mdef.parameter_spec in self.get_inner_types(entity, f.type)]
+        # Produce an error during code generation.
+        assert len(spec_fields) <= 1, f"Currently, only a single parameter spec is supported. Entity: {entity.__name__}"
+        spec_fields = ', '.join(spec_fields)
+        return spec_fields
+
     def determine_dependencies(self, all_names):
         xrefs = {}
 

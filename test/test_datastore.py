@@ -128,7 +128,7 @@ def data_store_tests():
         ok = False
         def check_request(url, method, kwargs):
             nonlocal ok
-            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "parent": None, "name": "Test1", "description": "This is a test block", "children": [], "__classname__": "Block"}
+            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "parent": None, "name": "Test1", "description": "This is a test block", "children": [], "__classname__": "Block", "ports": []}
             ok = True
             return Response(201, json={'Id': 123})
 
@@ -145,11 +145,11 @@ def data_store_tests():
         model = client.Block(name="Test1", description="This is a test block")
         item = ModeledShapeAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
         def check_request_model(url, method, kwargs):
-            assert json.loads(kwargs['data']) == {"Id": 0, "parent": 456, "name": "Test1", "description": "This is a test block", "order": 0, "children": [], "__classname__": "Block"}
+            assert json.loads(kwargs['data']) == {"Id": 0, "parent": 456, "name": "Test1", "description": "This is a test block", "order": 0, "children": [], "__classname__": "Block", "ports": []}
             return Response(201, json={'Id': 123})
 
         def check_request_repr(url, method, kwargs):
-            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "diagram": 456, "block": 123, "parent": None, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "__classname__": "ShapeWithTextAndPorts"}
+            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "diagram": 456, "block": 123, "parent": None, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "__classname__": "ModeledShapeAndPorts"}
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/Block', 'post', get_response=check_request_model)
@@ -216,7 +216,7 @@ def data_store_tests():
         def check_request_repr(url, method, kwargs):
             details = json.loads(kwargs['data'])
             expected = dict(Id=0, diagram=456, block=123, parent=None, x=100, y=150, z=0.0, width=64, height=40,
-                            styling={}, __classname__='ShapeWithTextAndPorts')
+                            styling={}, __classname__='ModeledShapeAndPorts')
             for k in expected.keys():
                 assert details[k] == expected[k], f"Values not equal for key {k}: {details[k]} != {expected[k]}"
             #assert kwargs['data'] == '''{"diagram": 456, "block": 123, "parent": null, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
@@ -391,5 +391,5 @@ def json_encoder_tests():
 
 
 if __name__ == '__main__':
-    #run_tests('*.add_repr_existing_model')
+    run_tests('*.test_ports')
     run_tests()

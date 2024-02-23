@@ -149,6 +149,11 @@ class Port(CP, StorableElement):
     def repr_category(cls) -> ReprCategory:
         return ReprCategory.port
 
+    def asdict(self) -> Dict[str, Any]:
+        details = StorableElement.asdict(self, ignore=['model_entity', 'id'])
+        return details
+
+
 @dataclass
 class ModeledShapeAndPorts(ModeledShape):
     ports: List[Port] = field(default_factory=list)
@@ -269,15 +274,11 @@ class ModeledRelationship(Relationship, StorableElement):
         return self
 
     def asdict(self) -> Dict[str, Any]:
-        details = StorableElement.asdict(self)
+        details = StorableElement.asdict(self, ignore=['model_entity', 'start', 'finish', 'waypoints', 'id'])
         details['relationship'] = self.model_entity.Id
         details['source_repr_id'] = self.start.Id
         details['target_repr_id'] = self.finish.Id
         details['routing'] = json.dumps(self.waypoints, cls=ExtendibleJsonEncoder)
-        del details['start']
-        del details['finish']
-        del details['waypoints']
-        del details['id']
         return details
 
     @classmethod

@@ -132,11 +132,12 @@ def make_explorer(holder, api: DataStore, allowed_children):
             document[context_menu_name].close()
             default_obj = etype()
             d = Dialog(f'Add {etype.__name__}', ok_cancel=True)
-            d.panel <= dataClassEditorForm(None, default_obj.get_editable_parameters(), api)
+            parameters = default_obj.get_editable_parameters()
+            d.panel <= dataClassEditorForm(None, parameters, api)
 
             @bind(d.ok_button, 'click')
             def on_ok(ev):
-                data = getFormValues(d.panel, etype)
+                data = getFormValues(d.panel, etype, parameters)
                 new_object = etype(parent=parent, **data)
                 api.add(new_object)
                 html = render_hierarchy([new_object])

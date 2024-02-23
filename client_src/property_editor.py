@@ -292,7 +292,7 @@ def dataClassEditorForm(o: ModelEntity, editable_fields: List[EditableParameterD
         _ = form <= getInputForField(o, field)
         _ = form <= html.BR()
 
-    port_types = o.get_allowed_ports()
+    port_types = o.get_allowed_ports() if o else []
     if port_types:
         f = [f for f in fields(o) if f.name == 'ports'][0]
         _ = form <= createPortEditor(o, f, port_types, data_store)

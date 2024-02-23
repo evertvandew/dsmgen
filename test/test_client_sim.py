@@ -417,6 +417,7 @@ def simulated_diagram_tests():
     @test
     def block_properties_editor_instance():
         """ Load a diagram with a single block: an instance with ports """
+        nonlocal d
         import public.sysml_client as client
         ds = mk_ds()
 
@@ -425,11 +426,11 @@ def simulated_diagram_tests():
             json=diagram_w_instance))
         diagram, rest = new_diagram(3, ds)
         ds.subscribe('shape_selected', diagram, client.on_diagram_selection)
+
         block = diagram.children[0]
         block.shape.dispatchEvent(events.MouseDown())
         block.shape.dispatchEvent(events.MouseUp())
         assert not unexpected_requests
-        nonlocal d
         form = d.select('form')
         assert len(form) == 2
         html_form = str(form)
@@ -645,5 +646,4 @@ def simulated_explorer_tests():
 
 
 if __name__ == '__main__':
-    run_tests('*.block_properties_editor_instance')
     run_tests()
