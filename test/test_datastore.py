@@ -128,7 +128,7 @@ def data_store_tests():
         ok = False
         def check_request(url, method, kwargs):
             nonlocal ok
-            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "parent": None, "name": "Test1", "description": "This is a test block", "children": [], "__classname__": "Block", "ports": []}
+            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "parent": None, "name": "Test1", "description": "This is a test block", "__classname__": "Block"}
             ok = True
             return Response(201, json={'Id': 123})
 
@@ -145,7 +145,7 @@ def data_store_tests():
         model = client.Block(name="Test1", description="This is a test block")
         item = ModeledShapeAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
         def check_request_model(url, method, kwargs):
-            assert json.loads(kwargs['data']) == {"Id": 0, "parent": 456, "name": "Test1", "description": "This is a test block", "order": 0, "children": [], "__classname__": "Block", "ports": []}
+            assert json.loads(kwargs['data']) == {"Id": 0, "parent": 456, "name": "Test1", "description": "This is a test block", "order": 0, "__classname__": "Block"}
             return Response(201, json={'Id': 123})
 
         def check_request_repr(url, method, kwargs):
@@ -377,19 +377,7 @@ def data_store_tests():
         assert 65 not in ds.shadow_copy[Collection.block_repr]
         assert 155 not in ds.shadow_copy[Collection.block]
 
-@prepare
-def json_encoder_tests():
-    @test
-    def nested_dataclasses():
-        import public.sysml_client as client
-        e = client.Block()
-        e.children = [client.FlowPort()]
-        s = json.dumps(e, cls=ExtendibleJsonEncoder)
-        assert '"__classname__": "Block"' in s
-        assert '"__classname__": "FlowPort"' in s
-
-
 
 if __name__ == '__main__':
-    run_tests('*.test_ports')
+    run_tests('*.add_modelitem')
     run_tests()

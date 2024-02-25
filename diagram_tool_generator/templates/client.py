@@ -21,7 +21,7 @@ from browser import document, console, html, svg, bind, ajax
 import json
 from explorer import Element, make_explorer, context_menu_name
 from dataclasses import dataclass, field, is_dataclass, asdict, fields
-from typing import Self, List, Dict, Any, Callable, Type, Optional
+from typing import Self, List, Dict, Any, Callable, Type, Optional, Union
 from collections.abc import Iterable
 import typing
 import types
@@ -49,45 +49,49 @@ def resolve(name: str) -> Type[ms.ModelEntity]:
 % for entity in generator.ordered_items:
 @dataclass
 class ${entity.__name__}(ms.ModelEntity, StorableElement):
-    % for f in fields(entity):
+    <%
+        # Make name:type pairs of all fields to add to this class.
+        # Start with the user-defined fields.
+        internal_fields = {f.name: (f.type, generator.get_default(f.type)) for f in fields(entity)}
+        persistent_fields = {f.name: f.type for f in fields(entity)}
+
+        # Add the ID.
+        persistent_fields['Id'] = int
+
+        # Add fields according to the type of entity
+        if generator.md.is_port(entity):
+            internal_fields['orientation'] = ('shapes.BlockOrientations', 'shapes.BlockOrientations.RIGHT')
+            persistent_fields['orientation'] = 'shapes.BlockOrientations'
+
+        if generator.get_allowed_ports().get(entity.__name__, []) or generator.md.is_instance_of(entity):
+            internal_fields['ports'] = ('List[ms.ModelEntity]', 'field(default_factory=list)')
+
+        if generator.md.is_instance_of(entity):
+            internal_fields['parameters'] = ('parameter_values', 'field(default_factory=dict)')
+            persistent_fields['parameters'] = 'parameter_values'
+
+
+        if not generator.md.is_relationship(entity):
+            internal_fields['order'] = ('int', '0')
+            persistent_fields['order'] = 'int'
+
+            internal_fields['children'] = ('shapes.HIDDEN', 'field(default_factory=list)')
+
+%>
+    % for key, (type_, default) in internal_fields.items():
     ## All elements must have a default value so they can be created from scratch
-    ${f.name}: ${generator.get_html_type(f.type)} = ${generator.get_default(f.type)}
+    ${key}: ${generator.get_html_type(type_)} = ${default}
     % endfor
-    %if generator.md.is_port(entity):
-    orientation: shapes.BlockOrientations = shapes.BlockOrientations.RIGHT
-    %endif
-    % if not generator.md.is_relationship(entity):
-    order: shapes.HIDDEN = 0
-    children: shapes.HIDDEN = field(default_factory=list)
-    % if generator.md.is_instance_of(entity):
-    parameters: parameter_values = field(default_factory=dict)
-    % endif
-    % if generator.get_allowed_ports().get(entity.__name__, []) or generator.md.is_instance_of(entity):
-    ports: List[ms.ModelEntity] = field(default_factory=list)
-    %endif
 
     def __eq__(self, other) -> bool:
         if type(self) != type(other):
             return False
         return (
-        %for f in fields(entity):
-            self.${f.name} == other.${f.name} and
-        %endfor
-        %if generator.md.is_port(entity):
-            self.orientation == other.orientation and
-        %endif
-        %if not generator.md.is_relationship(entity):
-            self.order == other.order and
-        %endif
-        %if generator.md.is_instance_of(entity):
-            self.parameters == other.parameters and
-        %endif
-            self.Id == other.Id
+            ${' and\n            '.join(f'self.{name} == other.{name}' for name in persistent_fields.keys())}
         )
 
     def get_icon(self):
         return "${generator.md.get_style(entity, 'icon', 'folder')}"
-    % endif
 
     % if generator.md.is_diagram(entity):
     class Diagram(ModeledDiagram):
@@ -137,7 +141,7 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
     %if generator.md.is_representable(entity):
     @classmethod
-    def get_representation_cls(cls) -> Optional[ms.ModeledShape | ms.ModeledShapeAndPorts | ms.Port | ms.ModeledRelationship]:
+    def get_representation_cls(cls) -> Optional[Union[ms.ModeledShape, ms.ModeledShapeAndPorts, ms.Port, ms.ModeledRelationship]]:
     %if generator.md.is_relationship(entity):
         return ms.ModeledRelationship
     %elif generator.md.is_port(entity):
@@ -176,18 +180,23 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         %endif
         return regular_parameters
 
-    %if generator.md.is_relationship(entity):
     def asdict(self) -> Dict[str, Any]:
         """ Relationships need to serialize only the ID's of the target and source,
             not the source or target themselves.
         """
-        details = StorableElement.asdict(self)
+        details = {
+            '__classname__': "${entity.__name__}",
+            ${",\n            ".join((f'"{k}": self.{k}') for k in persistent_fields.keys())}
+        }
+    % if generator.md.is_relationship(entity):
         details['source_id'] = self.source.Id if self.source else None
         details['target_id'] = self.target.Id if self.target else None
         del details['source']
         del details['target']
+    %endif
         return details
 
+    % if generator.md.is_relationship(entity):
     @classmethod
     def from_dict(cls, data_store: DataStore, **details) -> Self:
         self = from_dict(cls, **details)
@@ -222,7 +231,7 @@ class PortLabel(ms.ModeledShape):
     def is_instance_of(cls):
         return False
 
-    def get_representation_cls(self) -> Optional[ms.ModeledShape | ms.ModeledShapeAndPorts | ms.Port | ms.ModeledRelationship]:
+    def get_representation_cls(self) -> Optional[Union[ms.ModeledShape, ms.ModeledShapeAndPorts, ms.Port, ms.ModeledRelationship]]:
         return ms.ModeledShape
 
 
@@ -336,9 +345,6 @@ def run(explorer, canvas, details):
         block_entities=block_entities,
         relation_entities=relation_classes,
         port_entities=port_classes,
-        block_representations=block_representations,
-        relation_representations=relation_representations,
-        port_representations=port_representations,
         base_url='/data'
     )
 

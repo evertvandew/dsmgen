@@ -43,7 +43,7 @@ class ModelEntity:
         return False
 
     @classmethod
-    def get_representation_cls(cls) -> Optional[Shape | CP | Relationship]:
+    def get_representation_cls(cls) -> Optional[Self]:
         """ Create a shape representing this model item. """
         return None
 
