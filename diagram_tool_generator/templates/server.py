@@ -8,6 +8,8 @@ import magic
 import sys
 from typing import Any, Dict
 from dataclasses import is_dataclass
+from sqlalchemy.orm import aliased
+from sqlalchemy.sql import text
 import ${generator.module_name}data as dm
 
 
@@ -20,7 +22,7 @@ app = flask.Flask(__name__)
     import model_definition as mdef
     from model_definition import fields, is_dataclass, parameter_spec
 
-    ir = ", ".join([f'"{e.__name__}Representation"' for e in generator.md.instance_of])
+    ir = ", ".join([f'"{e.__name__}"' for e in generator.md.instance_of])
 
     parameter_specifications = {
         e.__name__: [f.name for f in fields(e) if parameter_spec in generator.get_inner_types(e, f.type)]
@@ -28,7 +30,7 @@ app = flask.Flask(__name__)
         if any(parameter_spec in generator.get_inner_types(e, f.type) for f in fields(e))
     }
 %>
-INSTANCE_REPRESENTATIONS = [${ir}]
+INSTANCE_ENTITIES = [${ir}]
 
 PARAMETER_SPECIFICATIONS = ${repr(parameter_specifications)}
 
@@ -72,8 +74,11 @@ def get_parameters_defaults(spec: dm.parameter_spec):
     """ Parse a parameter specification string into default parameters values string. """
     parameter_defaults = {'int': 0, 'float': 0.0, 'str': ''}
     print("Determining the defaults for parameters:", repr(spec))
+    if not spec:
+        return {}
     if isinstance(spec, str):
         try:
+            print(f'Reading parameters default from {spec}')
             spec = json.loads(spec)
         except json.JSONDecodeError:
             spec = {k.strip():v.strip() for k,v in [part.split(':') for part in spec.split(',')]}
@@ -317,9 +322,11 @@ def delete_entity_data(path, index):
                         # Delete the relationship from the model.
                         session.query(dm._Relationship).filter(dm._Relationship.Id==record.relationship).delete()
                 elif table is dm._BlockRepresentation:
-                    if record.block_cls in INSTANCE_REPRESENTATIONS:
-                        # Check if there are any more representation of this block
-                        count = session.query(table).filter(table.block == record.block).count()
+                    # Find the model entity and optional definition
+                    entity = session.query(dm._Entity).filter(dm._Entity.Id == record.block).first()
+                    if entity.definition:
+                        # Check if there are any more representation of this instance
+                        count = session.query(table).filter(table.block == entity.Id).count()
                         if count == 0:
                             # Delete the underlying Instance from the model.
                             session.query(dm._Entity).filter(dm._Entity.Id == record.block).delete()
@@ -359,7 +366,41 @@ def get_hierarchy():
 def diagram_contents(index):
     with dm.session_context() as session:
         # Get the representations shown in the diagram.
-        block_reps = session.query(dm._BlockRepresentation, dm._Entity).filter(dm._BlockRepresentation.diagram==index).join(dm._Entity, onclause=dm._BlockRepresentation.block==dm._Entity.Id).all()
+        # Get the representations shown in the diagram.
+        result = session.execute(text('''
+            SELECT _blockrepresentation.*, _entity.details as _entity, definition.details as _definition
+            FROM _blockrepresentation 
+            LEFT JOIN _entity ON _blockrepresentation.block = _entity.Id 
+            LEFT JOIN _entity as definition ON _entity.definition = definition.Id
+            WHERE _blockrepresentation.diagram = :index;
+        '''), {'index': index})
+
+        data = [{k:v for k, v in zip(r._fields, r._data)} for r in result]
+
+    for r in data:
+        details = json.loads(r['_entity'])
+        r['_entity'] = details
+        if details['__classname__'] in INSTANCE_ENTITIES:
+            definition = json.loads(r['_definition'])
+            r['_definition'] = definition
+        else:
+            del r['_definition']
+
+    response = flask.make_response(
+        json.dumps(data, cls=dm.ExtendibleJsonEncoder).encode('utf8'),
+        200
+    )
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+    if False:
+        entity = aliased(dm._Entity)
+        definition = aliased(dm._Entity)
+        query = session.query(dm._BlockRepresentation, dm._Entity).\
+            filter(dm._BlockRepresentation.diagram==index).\
+            join(entity, onclause=dm._BlockRepresentation.block==entity.Id).\
+            join(definition, onclause=entity.definition==definition.Id)
+        block_reps = query.all()
         relat_reps = session.query(dm._RelationshipRepresentation, dm._Relationship).filter(dm._RelationshipRepresentation.diagram==index).join(dm._Relationship).all()
         data = [(r[0].asdict(), r[1].asdict()) for r in block_reps+relat_reps]
 

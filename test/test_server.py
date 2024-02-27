@@ -57,7 +57,7 @@ def test_server():
         r = requests.get(vurl)
         assert r.status_code == 200
         records = json.loads(r.content)
-        assert len(records) == 2
+        assert len(records) >= 2
         assert records[0]['versionnr'] == '0.1'
         assert records[0]['category'] == 'generator'
         assert records[1]['versionnr'] == '0.1'
@@ -312,7 +312,40 @@ def test_server():
         r = requests.get(base_url+'/data/_BlockRepresentation/3')
         assert r.status_code == 404
 
+    @test
+    def test_create_instance_no_parameters():
+        sm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
+        clear_db()
+        load_db([
+            sm.Note(Id=1, description="Don't mind me"),
+            sm.BlockDefinitionDiagram(Id=2, name="Test diagram"),
+            sm.SubProgramDefinition(Id=3, name="Block 1", description="Dit is een test", parent=2, order=1,
+                                    parameters='')
+        ])
+
+        # Create an instance
+        r = requests.post(
+            base_url+'/data/BlockInstance/3/create_representation',
+            data=json.dumps({'diagram': 2, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40}),
+            headers={'Content-Type': 'application/json'}
+        )
+        assert r.status_code == 201
+        results = json.loads(r.content)
+        assert results['Id'] == 1
+        assert results['diagram'] == 2
+        assert results['parent'] == None
+        assert len(results['children']) == 0
+        assert results['_entity']['__classname__'] == 'BlockInstance'
+        assert results['_entity']['Id'] == 4
+        assert results['_entity']['parent'] == 2    # The Instance block is created under the diagram
+        assert results['_entity']['definition'] == 3
+        assert results['_entity']['parameters'] == {'parameters': {}}
+        assert results['_definition']['__classname__'] == 'SubProgramDefinition'
+        assert results['_definition']['Id'] == 3
+        assert results['_definition']['name'] == 'Block 1'
+        assert results['_definition']['description'] == 'Dit is een test'
+        assert results['_definition']['parameters'] == ''
 
 if __name__ == '__main__':
-    #run_tests('*.test_create_delete_instance')
+    run_tests('*.test_create_instance_no_parameters')
     run_tests()

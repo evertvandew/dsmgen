@@ -154,7 +154,8 @@ class _Entity(Base):
     Id: int = Column(Integer, primary_key=True)
     type: int = Column(Enum(EntityType))
     subtype: str = Column(String)
-    parent: str = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))  # For subblocks and ports
+    parent: str = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'), nullable=True)  # For subblocks and ports
+    definition: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'), nullable=True)  # For instances
     order: str = Column(Integer)
     details: str = Column("details", LargeBinary)
 
@@ -360,6 +361,7 @@ class ABlock(AWrapper):
             'type': self.get_entity_type(),
             'subtype': self.__class__.__name__,
             'parent': self.parent if hasattr(self, 'parent') else None,
+            'definition': None,
             'order': self.order
         }
 
@@ -369,6 +371,14 @@ class AInstance(ABlock):
     @classmethod
     def get_entity_type(cls):
         return EntityType.Instance
+    def extract_record_values(self):
+        return {
+            'type': self.get_entity_type(),
+            'subtype': self.__class__.__name__,
+            'parent': self.parent if hasattr(self, 'parent') else None,
+            'definition': self.definition,
+            'order': self.order
+        }
 
 class ARelationship(AWrapper):
     @staticmethod

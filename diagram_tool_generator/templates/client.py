@@ -315,6 +315,8 @@ def on_diagram_selection(_e_name, _e_source, data_store, details):
     model: ms.ModelEntity = repr.model_entity
 
     properties_div = document['details']
+    for e in properties_div.children:
+        e.remove()
     properties_div.children = []
     _ = properties_div <= dataClassEditor(model, model.get_editable_parameters(), data_store, update=update)
     _ = properties_div <= stylingEditorForm(repr)
@@ -335,6 +337,8 @@ def on_explorer_click(_event_name, _event_source, data_store, details):
     properties_div = document['details']
     for e in properties_div.children:
         e.remove()
+    properties_div.children = []
+
     properties_div <= dataClassEditor(data_element, data_element.get_editable_parameters(), data_store, update=update)
 
 
@@ -369,7 +373,7 @@ def run(explorer, canvas, details):
             svg_tag.classList.add('diagram')
             # container <= svg_tag
             ## In future: subscribe to events in the diagram api.
-            config = DiagramConfig({}, connections_from)
+            config = DiagramConfig(connections_from)
             diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], config, data_store, svg_tag)
             diagram_details = data_store.get(target_type, target_dbid)
             console.log(f'DETAILS: {details}')

@@ -12,7 +12,7 @@ from dispatcher import EventDispatcher
 from math import inf         # Used when evaluating waypoint strings
 from contextlib import contextmanager
 
-from browser import ajax, console
+from browser import ajax, console, alert
 
 class Collection(Enum):
     hierarchy = 'hierarchy'
@@ -304,7 +304,6 @@ class DataStore(EventDispatcher):
     def get_hierarchy(self, cb: Callable):
         def on_data(data: JsonResponse):
             records = self.make_objects(data)
-            records = self.update_cache(records)
             # Determine the actual hierarchy.
             lu = {}
             for r in records:
@@ -389,7 +388,7 @@ class DataStore(EventDispatcher):
         def on_complete(update: JsonResponse):
             nonlocal result
             if update.status > 299:
-                console.alert("Representation could not be created")
+                alert("Representation could not be created")
             else:
                 result = self.decode_representation(update.json)
                 result.ports = [ch for ch in result.children if ch.repr_category() == ReprCategory.port]
@@ -416,7 +415,9 @@ class DataStore(EventDispatcher):
         records = []
         for d in data.json:
             cls = self.all_classes[d['__classname__']]
-            records.append(cls.from_dict(self, **d))
+            instance = cls.from_dict(self, **d)
+            self.update_cache(instance)
+            records.append(instance)
         return records
 
     def update_cache(self, records: List[StorableElement] | StorableElement):
