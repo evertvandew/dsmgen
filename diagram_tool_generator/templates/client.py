@@ -155,8 +155,11 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     %endif
 
 
-    def get_parameter_spec_fields(self) -> Dict[str, type]:
-        return getattr(self, "${generator.get_spec_fields(entity)}")
+    def get_parameter_spec_fields(self) -> List[str]:
+        return "${generator.get_spec_fields(entity)}"
+
+    def get_parameter_specs(self) -> Dict[str, type]:
+        return getattr(self, self.get_parameter_spec_fields())
 
     def get_editable_parameters(self) -> List[ms.EditableParameterDetails]:
         regular_parameters = [
@@ -167,16 +170,20 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         %if generator.md.is_instance_of(entity):
         if not self.definition:
             return regular_parameters
-        field_specs = self.definition.get_parameter_spec_fields()
-        if not field_specs:
+        parameter_specs = self.definition.get_parameter_spec_fields()
+        if not parameter_specs:
             return regular_parameters
-        if isinstance(field_specs, str):
-            field_specs = dict(name_type.split(':') for name_type in field_specs.split(','))
-        keys_types = [(k, eval(t)) for k, t in field_specs.items()]
-        regular_parameters += [
-            ms.EditableParameterDetails(key, type_, self.parameters.get(key, ''), type_)
-            for key, type_ in keys_types
-        ]
+        field_specs = self.definition.get_parameter_specs()
+        if field_specs:
+            if isinstance(field_specs, str):
+                field_specs = dict(name_type.split(':') for name_type in field_specs.split(','))
+            keys_types = [(k, eval(t)) for k, t in field_specs.items()]
+            regular_parameters += [
+                ms.EditableParameterDetails(key, type_, self.parameters.get(key, ''), type_)
+                for key, type_ in keys_types
+            ]
+        # Filter out the parameter collection field
+        regular_parameters = [p for p in regular_parameters if p.name not in parameter_specs]
         %endif
         return regular_parameters
 
