@@ -46,6 +46,13 @@ type2default = {
 }
 
 
+parameter_types = {
+    'int': int,
+    'float': float,
+    'str': str
+}
+
+
 def type2Constructor(t: type):
     """ Find the right constructor for a specific type. The constructor is used to convert the value inside the
         edit field of the property editor, into an instance of this type.

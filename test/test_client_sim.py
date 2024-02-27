@@ -363,24 +363,31 @@ def simulated_diagram_tests():
 
     @test
     def handling_parameter_spec_dropped_block():
-        """ Simulate dropping a
-            Then instantiate it, and check the proper edit fields are presented and handled.
+        """ Simulate dropping a block so that it is instantiated.
+            Then check the proper edit fields are presented and handled.
         """
+        nonlocal d
+        import public.sysml_client as client
         ds = mk_ds()
+
         add_expected_response('/data/diagram_contents/5', 'get', Response(201, json=[]))
         diagram, rest = new_diagram(5, ds)
+        ds.subscribe('shape_selected', diagram.canvas, client.on_diagram_selection)
         rest.add = set_entity_ids([400])
-        instance = client.SubProgramDefinition(name='One', parent=3, Id=123, parameters={'limit': int, 'factor': float})
+
+        definition = client.SubProgramDefinition(Id=123, name='Block 1', parent=1, description='Dit is een test', parameters='limit:int,factor:float')
+        ds.update_cache(definition)
+
         restif = Mock()
-        restif.get_hierarchy = Mock(side_effect=lambda cb: cb([instance]))
+        restif.get_hierarchy = Mock(side_effect=lambda cb: cb([definition]))
         explorer.make_explorer(d['explorer'], restif, client.allowed_children)
         ev = events.DragStart()
-        ev.dataTransfer.data = {'entity': json.dumps(instance, cls=ExtendibleJsonEncoder)}
+        ev.dataTransfer.data = {'entity': json.dumps(definition, cls=ExtendibleJsonEncoder)}
 
         add_expected_response('/data/BlockInstance/123/create_representation', 'post', Response(201, json={
             'Id': 400,
             '__classname__': '_BlockInstanceRepresentation',
-            'block': 123,
+            'block': 125,
             'parent': None,
             'diagram': 5,
             'x': 400,
@@ -399,20 +406,33 @@ def simulated_diagram_tests():
                 }
             ],
             'block_cls': 'BlockInstanceRepresentation',
-            '_entity': {'name': 'One', 'parent': 3, 'Id': 123, 'parameters': 'limit:int,factor:float',  '__classname__': 'BlockInstance'},
-            '_definition': {'__classname__': 'SubProgramDefinition', 'Id': 3, 'name': 'Block 1', 'description': 'Dit is een test', 'parameters': 'limit:int,factor:float'}
+            '_entity': {'Id': 125, 'definition': 123, 'parameters': '',  'parent': 5, '__classname__': 'BlockInstance'},
+            '_definition': definition.asdict()
         }))
 
         for cls in [events.DragEnter, events.DragOver, events.DragOver, events.Drop, events.DragEnd]:
             diagram.canvas.dispatchEvent(cls(dataTransfer=ev.dataTransfer))
 
         assert diagram.children
-        repr = diagram.children[0]
+        repr: client.ms.ModeledShapeAndPorts = diagram.children[0]
         assert repr.diagram == 5
-        assert repr.model_entity.Id == 123
+        assert repr.model_entity.Id == 125
+        assert repr.model_entity.parent == 5
+        assert repr.model_entity.definition == definition
         assert repr.Id == 400
         assert not unexpected_requests
-        # TODO: Check the parameters are presented in the details editor.
+
+        # Trigger the details editor.
+        repr.shape.dispatchEvent(events.MouseDown())
+        repr.shape.dispatchEvent(events.MouseUp())
+        assert not unexpected_requests
+        form = d.select('form')
+        assert len(form) == 2
+
+        # Assert the correct edits have been created.
+        assert d.select('#edit_factor')
+        assert d.select('#edit_limit')
+        assert not d.select('#edit_parameters')
 
     @test
     def block_properties_editor_instance():
@@ -646,4 +666,4 @@ def simulated_explorer_tests():
 
 
 if __name__ == '__main__':
-    run_tests()
+    run_tests('*.handling_parameter_spec_dropped_block')

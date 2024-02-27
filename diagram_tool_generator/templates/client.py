@@ -31,7 +31,7 @@ from modeled_diagram import ModeledDiagram
 import modeled_shape as ms
 import diagrams
 import shapes
-from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, parameter_values, stylingEditorForm
+from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, parameter_values, stylingEditorForm, parameter_types
 from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder, Collection, StorableElement, from_dict
 from svg_shapes import getMarkerDefinitions
 from tab_view import TabView
@@ -111,14 +111,6 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     def is_instance_of(cls):
         % if generator.md.is_instance_of(entity):
         return True
-
-    @classmethod
-    def from_dict(cls, data_store: DataStore, **details) -> Self:
-        self = from_dict(cls, **details)
-        if self.definition:
-            self.definition = data_store.get(Collection.block, self.definition)
-        return self
-
         %else:
         return False
         %endif
@@ -177,7 +169,7 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         if field_specs:
             if isinstance(field_specs, str):
                 field_specs = dict(name_type.split(':') for name_type in field_specs.split(','))
-            keys_types = [(k, eval(t)) for k, t in field_specs.items()]
+            keys_types = [(k.strip(), parameter_types[t.strip()]) for k, t in field_specs.items()]
             regular_parameters += [
                 ms.EditableParameterDetails(key, type_, self.parameters.get(key, ''), type_)
                 for key, type_ in keys_types
@@ -211,6 +203,19 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         self.source = data_store.get(Collection.block, details['source'])
         self.target = data_store.get(Collection.block, details['target'])
         return self
+    %elif  generator.md.is_instance_of(entity):
+    @classmethod
+    def from_dict(cls, data_store: DataStore, **details) -> Self:
+        self = from_dict(cls, **details)
+        if self.definition:
+            self.definition = data_store.get(Collection.block, self.definition)
+        if self.parameters:
+            if isinstance(self.parameters, str):
+                self.parameters = json.loads(self.parameters)
+        else:
+            self.parameters = {}
+        return self
+
     %endif
 
 % endfor
@@ -296,7 +301,6 @@ opposite_ports = ${generator.get_opposite_ports()}
 class DiagramConfig(diagrams.DiagramConfiguration):
     def get_repr_for_create(self, cls) -> type:
         repr = super().get_repr_for_create(cls)
-        console.log(f"Got repr {repr.__name__}, {issubclass(repr, diagrams.CP)}")
         if issubclass(repr, diagrams.CP):
             # The user tries to create a new port. Inside a diagram, that is represented by a Label,
             # not by the normal representation for this CP.
@@ -340,7 +344,6 @@ def on_explorer_click(_event_name, _event_source, data_store, details):
     target_type: str = details['target_type']
     data_element: ms.ModelEntity = details['data_element']
     update = details.get('update', False) or datastore_update
-    console.log(f"Clicked on element {target_dbid}")
     properties_div = document['details']
     for e in properties_div.children:
         e.remove()
@@ -370,7 +373,6 @@ def run(explorer, canvas, details):
         canvas = details['context']['canvas']
         target_dbid: int = details['target_dbid']
         target_type: str = details['target_type']
-        console.log(f"Double-Clicked on element {target_dbid}")
 
         # If a diagram is double-clicked, open it.
         def oncomplete(response):
@@ -383,7 +385,6 @@ def run(explorer, canvas, details):
             config = DiagramConfig(connections_from)
             diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], config, data_store, svg_tag)
             diagram_details = data_store.get(target_type, target_dbid)
-            console.log(f'DETAILS: {details}')
             diagram_tabview.add_page(diagram_details.name, svg_tag, diagram.close)
             data_store.subscribe('shape_selected', svg_tag, on_diagram_selection)
 
