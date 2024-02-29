@@ -24,20 +24,22 @@ def test_port_editor():
     ds = Mock()
     @test
     def create():
+        port = client.FlowPort()
         block_repr = ModeledShapeAndPorts(
-            model_entity = client.Block(),
+            model_entity = client.Block(ports=[port]),
             x=100, y=100, width=64, height=40,
-            ports=[Port()]
+            ports=[Port(model_entity=port)]
         )
         f = [f for f in fields(block_repr) if f.name=='ports'][0]
 
         # Create the port editor
-        element = createPortEditor(block_repr, f, block_repr.get_allowed_ports(), ds)
+        element = createPortEditor(block_repr.model_entity, f, block_repr.get_allowed_ports(), ds)
 
         # Edit the values of the existing port
         line = element.select(".porttable tr")[0]
         line.dispatchEvent(events.Click())
         side_selector = document.select_one('#edit_orientation')
+        assert side_selector
         side_selector.value = 2
         dialog = document.select_one('.brython-dialog-main')
         dialog.ok_button.dispatchEvent(events.Click())
@@ -49,9 +51,10 @@ def test_port_editor():
         port_selector = document.select('SELECT')[0]
         port_selector.value = 1
         dialog.ok_button.dispatchEvent(events.Click())
-        assert len(block_repr.ports) == 2
+        assert len(block_repr.model_entity.ports) == 2
         pass
 
 
 if __name__ == '__main__':
+    run_tests('*.create')
     run_tests()

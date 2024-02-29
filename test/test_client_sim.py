@@ -434,6 +434,19 @@ def simulated_diagram_tests():
         assert d.select('#edit_limit')
         assert not d.select('#edit_parameters')
 
+        # Set the values and check they are stored properly.
+        d.select('#edit_factor')[0].value = '123.456'
+        d.select('#edit_limit')[0].value = '87654'
+        btn = d.select_one('#details .btn-primary')
+
+        add_expected_response('/data/BlockInstance/125', 'post', Response(200, json={}))
+        btn.dispatchEvent(events.Click())
+
+        assert repr.model_entity.parameters == {'factor': 123.456, 'limit': 87654}
+
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
+
     @test
     def block_properties_editor_instance():
         """ Load a diagram with a single block: an instance with ports """
@@ -664,6 +677,28 @@ def simulated_explorer_tests():
         assert not unexpected_requests
         assert len(expected_responses) == 0
 
+    @test
+    def existing_instance_property_editer():
+        # Create an explorer showing one definition block and one instance.
+        nonlocal d
+        import public.sysml_client as client
+        ds = mk_ds()
+        add_expected_response('/data/hierarchy', 'get', Response(201, json=[
+            {'Id': 123, 'name': 'Block 1', 'parent': None, 'description': 'Dit is een test', 'parameters': 'limit:int,factor:float', '__classname__': 'SubProgramDefinition'},
+            {'Id': 125, 'definition': 123, 'parameters': '', 'parent': None, '__classname__': 'BlockInstance', 'parameters': {'factor': 123, 'limit': 456}}
+        ]))
+        make_explorer(d['explorer'], ds, client.allowed_children)
+        blank = d['explorer']
+        ds.subscribe('click', blank, client.on_explorer_click)
+
+        # Click on the Instance and check that the values in the edit fields are correct.
+        source = [i for i in d['explorer'].select('.eline [draggable="true"]') if 'BlockInstance' in str(i)][0]
+        source.dispatchEvent(events.Click())
+        assert d.select('#edit_factor')[0].value == 123
+        assert d.select('#edit_limit')[0].value == 456
+        pass
+
 
 if __name__ == '__main__':
-    run_tests('*.handling_parameter_spec_dropped_block')
+    run_tests('*.existing_instance_property_editer')
+    run_tests()

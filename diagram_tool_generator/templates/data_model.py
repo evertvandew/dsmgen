@@ -326,8 +326,11 @@ class AWrapper:
         record = session.query(cls.get_db_table()).filter_by(Id=Id).first()
         return cls.decode(record)
 
-    def update(self):
-        with session_context() as session:
+    def update(self, session=None):
+        if session is None:
+            with session_context() as session:
+                return self.update(session)
+        else:
             record = session.query(self.get_db_table()).filter_by(Id=self.Id).first()
             data_bytes = self.asjson()
             if record.details != data_bytes:

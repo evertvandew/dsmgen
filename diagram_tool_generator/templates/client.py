@@ -151,12 +151,16 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         return "${generator.get_spec_fields(entity)}"
 
     def get_parameter_specs(self) -> Dict[str, type]:
-        return getattr(self, self.get_parameter_spec_fields())
+        field_specs = getattr(self, self.get_parameter_spec_fields())
+        if isinstance(field_specs, str):
+            field_specs = dict(name_type.split(':') for name_type in field_specs.split(','))
+        keys_types = {k.strip(): parameter_types[t.strip()] for k, t in field_specs.items()}
+        return keys_types
 
     def get_editable_parameters(self) -> List[ms.EditableParameterDetails]:
         regular_parameters = [
-        %for f in [f for f in fields(entity) if f.name not in ['parent', 'Id', 'ports', 'children', 'source', 'target', 'definition']]:
-            ms.EditableParameterDetails("${f.name}", ${generator.get_html_type(f.type)}, self.${f.name}, ${generator.get_html_type(f.type)}),
+        %for name, type_ in {k:v for k, v in persistent_fields.items() if k not in ['parent', 'Id', 'ports', 'children', 'source', 'target', 'definition']}.items():
+            ms.EditableParameterDetails("${name}", ${generator.get_html_type(type_)}, self.${name}, ${generator.get_html_type(type_)}),
         %endfor
         ]
         %if generator.md.is_instance_of(entity):
@@ -165,14 +169,11 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         parameter_specs = self.definition.get_parameter_spec_fields()
         if not parameter_specs:
             return regular_parameters
-        field_specs = self.definition.get_parameter_specs()
-        if field_specs:
-            if isinstance(field_specs, str):
-                field_specs = dict(name_type.split(':') for name_type in field_specs.split(','))
-            keys_types = [(k.strip(), parameter_types[t.strip()]) for k, t in field_specs.items()]
+        keys_types = self.definition.get_parameter_specs()
+        if keys_types:
             regular_parameters += [
                 ms.EditableParameterDetails(key, type_, self.parameters.get(key, ''), type_)
-                for key, type_ in keys_types
+                for key, type_ in keys_types.items()
             ]
         # Filter out the parameter collection field
         regular_parameters = [p for p in regular_parameters if p.name not in parameter_specs]
@@ -193,6 +194,9 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         del details['source']
         del details['target']
     %endif
+    % if generator.md.is_instance_of(entity):
+        details['definition'] = self.definition.Id
+    % endif
         return details
 
     % if generator.md.is_relationship(entity):
@@ -215,6 +219,16 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         else:
             self.parameters = {}
         return self
+
+    def update(self, data: Dict[str, Any]):
+        """ Overload of the `ModelEntity.update` function that takes parameters into account. """
+        key_types = self.definition.get_parameter_specs()
+        for k, v in data.items():
+            if k in key_types:
+                self.parameters[k] = key_types[k](v)
+            else:
+                if hasattr(self, k):
+                    setattr(self, k, v)
 
     %endif
 
@@ -335,9 +349,9 @@ def on_diagram_selection(_e_name, _e_source, data_store, details):
 
 def on_explorer_click(_event_name, _event_source, data_store, details):
     """ Called when an element was left-clicked. """
-    def datastore_update(update: Dict):
-        for k, v in json.loads(update).items():
-            setattr(data_element, k, v)
+    def datastore_update(update: str):
+        update_dict = json.loads(update)
+        data_element.update(update_dict)
         data_store.update(data_element)
 
     target_dbid = details['target_dbid']

@@ -245,13 +245,14 @@ def update_entity_data(path, index):
             result.headers['Content-Type'] = 'application/json'
             return result
     elif is_dataclass(table):
-        record = table.retrieve(index)
-        for key, value in data.items():
-            if hasattr(record, key):
-                setattr(record, key, value)
-        record.update()
-        result = record.asjson()
-        return flask.make_response(result, 202)
+        with dm.session_context() as session:
+            record = table.retrieve(index, session)
+            for key, value in data.items():
+                if hasattr(record, key):
+                    setattr(record, key, value)
+            record.update(session)
+            result = record.asjson()
+            return flask.make_response(result, 202)
 
 @app.route("/data/<path:path>", methods=['POST', 'PUT'])
 def add_entity_data(path):

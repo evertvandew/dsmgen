@@ -100,12 +100,13 @@ class ModeledDiagram(Diagram):
         super().deleteBlock(block)
 
     def mouseDownChild(self, widget, ev):
-        def uf(new_data):
+        def uf(new_data: str):
             # Store the existing values to see if anything actually changed.
+            new_values = json.loads(new_data)
             old_values = widget.asdict()
-            widget.update(new_data)
+            widget.model_entity.update(new_values)
             # Inform the datastore of any change
-            self.datastore and self.datastore.update(widget)
+            self.datastore and self.datastore.update(widget.model_entity)
 
         super().mouseDownChild(widget, ev, uf)
 

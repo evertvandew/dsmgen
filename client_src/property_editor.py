@@ -8,7 +8,7 @@ import json
 from svg_shapes import HAlign, VAlign
 from shapes import HIDDEN
 from data_store import DataStore, ExtendibleJsonEncoder, parameter_spec, parameter_values
-from modeled_shape import ModeledShape, ModelEntity, EditableParameterDetails
+from modeled_shape import ModeledShape, ModeledShapeAndPorts, ModelEntity, EditableParameterDetails, ModelRepresentation
 
 #diagrams.createDiagram("canvas");
 
@@ -123,11 +123,11 @@ def getInputForValue(name: str, field_type: type, value: Any):
         return input
     console.log(f"Could not determine input for {field_type}")
 
-def getInputForField(o: dataclass, field: Field):
+def getInputForField(field: EditableParameterDetails):
     """ Determine the right edit widget to use for a specific field description.
         The field is an instance of
     """
-    return getInputForValue(field.name, field.type, getattr(o, field.name, None) if o else '')
+    return getInputForValue(field.name, field.type, field.current_value)
 
 
 def getInputForStyle(o: Any, key, value):
@@ -181,23 +181,23 @@ def createDefault(dcls):
     return dcls(**default)
 
 
-def createPortEditor(o, field, port_types, data_store: DataStore):
+def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
     div = html.DIV()
     table = html.TABLE()
     table.className = 'porttable'
     div <= html.H3(field.name) + '\n' + table
 
-    def bindRowToEditor(row, item, delete):
+    def bindRowToEditor(row, item: ModelEntity, delete):
         row.bind('click', lambda ev: editDialog(item))
         delete.bind('click', lambda ev: (confirmDeleteDialog(item, row), ev.stopPropagation()))
 
     def fillTable():
         table.clear()
-        sorted_ports = sorted(getattr(o, field.name), key = lambda p: 100*int(p.orientation) + p.order)
+        sorted_ports: List[ModelEntity] = sorted(getattr(o, field.name), key = lambda p: 100*int(p.orientation) + p.order)
         for item in sorted_ports:
             row = html.TR()
-            for f in fields(item):
-                row <= html.TD(str(getattr(item, f.name)))
+            for f in item.get_editable_parameters():
+                row <= html.TD(str(f.current_value))
             # Add a delete button for each port
             delete = html.BUTTON('X', style="background-color:red; color:white", type='button')
             row <= delete
@@ -217,19 +217,19 @@ def createPortEditor(o, field, port_types, data_store: DataStore):
             d.close()
 
 
-    def editDialog(current):
+    def editDialog(current: ModelEntity):
         d = Dialog("Test", ok_cancel=True)
 
         style = dict(textAlign="center", paddingBottom="1em")
 
         # Determine which possible fields are available
         # We make a single dict of all editable options.
-        all_editables = {f.name: f for f in fields(current) if isEditable(f)}
+        all_editables = current.get_editable_parameters()
 
-        for k, edit_type in all_editables.items():
-            d.panel <= html.LABEL(k) + getInputForField(current, edit_type) + html.BR()
+        for f in all_editables:
+            d.panel <= html.LABEL(f.name) + getInputForField(f) + html.BR()
 
-        converters = {k: createFromValue(t.type) for k, t in all_editables.items()}
+        converters = {f.name: createFromValue(f.type) for f in all_editables}
 
         # Event handler for "Ok" button
         @bind(d.ok_button, "click")
@@ -237,7 +237,7 @@ def createPortEditor(o, field, port_types, data_store: DataStore):
             """InfoDialog with text depending on user entry, at the same position as the
             original box."""
             port_index = getattr(o, field.name).index(current)
-            values = {k: converters[k](d.panel.select_one(f'#edit_{k}').value) for k in all_editables}
+            values = {f.name: converters[f.name](d.panel.select_one(f'#edit_{f.name}').value) for f in all_editables}
             for k, v in values.items():
                 setattr(current, k, v)
 
@@ -252,7 +252,9 @@ def createPortEditor(o, field, port_types, data_store: DataStore):
         if len(port_types) == 1:
             # Just add the new port to the block and be done with it.
             # Use the default values for each of the attributes of the port.
-            getattr(o, field.name).append(port_types[0]())
+            getattr(o, field.name).append(port_types[0])
+            data_store.update_data(o, div)
+            fillTable()
             return
 
         # We need to select what type of port we want to add.
@@ -296,7 +298,7 @@ def dataClassEditorForm(o: ModelEntity, editable_fields: List[EditableParameterD
         label = html.LABEL(field.name)
         label.className ="col-sm-3 col-form-label"
         _ = form <= label
-        _ = form <= getInputForField(o, field)
+        _ = form <= getInputForField(field)
         _ = form <= html.BR()
 
     port_types = o.get_allowed_ports() if o else []

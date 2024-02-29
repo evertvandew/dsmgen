@@ -1,5 +1,5 @@
 
-from typing import Any, Self, List, Dict, Optional
+from typing import Any, Self, List, Dict, Optional, Type
 from dataclasses import dataclass, field
 import json
 from browser import svg, console
@@ -62,10 +62,13 @@ class ModelEntity:
 
 ###############################################################################
 @dataclass
-class ModeledShape(Shape, StorableElement):
+class ModelRepresentation(StorableElement):
     model_entity: ModelEntity = None
-    diagram: int = 0
-    parent: Optional[int] = None
+    diagram: int = 0                    # Diagram in which this representation is displayed.
+
+@dataclass
+class ModeledShape(Shape, ModelRepresentation):
+    parent: Optional[int] = None        # For hierarchical shapes (inner block & ports): the owner of this repr.
 
     default_style = dict(blockcolor='#FFFBD6')
     TextWidget = shapes.Text('description')
@@ -118,11 +121,11 @@ class ModeledShape(Shape, StorableElement):
         return self.model_entity.get_editable_parameters()
 
 @dataclass
-class Port(CP, StorableElement):
-    block: int = 0
-    parent: Optional[int] = None
-    diagram: int = 0
-    model_entity: StorableElement = None
+class Port(CP, ModelRepresentation):
+    # These two items have slightly illogical names. That is because they are stored in the database in
+    # the same table as regular blocks, so that connections can be made to them.
+    block: int = 0                  # The ID of the model_entity for this port.
+    parent: Optional[int] = None    # The block this port belongs to.
 
     def getShape(self):
         p = self.pos
@@ -221,15 +224,15 @@ class ModeledShapeAndPorts(ModeledShape):
         deleted = [s for s, p in self.port_shape_lookup.items() if p not in self.ports]
         for s in deleted:
             s.remove()
-        shape_lookup = {p.id: s for s, p in self.port_shape_lookup.items()}
+        shape_lookup = {p.Id: s for s, p in self.port_shape_lookup.items()}
 
         for orientation in [Orientations.LEFT, Orientations.RIGHT, Orientations.BOTTOM, Orientations.TOP]:
             ports = sorted_ports[orientation]
             pos_func = self.getPointPosFunc(orientation, ports)
             for i, p in enumerate(ports):
                 p.pos = pos_func(i)
-                if p.id in shape_lookup:
-                    p.updateShape(shape_lookup[p.id])
+                if p.Id in shape_lookup:
+                    p.updateShape(shape_lookup[p.Id])
                 else:
                     s = p.getShape()
                     _ = shape <= s
@@ -258,12 +261,11 @@ class ModeledShapeAndPorts(ModeledShape):
     def get_allowed_ports(self):
         return self.model_entity.get_allowed_ports()
 
+
 @dataclass
-class ModeledRelationship(Relationship, StorableElement):
+class ModeledRelationship(Relationship, ModelRepresentation):
     start: ModeledShape = None
     finish: ModeledShape = None
-    model_entity: Optional[ModelEntity] = None
-    diagram: int = 0
 
     @staticmethod
     def from_dict(data_store: DataStore, **details) -> Self:
