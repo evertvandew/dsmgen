@@ -181,7 +181,8 @@ def make_explorer(holder, api: DataStore, allowed_children):
             icon = element.get_icon()
             if (children := getattr(element, 'children', None)) is not None:
                 de <= html.SPAN(Class="caret fa fa-caret-right", style={"width": "1em"})
-            descriptor = html.SPAN(Class="description", draggable="true")
+            descriptor = html.SPAN(Class="description", draggable="true", data_modelid=str(element.Id),
+                                   data_modelcls=type(element).__name__)
             descriptor <= html.SPAN(Class=f"fa fa-{icon}", style={"margin-left":"1em"})
             descriptor <= html.SPAN(format_name(getattr(element, 'name', type(element).__name__)), Class=name_cls)
             de <= descriptor

@@ -5,6 +5,8 @@ import json
 import requests
 import time
 from dataclasses import is_dataclass
+
+import data_store
 from test_frame import prepare, test, run_tests, cleanup
 import generate_project     # Ensures the client is built up to date
 
@@ -210,13 +212,13 @@ def test_server():
         ])
         r = requests.post(
             base_url+'/data/Block/2/create_representation',
-            data=json.dumps({'diagram': 1, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40}),
+            data=json.dumps({'diagram': 1, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40, 'category': 2}),
             headers={'Content-Type': 'application/json'}
         )
         assert r.status_code == 201
         results = json.loads(r.content)
         for i, p in enumerate(results['children']):
-            assert p['block_cls'] == 'FlowPortRepresentation'
+            assert p['category'] == int(data_store.ReprCategory.port)
             assert p['block'] == 3 + i
             assert p['diagram'] == 1
             assert p['parent'] == 1
@@ -232,12 +234,11 @@ def test_server():
             sm._Relationship(Id=1, subtype='Anchor', source_id=3, target_id=1),
             sm._BlockRepresentation(Id=1, block=1, diagram=2),
             sm._BlockRepresentation(Id=2, block=3, diagram=2),
-            sm._RelationshipRepresentation(Id=1, diagram=2, relationship=1, source_repr_id=1, target_repr_id=2, rel_cls='Anchor'),
+            sm._RelationshipRepresentation(Id=1, diagram=2, relationship=1, source_repr_id=1, target_repr_id=2),
             sm.BlockDefinitionDiagram(Id=4, name="Test diagram"),
             sm._BlockRepresentation(Id=3, block=1, diagram=4),
             sm._BlockRepresentation(Id=4, block=3, diagram=4),
-            sm._RelationshipRepresentation(Id=2, diagram=4, relationship=1, source_repr_id=3, target_repr_id=4,
-                                           rel_cls='Anchor')
+            sm._RelationshipRepresentation(Id=2, diagram=4, relationship=1, source_repr_id=3, target_repr_id=4)
         ])
 
         # Delete the first representation
@@ -269,12 +270,12 @@ def test_server():
         # Create an instance
         r = requests.post(
             base_url+'/data/BlockInstance/3/create_representation',
-            data=json.dumps({'diagram': 2, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40}),
+            data=json.dumps({'diagram': 2, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40, 'category': 2}),
             headers={'Content-Type': 'application/json'}
         )
         assert r.status_code == 201
         results = json.loads(r.content)
-        assert results['block_cls'] == 'BlockInstanceRepresentation'
+        assert results['category'] == int(data_store.ReprCategory.block)
         assert results['Id'] == 1
         assert results['diagram'] == 2
         assert results['parent'] == None
@@ -291,7 +292,7 @@ def test_server():
         assert results['_definition']['parameters'] == '{"limit":"int","factor":"float"}'
 
         for i, p in enumerate(results['children']):
-            assert p['block_cls'] == 'FlowPortRepresentation'
+            assert p['category'] == int(data_store.ReprCategory.port)
             assert p['block'] == 4 + i
             assert p['diagram'] == 2
             assert p['parent'] == 1
@@ -326,7 +327,8 @@ def test_server():
         # Create an instance
         r = requests.post(
             base_url+'/data/BlockInstance/3/create_representation',
-            data=json.dumps({'diagram': 2, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40}),
+            data=json.dumps({'diagram': 2, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40,
+                             'category': int(data_store.ReprCategory.block)}),
             headers={'Content-Type': 'application/json'}
         )
         assert r.status_code == 201

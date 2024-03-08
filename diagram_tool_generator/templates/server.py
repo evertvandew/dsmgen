@@ -101,13 +101,17 @@ def create_port_representations(definition_id, representation_id, diagram, sessi
             width=0,
             height=0,
             styling='',
-            block_cls=type(ch).__name__ + 'Representation',
+            category=dm.ReprCategory.port,
         ) for ch in port_entities]
     for p in port_reprs:
         session.add(p)
     return port_entities, port_reprs
 
 def create_block_representation(index, table, data, session, dm):
+    """ Create a new representation of a model entity.
+        If necessary, this also creates representations of ports and other additional information
+        useful for rendering the new element in a diagram.
+    """
     if issubclass(table, dm.AInstance):
         # ensure the index actually exists, for safety
         definition_records = session.query(dm._Entity).filter(dm._Entity.Id == index).all()
@@ -139,7 +143,7 @@ def create_block_representation(index, table, data, session, dm):
         width=data['width'],
         height=data['height'],
         styling='',
-        block_cls=type(entity).__name__ + 'Representation'
+        category = dm.ReprCategory.block
     )
     record.post_init()
     session.add(record)

@@ -41,6 +41,7 @@ class ReprCategory(IntEnum):
     block = auto()
     port = auto()
     relationship = auto()
+    message = auto()
 
 
 def from_dict(cls, **details) -> Self:
@@ -163,25 +164,21 @@ class DataStore(EventDispatcher):
             Collection.block_repr: '_BlockRepresentation',
         }
 
-    # Override the dispatching methods to persist the changes
-    def add_data(self, item, source):
-        if type(item).__name__ in self.all_classes:
-            self.add(item)
-        super().add_data(item, source)
-    def update_data(self, item, source):
-        super().update_data(item, source)
-        if type(item).__name__ in self.all_classes:
-            self.update(item)
-    def delete_data(self, item, source):
-        super().delete_data(item, source)
-        if type(item).__name__ in self.all_classes:
-            self.delete(item)
-
     @contextmanager
     def transaction(self):
         yield None
 
-    def add(self, record: Any) -> Any:
+    @property
+    def ports(self) -> List[StorableElement]:
+        """ Return all port elements in the current model """
+        return [e for e in self.live_instances[Collection.block].values() if type(e).__name__ in self.configuration.port_entities]
+    @property
+    def relationships(self) -> List[StorableElement]:
+        """ Return all relationship elements in the current model """
+        return list(self.live_instances[Collection.relation].values())
+
+
+    def add(self, record: StorableElement) -> StorableElement:
         """ Persist a new element """
         collection = record.get_collection()
         if collection in Collection.representations():
@@ -215,6 +212,7 @@ class DataStore(EventDispatcher):
             data = json.dumps(repr, cls=ExtendibleJsonEncoder)
             ajax.post(f'{self.configuration.base_url}/{collection_url}', blocking=True, data=data,
                       oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
+            self.add_data(record)
             return record
         else:
             data = json.dumps(record, cls=ExtendibleJsonEncoder)
@@ -223,9 +221,10 @@ class DataStore(EventDispatcher):
                 assert self.update_cache(record) is record
             ajax.post(f'/data/{type(record).__name__}', blocking=True, data=data, oncomplete=on_complete,
                       mode='json', headers={"Content-Type": "application/json"})
+            self.add_data(record)
             return record
 
-    def update(self, record):
+    def update(self, record: StorableElement):
         collection = record.get_collection()
 
         def on_complete(update):
@@ -247,6 +246,8 @@ class DataStore(EventDispatcher):
                 data = json.dumps(repr, cls=ExtendibleJsonEncoder)
                 ajax.post(f'{self.configuration.base_url}/{url}/{record.Id}', blocking=True, data=data,
                           oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
+                self.update_data(repr)
+
             # Handle any ports
             if collection == Collection.block_repr and hasattr(record, 'ports'):
                 orig_ports = org_repr.ports
@@ -274,15 +275,17 @@ class DataStore(EventDispatcher):
                         self.update(lu_new[i])
                     assert self.update_cache(record) == record
         else:
+            # Handle non-representations
             original = self.shadow_copy[collection][record.Id]
             if record != original:
                 data = json.dumps(record, cls=ExtendibleJsonEncoder)
                 ajax.post(f'{self.configuration.base_url}/{type(record).__name__}/{record.Id}', blocking=True,
                           data=data, oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
+                self.update_data(record)
 
 
 
-    def delete(self, record):
+    def delete(self, record: StorableElement):
         collection = record.get_collection()
         def on_complete(update: JsonResponse):
             if update.status < 300:
@@ -291,8 +294,9 @@ class DataStore(EventDispatcher):
         url = type(record).__name__ if collection not in Collection.representations() else \
             self.repr_collection_urls[collection]
         ajax.delete(f'{self.configuration.base_url}/{url}/{record.Id}', blocking=True, oncomplete=on_complete)
+        self.delete_data(record)
 
-    def get(self, collection: Collection | str, Id: int):
+    def get(self, collection: Collection | str, Id: int) -> StorableElement:
         if isinstance(collection, str):
             collection = self.configuration.all_classes[collection].get_collection()
         # Check if the record is in the cache
@@ -303,6 +307,10 @@ class DataStore(EventDispatcher):
 
     def get_hierarchy(self, cb: Callable):
         def on_data(data: JsonResponse):
+            if data.status >= 400:
+                # A problem occurred loading the data
+                alert("Could not load data")
+                return
             records = self.make_objects(data)
             # Determine the actual hierarchy.
             lu = {}
@@ -405,7 +413,15 @@ class DataStore(EventDispatcher):
         model_instance = self.update_cache(model_cls.from_dict(self, **details))
         if 'children' in data:
             data['children'] = [self.decode_representation(ch) for ch in data.get('children', [])]
-        representation_cls = model_instance.get_representation_cls()
+        if data['__classname__'] == '_BlockRepresentation':
+            repr_category = data['category']
+        else:
+            repr_category = {
+                '_RelationshipRepresentation': ReprCategory.relationship,
+                '_MessageRepresentation': ReprCategory.message,
+                '_BlockInstanceRepresentation': ReprCategory.block,
+            }[data['__classname__']]
+        representation_cls = model_instance.get_representation_cls(repr_category)
         repr = representation_cls.from_dict(self, model_entity=model_instance, **data)
         self.update_cache(repr)
         return repr

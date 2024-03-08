@@ -8,7 +8,7 @@ from browser import console, svg
 from browser.widgets.dialog import InfoDialog
 from diagrams import Diagram, getMousePos, DiagramConfiguration
 import shapes
-from data_store import DataStore
+from data_store import DataStore, ReprCategory, StorableElement, Collection, ReprCategory
 from modeled_shape import ModeledRelationship, ModelEntity
 
 class ModeledDiagram(Diagram):
@@ -17,14 +17,46 @@ class ModeledDiagram(Diagram):
         self.datastore = datastore               # Interface for getting and storing diagram state
         self.diagram_id = diagram_id
 
-        def representationAction(event, source, ds, details):
-            action, clsname, Id = event.split('/')
-            item = details['item']
-            if item.diagram != diagram_id:
-                return
-            item.updateShape(item.shape)
+        def addAction(event, source: StorableElement, ds, details):
+            """ Perform specific actions when a new record is created """
+            ## If a new port is added to the model, check if it is added to any block shown here.
+            if type(source).__name__ in datastore.configuration.port_entities:
+                # Check if it is owned by any block represented directly.
+                reprs = [c for c in self.children if c.model_entity.Id is source.parent]
+                for r in reprs:
+                    repr_cls = source.get_representation_cls(ReprCategory.port)
+                    # Check it is in the ports collection of each model_entity
+                    if source not in r.model_entity.ports:
+                        r.model_entity.ports.append(source)
+                    # Check it is represented in each representation
+                    if not source in [p.model_entity for p in r.ports]:
+                        p = repr_cls(block=source.Id, parent=r.Id, model_entity=source, diagram=self.diagram_id)
+                        self.datastore.add(p)
+                        r.ports.append(p)
+                        # Redraw the shape
+                        r.updateShape(r.shape)
 
-        datastore and datastore.subscribe('*/*Representation/*', self, representationAction)
+                # Check if it is owned by a diagram block whose diagram is shown here
+                if source.parent == self.diagram_id:
+                    # Now we need to create a PortLabel
+                    repr_cls = source.get_representation_cls(ReprCategory.block)
+                    self.addBlock(repr_cls(model_entity=source, block=source.Id, diagram=self.diagram_id))
+
+                # Check if it is owned by a block that is instantiated here.
+                reprs = [c for c in self.children if getattr(getattr(c, '_definition', None), 'Id', -1) == source.parent]
+                for r in reprs:
+                    repr_cls = source.get_representation_cls(ReprCategory.port)
+                    # Check it is in the ports collection of each _definition
+                    if source not in r._definition.ports:
+                        r._definition.append(source)
+                    # Check it is represented
+                    if not source in [p.model_entity for p in r.ports]:
+                        p = repr_cls(block=source.Id, parent=r.Id, model_entity=source, diagram=self.diagram_id)
+                        r.ports.append(p)
+                        self.datastore.add(p)
+                        r.shape.updateShape()
+
+        datastore.subscribe('add/*', self, addAction)
 
     @classmethod
     def get_allowed_blocks(cls, block_cls_name: str, for_drop=False) -> Dict[str, Type[ModelEntity]]:
@@ -49,7 +81,7 @@ class ModeledDiagram(Diagram):
         # First create the model_entity for the connection.
         connection = cls(source=a.model_entity, target=b.model_entity)
         # Create the representation of the connection.
-        representation = ModeledRelationship(model_entity=connection, start=a, finish=b)
+        representation = ModeledRelationship(model_entity=connection, start=a, finish=b, diagram=self.diagram_id)
         # Add the connection to the diagram & database
         self.datastore and self.datastore.add(representation)
         super().addConnection(representation)
@@ -80,7 +112,7 @@ class ModeledDiagram(Diagram):
             return
 
         block_cls = allowed_blocks[data['__classname__']]
-        repr_cls = block_cls.get_representation_cls()
+        repr_cls = block_cls.get_representation_cls(ReprCategory.block)
         default_style = repr_cls.getDefaultStyle()
         drop_details = dict(
             x=loc.x, y=loc.y,

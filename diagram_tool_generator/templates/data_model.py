@@ -141,6 +141,13 @@ def init_db():
 # #
 # # The contents of a diagram are stored in separate structures.
 
+class ReprCategory(IntEnum):
+    no_repr = auto()
+    block = auto()
+    port = auto()
+    relationship = auto()
+    message = auto()
+
 
 class EntityType(IntEnum):
     Block = auto()
@@ -180,7 +187,29 @@ class _BlockRepresentation(Base):
     order: int = Column(Integer)
     orientation: int = Column(Integer)
     styling: str = Column(String)
-    block_cls: str = Column(String)
+    category: int = Column(Integer)
+
+    def post_init(self):
+        """ In the database, styling is stored as a string. """
+        if isinstance(self.styling, dict):
+            # Using `eval` is insecure, parse the string directly.
+            self.styling = json.dumps(self.styling) if self.styling else ''
+
+    def asdict(self):
+        """ When converting to json, format the styling as a string """
+        result = Base.asdict(self)
+        result['styling'] = json.loads(self.styling) if self.styling else {}
+        result['__classname__'] = type(self).__name__
+        return result
+
+class _MessageRepresentation(Base):
+    Id: int = Column(Integer, primary_key=True)
+    diagram: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
+    message: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
+    parent: int = Column(Integer, ForeignKey("_relationshiprepresentation.Id", ondelete='CASCADE'))
+    order: int = Column(Integer)
+    orientation: int = Column(Integer)
+    styling: str = Column(String)
 
     def post_init(self):
         """ In the database, styling is stored as a string. """
@@ -204,7 +233,6 @@ class _RelationshipRepresentation(Base):
     routing: bytes = Column(String)       # JSON list of Co-ordinates of nodes
     z: float = Column(Float)                   # For ensuring the line goes over the right blocks.
     styling: str = Column(String)
-    rel_cls: str = Column(String)
 
     def post_init(self):
         """ In the database, styling is stored as a string. """
@@ -215,6 +243,7 @@ class _RelationshipRepresentation(Base):
         """ When converting to json, format the styling as a string """
         result = super().asdict()
         result['styling'] = json.loads(self.styling)
+        result['__classname__'] = type(self).__name__
         return result
 
 

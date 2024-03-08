@@ -1,7 +1,7 @@
 
 import json
 from test_frame import prepare, test, run_tests
-from data_store import DataConfiguration, DataStore, Collection, ExtendibleJsonEncoder
+from data_store import DataConfiguration, DataStore, Collection, ExtendibleJsonEncoder, ReprCategory
 import generate_project     # Ensures the client is built up to date
 from unittest.mock import Mock
 from build import sysml_data as sm
@@ -73,26 +73,26 @@ def data_store_tests():
         add_expected_response('/data/diagram_contents/3', 'get', Response(
             200,
             json=[{"Id": 1, "diagram": 3, "block": 4, "x": 401.0, "y": 104.0, "z": 0.0, "width": 64.0, "height": 40.0,
-                   "styling": {"color": "yellow"}, "block_cls": "BlockRepresentation",
+                   "styling": {"color": "yellow"}, "category": ReprCategory.block,
                    "__classname__": "_BlockRepresentation",
                    "_entity": {"order": 0, "Id": 4, "parent": None, "name": "Test1", "description": "This is a test block",
                                "__classname__": "Block"}},
                   {"Id": 2, "diagram": 3, "block": 5, "x": 369.0, "y": 345.0, "z": 0.0, "width": 64.0, "height": 40.0,
-                   "styling": {}, "block_cls": "BlockRepresentation", "__classname__": "_BlockRepresentation",
+                   "styling": {}, "category": ReprCategory.block, "__classname__": "_BlockRepresentation",
                    "_entity": {"order": 0, "Id": 5, "parent": 2, "name": "Test2", "description": "",
                                "__classname__": "Block"}},
                   {"Id": 3, "diagram": 3, "block": 7, "x": 101.0, "y": 360.0, "z": 0.0, "width": 110.0, "height": 65.0,
                    "styling": {"bordercolor": "#000000", "bordersize": "2", "blockcolor": "#fffbd6", "fold_size": "10",
                                "font": "Arial", "fontsize": "16", "textcolor": "#000000", "xmargin": 2, "ymargin": 2,
-                               "halign": 11, "valign": 2}, "block_cls": "NoteRepresentation",
+                               "halign": 11, "valign": 2}, "category": ReprCategory.block,
                    "__classname__": "_BlockRepresentation",
                    "_entity": {"order": 0, "Id": 7, "description": "Dit is een commentaar", "parent": 3,
                                "__classname__": "Note"}},
                   {"Id": 1, "diagram": 3, "relationship": 1, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]",
-                   "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation",
+                   "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation", "rel_cls": "BlockReferenceRepresentation",
                    "_entity": {"Id": 1, "stereotype": 1, "source": 4, "target": 5, "source_multiplicity": 1,
                                "target_multiplicity": 1, "__classname__": "BlockReference"}},
-                  {"Id": 51, "diagram": 3, "block": 10, "parent": 2, "__classname__": "_BlockRepresentation", "block_cls": "FlowPortRepresentation",
+                  {"Id": 51, "diagram": 3, "block": 10, "parent": 2, "__classname__": "_BlockRepresentation", "category": ReprCategory.port,
                    "_entity": {"Id": 10, "parent": 5, "__classname__": "FlowPort"}}
                   ]))
 

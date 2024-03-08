@@ -133,15 +133,21 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
     %if generator.md.is_representable(entity):
     @classmethod
-    def get_representation_cls(cls) -> Optional[Union[ms.ModeledShape, ms.ModeledShapeAndPorts, ms.Port, ms.ModeledRelationship]]:
+    def get_representation_cls(cls, category: ms.ReprCategory) -> Optional[Union[ms.ModeledShape, ms.ModeledShapeAndPorts, ms.Port, ms.ModeledRelationship]]:
     %if generator.md.is_relationship(entity):
-        return ms.ModeledRelationship
+        if category == ms.ReprCategory.relationship:
+            return ms.ModeledRelationship
     %elif generator.md.is_port(entity):
-        return ms.Port
+        if category == ms.ReprCategory.block:
+            return PortLabel
+        elif category == ms.ReprCategory.port:
+            return ms.Port
     %elif generator.get_allowed_ports().get(entity.__name__, []) or generator.md.is_instance_of(entity):
-        return ms.ModeledShapeAndPorts
+        if category == ms.ReprCategory.block:
+            return ms.ModeledShapeAndPorts
     %else:
-        return ms.ModeledShape
+        if category == ms.ReprCategory.block:
+            return ms.ModeledShape
     %endif
 
     %endif
@@ -257,9 +263,6 @@ class PortLabel(ms.ModeledShape):
     def is_instance_of(cls):
         return False
 
-    def get_representation_cls(self) -> Optional[Union[ms.ModeledShape, ms.ModeledShapeAndPorts, ms.Port, ms.ModeledRelationship]]:
-        return ms.ModeledShape
-
 
 allowed_children = {
     % for name in generator.all_names.keys():
@@ -366,8 +369,25 @@ def on_explorer_click(_event_name, _event_source, data_store, details):
     properties_div <= dataClassEditor(data_element, data_element.get_editable_parameters(), data_store, update=update)
 
 
+def on_explorer_dblclick(data_store, details, tabview):
+    """ Called when an element was double-clicked. """
+    target_dbid: int = details['target_dbid']
+    target_type: str = details['target_type']
 
-def run(explorer, canvas, details):
+    # If a diagram is double-clicked, open it.
+    if target_type in diagram_classes:
+        svg_tag = html.SVG(id=target_dbid)
+        svg_tag <= getMarkerDefinitions()
+        svg_tag.classList.add('diagram')
+        # container <= svg_tag
+        ## In future: subscribe to events in the diagram api.
+        config = DiagramConfig(connections_from)
+        diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], config, data_store, svg_tag)
+        diagram_details = data_store.get(target_type, target_dbid)
+        tabview.add_page(diagram_details.name, svg_tag, diagram)
+        data_store.subscribe('shape_selected', svg_tag, on_diagram_selection)
+
+def run(explorer: str, canvas: str, details: str):
     config = DataConfiguration(
         hierarchy_elements=explorer_classes,
         block_entities=block_entities,
@@ -380,33 +400,13 @@ def run(explorer, canvas, details):
 
 
     blank = document[explorer]
-    diagram_tabview = TabView('canvas')
+    diagram_tabview = TabView(canvas)
 
-    def on_explorer_dblclick(_event_name, event_source, data_store, details):
+    def on_dblclick(_event_name, event_source, data_store, details):
         """ Called when an element was left-clicked. """
-        canvas = details['context']['canvas']
-        target_dbid: int = details['target_dbid']
-        target_type: str = details['target_type']
+        on_explorer_dblclick(data_store, details, diagram_tabview)
 
-        # If a diagram is double-clicked, open it.
-        def oncomplete(response):
-            # Clear any existing diagrams
-            svg_tag = html.SVG()
-            svg_tag <= getMarkerDefinitions()
-            svg_tag.classList.add('diagram')
-            # container <= svg_tag
-            ## In future: subscribe to events in the diagram api.
-            config = DiagramConfig(connections_from)
-            diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], config, data_store, svg_tag)
-            diagram_details = data_store.get(target_type, target_dbid)
-            diagram_tabview.add_page(diagram_details.name, svg_tag, diagram.close)
-            data_store.subscribe('shape_selected', svg_tag, on_diagram_selection)
-
-        if target_type in diagram_classes:
-            ajax.get(f'/data/diagram_contents/{target_dbid}', oncomplete=oncomplete)
-
-
-    data_store.subscribe('dblclick', blank, on_explorer_dblclick, context={'canvas': canvas})
+    data_store.subscribe('dblclick', blank, on_dblclick, context={'canvas': canvas})
     data_store.subscribe('click', blank, on_explorer_click)
     make_explorer(blank, data_store, allowed_children)
 
@@ -417,3 +417,5 @@ def run(explorer, canvas, details):
         if cm := document.get(id=context_menu_name):
             cm.close()
 
+    # Return the data_store so it can be accessed in integration tests.
+    return data_store, diagram_tabview

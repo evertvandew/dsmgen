@@ -1,6 +1,7 @@
 
 
 # Bugs:
+* When adding or removing ports to a definition, its representations in Implementations aren't updated.
 * When editing the name of a block or adding one, the explorer is not updated.
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
 * Some exceptions occur when manipulating connections.
@@ -24,7 +25,8 @@
 * Get rid of mechanisms where the presence of an attribute decides actions. Replace these with (member) functions.
 
 # Future enhancements
-* Make it possible for library blocks to create inputs based on configuration.
+* Make it possible for library blocks to create inputs based on configuration. This requires a new mechanism.
+  Probably in the function `addAction` in `modeled_diagram.py`.
 * Make transactions of what happens in an event handler, so that if an exception occurs, the system stays in a known 
   state.
 * Allow extra details to be shown around a relationship.
@@ -49,7 +51,7 @@
 * Implement a proper Z-order in the diagrams.
 * The explorer should handle create and rename events from entities created while editing a diagram.
 * Port to an environment where the javascript is pre-compiled. Probably pyjamas or pyjaco? Or perhaps to Kotlin?
-* Automatisch uitlijnen en grootte van blokken bepalen.
+* Automatic alignment and sizing of blocks.
 * Scrolling of the diagram viewer.
 * Resizing of the frames in the tool (explorer / diagram / details).
 * Implementation of Undo / Redo.

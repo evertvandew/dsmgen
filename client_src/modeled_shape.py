@@ -6,6 +6,7 @@ from browser import svg, console
 from diagrams import shapes, Shape, Relationship, CP, Point, Orientations
 from data_store import StorableElement, Collection, ReprCategory, from_dict, ExtendibleJsonEncoder, DataStore
 from point import load_waypoints
+from enum import IntEnum, auto
 
 
 
@@ -43,8 +44,10 @@ class ModelEntity:
         return False
 
     @classmethod
-    def get_representation_cls(cls) -> Optional[Self]:
-        """ Create a shape representing this model item. """
+    def get_representation_cls(cls, context: ReprCategory) -> Optional[Self]:
+        """ Create a shape representing this model item.
+            context: how this entity is represented: as a block, as a port, as a relation, etc.
+        """
         return None
 
     @classmethod
@@ -65,6 +68,20 @@ class ModelEntity:
 class ModelRepresentation(StorableElement):
     model_entity: ModelEntity = None
     diagram: int = 0                    # Diagram in which this representation is displayed.
+
+    @classmethod
+    def repr_category(cls) -> ReprCategory:
+        raise NotImplementedError()
+
+    def getShape(self):
+        shape = self.getShape()
+        shape.attrs['id'] = self.Id
+        shape.attrs['data-modelid'] = str(self.model_entity.Id)
+        shape.attrs['data-reprid'] = str(self.Id)
+        shape.attrs['data-reprcls'] = type(self).__name__
+        shape.attrs['data-modelcls'] = type(self.model_entity).__name__
+        return shape
+
 
 @dataclass
 class ModeledShape(Shape, ModelRepresentation):
@@ -102,6 +119,7 @@ class ModeledShape(Shape, ModelRepresentation):
         style.update(cls.default_style.copy())
         return style
 
+    @classmethod
     def repr_category(cls) -> ReprCategory:
         return ReprCategory.block
 
@@ -202,6 +220,7 @@ class ModeledShapeAndPorts(ModeledShape):
                 p.pos = pos_func(i)
                 s = p.getShape()
                 _ = g <= s
+                p.shape = s
                 port_shape_lookup[s] = p
         self.port_shape_lookup = port_shape_lookup
 
@@ -234,7 +253,9 @@ class ModeledShapeAndPorts(ModeledShape):
                 if p.Id in shape_lookup:
                     p.updateShape(shape_lookup[p.Id])
                 else:
+                    # Get the shape for the port
                     s = p.getShape()
+                    p.shape = s
                     _ = shape <= s
                     self.port_shape_lookup[s] = p
 

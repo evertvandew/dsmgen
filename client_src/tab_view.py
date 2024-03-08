@@ -1,18 +1,27 @@
 
 from typing import Optional, Callable
-from browser import document, html, bind
+from browser import document, html, bind, events
+
+header_cls = "tabview-header"
+body_cls = "tabview-body"
+
+
+class Closeable:
+    def close(self):
+        raise NotImplementedError()
 
 class TabView:
     def __init__(self, parent):
         self.container = document[parent]
         c = self.container
-        self.header = html.DIV(Class="tabview-header")
-        self.body = html.DIV(Class="tabview-body")
+        self.header = html.DIV(Class=header_cls)
+        self.body = html.DIV(Class=body_cls)
         c <= self.header
         c <= self.body
         self.current_page: Optional[Closeable] = None
+        self.current_diagram: Optional[Closeable] = None
 
-    def add_page(self, title, page, closer: Callable = None):
+    def add_page(self, title, page, diagram: Closeable = None):
         new_header = html.SPAN(title, Class='tab')
         btn = html.SPAN(Class='fa fa-times', style='background-color:red;color:white')
         new_header <= btn
@@ -23,8 +32,8 @@ class TabView:
         def onClose(evt):
             nonlocal new_header, page
             page.remove()
-            if closer != None:
-                closer()
+            if diagram != None:
+                diagram.close()
             current_tabs = self.header.select('.tab')
             current_index = current_tabs.index(new_header)
             new_header.remove()
@@ -35,11 +44,11 @@ class TabView:
 
             # Click the tab to the right (or left if none exists) the existing tab.
             new_index = current_index if current_index < len(current_tabs) else len(current_tabs)-1
-            current_tabs[new_index]
+            current_tabs[new_index].dispatchEvents(events.Click())
 
 
         @bind(new_header, 'click')
-        def onActivate(evt):
+        def onActivate(evt: Optional):
             nonlocal new_header, page
             if self.current_page:
                 self.current_page.style.display = 'none'
@@ -48,6 +57,7 @@ class TabView:
             for t in self.header.select('.tab-active'):
                 t.classList.remove('tab-active')
             new_header.classList.add('tab-active')
+            self.current_diagram = diagram
 
         # Display the page and hide the others.
         onActivate(None)

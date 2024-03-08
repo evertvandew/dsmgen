@@ -1,6 +1,6 @@
 """ Stub of the Brython HTML interface """
 
-from typing import Self, Iterable, List, Dict, Callable
+from typing import Self, Iterable, List, Dict, Callable, Optional, Any, Tuple
 from enum import Enum
 import re
 from copy import copy
@@ -215,6 +215,21 @@ def parse_selector(s):
     return selector
 
 
+class Style:
+    """ In Brython, the class can be treated as a dict or as a regular object with members. """
+    def __init__(self, d: Optional[Dict[str, Any] | List[Tuple[str, Any]]]):
+        if isinstance(d, dict):
+            self.__dict__.update(d)
+        elif isinstance(d, list):
+            for k, v in d:
+                self.__dict__[k] = v
+    def __setitem__(self, key: str, value: Any):
+        self.__dict__[key] = value
+    def __getitem__(self, key: str, default: Optional[Any] = None):
+        if default is not None:
+            return getattr(self, key, default)
+        return getattr(self, key)
+
 class tag:
     """ Base class for all tags.
         Tags have a uniform interface, so no tags need custom attributes or code.
@@ -224,7 +239,7 @@ class tag:
         self.children = []
         self.parent = None
         self.subscribers: Dict[str, List[Callable]] = {}
-        self.style = {}
+        self.style = Style({})
         if content:
             if isinstance(content, str):
                 if '<' in content:
@@ -241,14 +256,14 @@ class tag:
         if 'text' in kwargs:
             self.text = kwargs['text']
             del kwargs['text']
-        self.attrs = kwargs
+        self.attrs = {k.replace('_', '-'): v for k, v in kwargs.items()}
         self.classList = set(self.attrs.get('Class', '').split())
         if 'style' in kwargs:
             if isinstance(kwargs['style'], str):
-                self.style = {k:v for k, v in [l.strip().split(':', maxsplit=1) for l in kwargs['style'].split(';')]}
+                self.style = Style({k:v for k, v in [l.strip().split(':', maxsplit=1) for l in kwargs['style'].split(';')]})
             else:
                 assert isinstance(kwargs['style'], dict)
-                self.style = kwargs['style']
+                self.style = Style(kwargs['style'])
 
     def __repr__(self):
         children = ''.join(str(c) for c in self.children)

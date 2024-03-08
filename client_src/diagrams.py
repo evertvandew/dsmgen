@@ -10,7 +10,7 @@ from math import inf
 import json
 from point import Point
 from shapes import (Shape, CP, Relationship, getMousePos, Orientations, BlockOrientations, OwnerInterface)
-from data_store import DataStore, ExtendibleJsonEncoder
+from data_store import DataStore, ExtendibleJsonEncoder, ReprCategory
 import shapes
 import svg_shapes
 
@@ -651,7 +651,7 @@ def createSvgButtonBar(canvas, icons, callbacks, hover_texts=None, x=0, y=0):
     # Create the buttons
     for i, (icon, cb) in enumerate(zip(icons, callbacks)):
         xi = x+i*(margin+width)
-        r = svg.rect(x=xi, y=y, width=width, height=width, fill='#EFF0F1', stroke='#000000',
+        r = svg.rect(id=cb.__name__, x=xi, y=y, width=width, height=width, fill='#EFF0F1', stroke='#000000',
                            stroke_width='1', ry='2')
         g = icon(xi+2*margin, y+2*margin, width-4*margin)
         canvas <= r
@@ -686,18 +686,18 @@ class BlockCreateWidget:
         self.diagram_id = diagram.diagram_id
         blocks = {k: b for k, b in diagram.get_allowed_blocks().items() if not b.is_instance_of()}
 
-        g = svg.g()
+        g = svg.g(id=type(self).__name__)
         # Draw the border of the widget
         _ = g <= svg.rect(x=0, width=2*self.margin+1.6*self.height, y=0, height=len(blocks)*(self.height+self.margin)+self.margin,
                       fill='white', stroke='black', stroke_width="2")
         for i, (name, block_cls) in enumerate(blocks.items()):
             entity = block_cls()
-            repr_cls = entity.get_representation_cls()
-            console.log(f"Creating element of type {repr_cls.__name__} -- shape: {repr_cls.getShapeDescriptor()}")
+            repr_cls = entity.get_representation_cls(ReprCategory.block)
             representation = repr_cls(x=self.margin, y=i*(self.height+self.margin)+self.margin,
                          height=self.height, width=1.6*self.height)
             representation.logical_class = block_cls
             shape = representation.getShape()
+            shape.attrs['id'] = f'create_{name}_btn'
             _ = g <= shape
             _ = g <= svg.text(name, x=self.margin+5, y=i*(self.height+self.margin)+self.margin + self.height/1.5,
                 font_size=12, font_family='arial')
@@ -712,7 +712,7 @@ class BlockCreateWidget:
         # Simply create a new block at the default position.
         cls = type(representation)
         instance = cls(x=300, y=300, height=self.height, width=int(1.6*self.height), diagram=self.diagram_id)
-        instance.logical_class = representation.logical_class
+        instance.model_entity = representation.logical_class(parent=self.diagram_id)
         diagram.datastore.add(instance)
         diagram.addBlock(instance)
 

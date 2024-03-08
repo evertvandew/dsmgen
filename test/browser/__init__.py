@@ -15,4 +15,5 @@ def bind(node, event):
                 n.bind(event, func)
         else:
             node.bind(event, func)
+        return func
     return decorate
