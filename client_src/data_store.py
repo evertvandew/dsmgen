@@ -413,7 +413,7 @@ class DataStore(EventDispatcher):
         model_instance = self.update_cache(model_cls.from_dict(self, **details))
         if 'children' in data:
             data['children'] = [self.decode_representation(ch) for ch in data.get('children', [])]
-        if data['__classname__'] == '_BlockRepresentation':
+        if 'category' in data:
             repr_category = data['category']
         else:
             repr_category = {

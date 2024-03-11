@@ -1,6 +1,6 @@
 
 from typing import Optional, Callable
-from browser import document, html, bind, events
+from browser import document, html, bind
 
 header_cls = "tabview-header"
 body_cls = "tabview-body"
@@ -44,7 +44,7 @@ class TabView:
 
             # Click the tab to the right (or left if none exists) the existing tab.
             new_index = current_index if current_index < len(current_tabs) else len(current_tabs)-1
-            current_tabs[new_index].dispatchEvents(events.Click())
+            current_tabs[new_index]
 
 
         @bind(new_header, 'click')

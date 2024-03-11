@@ -237,12 +237,12 @@ class _RelationshipRepresentation(Base):
     def post_init(self):
         """ In the database, styling is stored as a string. """
         if isinstance(self.styling, dict):
-            self.styling = json.dumps(self.styling)
+            self.styling = json.dumps(self.styling) if self.styling else ''
 
     def asdict(self):
         """ When converting to json, format the styling as a string """
         result = super().asdict()
-        result['styling'] = json.loads(self.styling)
+        result['styling'] = json.loads(self.styling) if result['styling'] else {}
         result['__classname__'] = type(self).__name__
         return result
 

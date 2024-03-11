@@ -387,14 +387,17 @@ def on_explorer_dblclick(data_store, details, tabview):
         tabview.add_page(diagram_details.name, svg_tag, diagram)
         data_store.subscribe('shape_selected', svg_tag, on_diagram_selection)
 
-def run(explorer: str, canvas: str, details: str):
-    config = DataConfiguration(
+
+data_config = DataConfiguration(
         hierarchy_elements=explorer_classes,
         block_entities=block_entities,
         relation_entities=relation_classes,
         port_entities=port_classes,
         base_url='/data'
     )
+
+def run(explorer: str, canvas: str, details: str):
+    config = data_config
 
     data_store = DataStore(config)
 

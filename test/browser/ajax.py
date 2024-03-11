@@ -3,6 +3,12 @@
 from dataclasses import dataclass
 from typing import Callable, Optional, Any, List
 from xml.etree import ElementTree
+import requests
+import json
+
+DO_NOT_SIMULATE = False
+server_base = ''
+
 
 class rest_call:
     def __exec__(self, *args, **kwargs):
@@ -36,24 +42,31 @@ def clear_expected_response():
     unexpected_requests = []
 
 def determine_response(url, method, kwargs):
-    index = None
-    for i, r in enumerate(expected_responses):
-        if r.url == url and r.method == method:
-            index = i
-            break
-    if index is None:
-        response = Response(408)  # Timeout return code
-        unexpected_requests.append(ExpectedResponse(url=url, method=method, response=Response(408, kwargs)))
+    if DO_NOT_SIMULATE:
+        func = {'get': requests.get, 'post': requests.post, 'delete': requests.delete, 'put': requests.put}[method.lower()]
+        r = func(server_base+url, data=kwargs)
+        response = Response(r.status_code, r.text)
+        if r.status_code < 300:
+            response.json = r.json()
     else:
-        expected = expected_responses[index]
-        if expected.check_request:
-            expected.check_request(url, method, kwargs)
-        if not expected.reuse:
-            expected_responses.pop(index)
-        if expected.get_response:
-            response = expected.get_response(url, method, kwargs)
+        index = None
+        for i, r in enumerate(expected_responses):
+            if r.url == url and r.method == method:
+                index = i
+                break
+        if index is None:
+            response = Response(408)  # Timeout return code
+            unexpected_requests.append(ExpectedResponse(url=url, method=method, response=Response(408, kwargs)))
         else:
-            response = expected.response
+            expected = expected_responses[index]
+            if expected.check_request:
+                expected.check_request(url, method, kwargs)
+            if not expected.reuse:
+                expected_responses.pop(index)
+            if expected.get_response:
+                response = expected.get_response(url, method, kwargs)
+            else:
+                response = expected.response
     if cb := kwargs.get('oncomplete'):
         cb(response)
 

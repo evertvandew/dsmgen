@@ -29,6 +29,7 @@ def run_server():
 
 @prepare
 def test_server():
+    import public.sysml_client as client
     #base_url = 'http://localhost:5200'
     base_url = run_server()
 
@@ -180,6 +181,15 @@ def test_server():
 
     @test
     def test_diagram_contents():
+        from data_store import DataStore, Collection
+        from browser import ajax
+        ajax.DO_NOT_SIMULATE = True
+        ajax.server_base = base_url
+
+        @cleanup
+        def clean_up():
+            ajax.DO_NOT_SIMULATE = False
+
         sm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
         clear_db()
         load_db([
@@ -187,17 +197,30 @@ def test_server():
             sm.BlockDefinitionDiagram(Id=2, name="Test diagram"),
             sm.Block(Id=3, name="Block 1", description="Dit is een test", parent=2, order=1),
             sm.FlowPort(Id=4, name='out', orientation=4, parent=3),
-            sm._BlockRepresentation(Id=1, block=1, diagram=2),
-            sm._BlockRepresentation(Id=2, block=3, diagram=2),
-            sm._BlockRepresentation(Id=3, block=4, parent=2, diagram=2)
+            sm._BlockRepresentation(Id=1, block=1, diagram=2, category=2),
+            sm._BlockRepresentation(Id=2, block=3, diagram=2, category=2),
+            sm._BlockRepresentation(Id=3, block=4, parent=2, diagram=2, category=3),
+            sm.Anchor(Id=1, source=1, target=3),
+            sm._RelationshipRepresentation(
+                Id=1,
+                diagram=2,
+                relationship=1,
+                source_repr_id=1,
+                target_repr_id=2
+            )
         ])
 
-        r = requests.get(base_url+'/data/diagram_contents/2')
-        assert r.status_code == 200
-        results = json.loads(r.content)
-        assert len(results) == 3
-        assert results[0]['diagram'] == 2
-        assert results[1]['diagram'] == 2
+        ds = DataStore(client.data_config)
+        def check_data(data):
+            assert len(data) == 3
+            assert len(data[1].ports) == 1
+        ds.get_diagram_data(2, check_data)
+        assert len(ds.live_instances[Collection.block_repr]) == 3
+        assert len(ds.live_instances[Collection.block]) == 3
+        assert len(ds.live_instances[Collection.relation_repr]) == 1
+        assert len(ds.live_instances[Collection.relation]) == 1
+
+        # Add tests for instances and PortLabels.
 
     @test
     def test_create_block_representation():
@@ -349,5 +372,5 @@ def test_server():
         assert results['_definition']['parameters'] == ''
 
 if __name__ == '__main__':
-    run_tests('*.test_create_instance_no_parameters')
+    run_tests('*.test_diagram_contents')
     run_tests()

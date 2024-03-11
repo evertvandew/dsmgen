@@ -35,6 +35,8 @@ class Point:
 
 def load_waypoints(s: str) -> List[Tuple[float, float]]:
     """ The Brython JSON decoder doesn't handle infinity, so we need a workaround. """
+    if not s:
+        return []
     # Check the string doesn't contain anything weird
     # Do not allow parenthesis, as function calls are dangerous.
     if '(' in s:

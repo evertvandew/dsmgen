@@ -1,6 +1,7 @@
 
 
 # Bugs:
+* Check that closing a tab will activate the right one of the remaining diagrams.
 * When adding or removing ports to a definition, its representations in Implementations aren't updated.
 * When editing the name of a block or adding one, the explorer is not updated.
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
@@ -8,6 +9,7 @@
 * Use `get_type_hints` instead of raw `__annotations__`.
 * Double-click on a subprogram doesn't open the associated diagram.
 * When dragging an object, escape does not stop the behaviour if the mouse is not pressed down.
+
 
 
 # TODO for the First Viable Product Release:

@@ -371,7 +371,7 @@ def get_hierarchy():
 def diagram_contents(index):
     with dm.session_context() as session:
         # Get the representations shown in the diagram.
-        # Get the representations shown in the diagram.
+        # Using a pure SQL query is easier to get the blocks than tickeling SQLAlchemy and massaging what its returns.
         result = session.execute(text('''
             SELECT _blockrepresentation.*, _entity.details as _entity, definition.details as _definition
             FROM _blockrepresentation 
@@ -381,15 +381,23 @@ def diagram_contents(index):
         '''), {'index': index})
 
         data = [{k:v for k, v in zip(r._fields, r._data)} for r in result]
+        for d in data:
+            d['__classname__'] = '_BlockRepresentation'
 
-    for r in data:
-        details = json.loads(r['_entity'])
-        r['_entity'] = details
-        if details['__classname__'] in INSTANCE_ENTITIES:
-            definition = json.loads(r['_definition'])
-            r['_definition'] = definition
-        else:
-            del r['_definition']
+        for r in data:
+            details = json.loads(r['_entity'])
+            r['_entity'] = details
+            if details['__classname__'] in INSTANCE_ENTITIES:
+                definition = json.loads(r['_definition'])
+                r['_definition'] = definition
+            else:
+                del r['_definition']
+
+        # Relationships are more straight-forward.
+        for relat_rep in session.query(dm._RelationshipRepresentation, dm._Relationship).filter(dm._RelationshipRepresentation.diagram==index).join(dm._Relationship).all():
+            r = relat_rep[0].asdict()
+            r['_entity'] = json.loads(relat_rep[1].details)
+            data.append(r)
 
     response = flask.make_response(
         json.dumps(data, cls=dm.ExtendibleJsonEncoder).encode('utf8'),
