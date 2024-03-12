@@ -193,34 +193,54 @@ def test_server():
         sm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
         clear_db()
         load_db([
-            sm.Note(Id=1, description="Don't mind me"),
-            sm.BlockDefinitionDiagram(Id=2, name="Test diagram"),
-            sm.Block(Id=3, name="Block 1", description="Dit is een test", parent=2, order=1),
-            sm.FlowPort(Id=4, name='out', orientation=4, parent=3),
-            sm._BlockRepresentation(Id=1, block=1, diagram=2, category=2),
-            sm._BlockRepresentation(Id=2, block=3, diagram=2, category=2),
-            sm._BlockRepresentation(Id=3, block=4, parent=2, diagram=2, category=3),
-            sm.Anchor(Id=1, source=1, target=3),
+            # Create a model, with one recursive block with a port,
+            # and three connected blocks inside. Including the instance of another block
+            sm.SubProgramDefinition(Id=2, name="Test diagram"),
+            sm.FlowPort(Id=1, name='in', parent=2),
+            sm.SubProgramDefinition(Id=3),
+            sm.FlowPort(Id=4, parent=3),
+            sm.BlockInstance(Id=5, definition=3),
+            sm.Block(Id=6, name="Block 1", description="Dit is een test"),
+            sm.Note(Id=7, description="Don't mind me"),
+            sm.FlowPortConnection(Id=1, source=1, target=4),
+            sm.Anchor(Id=2, source=7, target=6),
+
+            # Put the representations in diagram #1
+            # First the "blocks"
+            sm._BlockRepresentation(Id=1, block=1, diagram=2, category=2),  # Port Label!
+            sm._BlockRepresentation(Id=2, block=5, diagram=2, category=2),  # BlockInstance
+            sm._BlockRepresentation(Id=3, block=6, diagram=2, category=2),  # Block
+            sm._BlockRepresentation(Id=4, block=7, diagram=2, category=2),  # Note
+            # The ports represented as ports
+            sm._BlockRepresentation(Id=5, block=4, diagram=2, parent=2, category=3), # Port linked to block instance
+            # Relationships
             sm._RelationshipRepresentation(
                 Id=1,
                 diagram=2,
                 relationship=1,
                 source_repr_id=1,
-                target_repr_id=2
-            )
+                target_repr_id=5
+            ),  # From PortLabel to BlockInstance port
+            sm._RelationshipRepresentation(
+                Id=2,
+                diagram=2,
+                relationship=2,
+                source_repr_id=4,
+                target_repr_id=3
+            )  # From Note to Block
         ])
 
         ds = DataStore(client.data_config)
         def check_data(data):
-            assert len(data) == 3
+            assert len(data) == 6
             assert len(data[1].ports) == 1
-        ds.get_diagram_data(2, check_data)
-        assert len(ds.live_instances[Collection.block_repr]) == 3
-        assert len(ds.live_instances[Collection.block]) == 3
-        assert len(ds.live_instances[Collection.relation_repr]) == 1
-        assert len(ds.live_instances[Collection.relation]) == 1
 
-        # Add tests for instances and PortLabels.
+        ds.get_diagram_data(2, check_data)
+        assert len(ds.live_instances[Collection.block_repr]) == 5
+        assert len(ds.live_instances[Collection.block]) == 6
+        assert len(ds.live_instances[Collection.relation_repr]) == 2
+        assert len(ds.live_instances[Collection.relation]) == 2
+        assert ds.live_instances[Collection.block_repr][2].model_entity.definition.Id == 3
 
     @test
     def test_create_block_representation():
