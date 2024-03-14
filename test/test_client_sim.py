@@ -134,6 +134,10 @@ diagram_w_instance = [
 
 
 class IntegrationContext:
+
+    def get_new_id(self, block_cls: Type[StorableElement]) -> int:
+        return max(list(self.data_store.live_instances[block_cls.get_collection()]) + [0]) + 1
+
     def __init__(self, hierarchy=None):
         d.clear()
         d <= html.DIV(id='explorer')
@@ -201,6 +205,12 @@ class IntegrationContext:
                 btn.dispatchEvent(events.MouseUp())
                 # Check the AJAX requests were consumed.
                 assert len(expected_responses) == 0
+
+            def click_block(self, rid: int):
+                shape = self.resolve(rid).shape
+                shape.dispatchEvent(events.MouseDown())
+                shape.dispatchEvent(events.MouseUp())
+                shape.dispatchEvent(events.Click())
 
             def move_block(self, rid: int, cood: Tuple[float,float] | Point):
                 """ Move the block by manipulating it through mouse events
@@ -285,16 +295,73 @@ class IntegrationContext:
                 assert len(expected_responses) == 0
                 assert not unexpected_requests
 
+        class PropertyEditorApi(HtmlApi):
+            parent: html.tag = d['details']
+
+            def save(self):
+                """ Save the current values in the port editor to the model.. """
+                self.parent.select_one(f'#save_properties').dispatchEvent(events.Click())
+            def add_port(self, port_cls: Type, nr_reprs: int=0):
+                """ Add a new port of class `port_cls` using the property editor.
+                    Expect nr_reprs to be made in various diagrams.
+                """
+                # Expect new records to be created in the database, and determine IDs for the new records
+                pid = integration_context.get_new_id(port_cls)
+                add_expected_response(f'/data/{port_cls.__name__}', 'post', Response(201, json={'Id': pid}))
+                # Expect a number of representations to be made.
+                for _ in range(nr_reprs):
+                    rid = integration_context.get_new_id(port_cls.get_representation_cls(modeled_shape.ReprCategory.port))
+                    add_expected_response(f'/data/_BlockRepresentation', 'post', Response(201, json={'Id': rid}))
+
+                self.parent.select_one(f'#add_port').dispatchEvent(events.Click())
+                # Check if the selection dialog popped up
+                port_options = d.select('#port_selector option')
+                if port_options:
+                    # Select the right option
+                    for o in port_options:
+                        if o.text == port_cls.__name__:
+                            d.select_one('#port_selector').value = o.attrs['value']
+                    # Click the Ok button
+                    [b for b in d.select('.brython-dialog-button') if b.text.lower() == 'ok'][0].dispatchEvent(events.Click())
+
+                # Check the AJAX requests were consumed.
+                assert len(expected_responses) == 0
+                assert not unexpected_requests
+
+            def remove_port(self, index: int=0):
+                """ remove a specific port from the list """
+                # Determine which database record will be deleted.
+                rows = self.find_elements('tr.port_row')
+                row_ids = [int(r.attrs['data-mid']) for r in rows]
+                mid = row_ids[index]
+                record = integration_context.data_store.live_instances[Collection.block][mid]
+                add_expected_response(f'/data/{type(record).__name__}/{record.Id}', 'delete', Response(204))
+                # Also expect representations of this record to be deleted.
+                repr_ids = [r.Id for r in integration_context.data_store.live_instances[Collection.block_repr].values() if r.block == mid]
+                for rid in repr_ids:
+                    add_expected_response(f'/data/_BlockRepresentation/{rid}', 'delete', Response(204))
+                # Click on the button deleting the port.
+                rows[index].select_one('button').dispatchEvent(events.Click())
+                # Now click on the "Yes" button.
+                [b for b in d.select('.brython-dialog-button') if b.text.lower() == 'yes'][0].dispatchEvent(
+                    events.Click())
+                # Check the AJAX requests were consumed.
+                assert len(expected_responses) == 0
+                assert not unexpected_requests
+
+            def count_ports(self):
+                return len(self.parent.select('[id^="delete_port_"]'))
+
+
         self.explorer = ExplorerApi()
         self.diagrams = DiagramsApi()
+        self.property_editor = PropertyEditorApi()
 
         if hierarchy:
             add_expected_response(f'/data/hierarchy', 'get', Response(201, json=hierarchy))
 
         self.data_store, self.diagram_tabview = client.run('explorer', 'canvas', 'details')
 
-    def get_new_id(self, block_cls: Type[StorableElement]) -> int:
-        return max(list(self.data_store.live_instances[block_cls.get_collection()]) + [0]) + 1
 
 
 @prepare
@@ -668,6 +735,33 @@ def simulated_diagram_tests():
         assert not unexpected_requests
         assert len(expected_responses) == 0
 
+    @test
+    def load_test_diagrams():
+        resp = [{"Id": 0, "diagram": 4, "block": 7, "parent": None, "x": 110.0, "y": 393.0, "z": 0.0, "width": 64.0,
+          "height": 40.0, "order": 0, "orientation": None, "styling": "", "category": None,
+          "_entity": {"order": 0, "Id": 7, "description": "Dit is een test", "parent": 4, "__classname__": "Note"},
+          "__classname__": "_BlockRepresentation"},
+         {"Id": 1, "diagram": 4, "block": 5, "parent": None, "x": 188.0, "y": 106.0, "z": 0.0, "width": 64.0,
+          "height": 40.0, "order": None, "orientation": None, "styling": "", "category": 2,
+          "_entity": {"order": 0, "parameters": {"parameters": {}}, "Id": 5, "parent": 4, "definition": 3,
+                      "__classname__": "BlockInstance"},
+          "_definition": {"order": 0, "Id": 3, "parent": 1, "name": "test_block", "implementation": "",
+                          "parameters": "{}", "__classname__": "BlockDefinition"},
+          "__classname__": "_BlockRepresentation"},
+         {"Id": 2, "diagram": 4, "block": 6, "parent": None, "x": 309.0, "y": 104.0, "z": 0.0, "width": 64.0,
+          "height": 40.0, "order": None, "orientation": None, "styling": "", "category": 2,
+          "_entity": {"order": 0, "Id": 6, "name": "subprog", "description": "", "parameters": "", "parent": 4,
+                      "__classname__": "SubProgram"}, "__classname__": "_BlockRepresentation"}]
+
+        nonlocal d
+        import public.sysml_client as client
+        ds = mk_ds()
+
+        add_expected_response('/data/diagram_contents/4', 'get', Response(
+            200,
+            json=diagram_w_instance))
+        diagram, rest = new_diagram(4, ds)
+
 
 @prepare
 def simulated_explorer_tests():
@@ -917,7 +1011,68 @@ def integration_tests():
         # There should be two relationships to the block
         assert len(context.data_store.relationships) == 2
 
+    @test
+    def edit_ports():
+        """ Create a block, add ports, edit them and delete them.
+            Use the property editor, check changes are reflected in the diagram.
+        """
+        context = IntegrationContext(hierarchy=[
+            client.BlockDefinitionDiagram(Id=1, name="diagram").asdict(),
+        ])
+        # Open the diagram in the display and add a block
+        context.explorer.dblclick_element(mid=1)
+        context.diagrams.create_block(client.Block)
+        # Open the property editor for this block
+        context.diagrams.click_block(rid=1)
+        # Add a port and check it is represented
+        context.property_editor.add_port(client.FlowPort, 1)
+        context.property_editor.save()
+        assert context.property_editor.count_ports() == 1
+        assert len(context.diagrams.ports(rid=1)) == 1
+        # Add another port
+        context.property_editor.add_port(client.FlowPort, 1)
+        context.property_editor.save()
+        assert context.property_editor.count_ports() == 2
+        assert len(context.diagrams.ports(rid=1)) == 2
+        # Check they are in the database
+        assert len(context.data_store.live_instances[Collection.block]) == 3
+        assert len(context.data_store.live_instances[Collection.block_repr]) == 3
+        # Delete the two ports
+        add_expected_response(f'/data/FlowPort/3', 'delete', Response(204))
+        context.property_editor.remove_port()
+        add_expected_response(f'/data/FlowPort/2', 'delete', Response(204))
+        context.property_editor.remove_port()
+        context.property_editor.save()
+        assert context.property_editor.count_ports() == 0
+        assert len(context.diagrams.ports(rid=1)) == 0
+        # Check they are no more in the database
+        assert len(context.data_store.live_instances[Collection.block]) == 1
+        assert not context.data_store.live_instances[Collection.block][1].ports
+        assert len(context.data_store.live_instances[Collection.block_repr]) == 1
+        assert not context.data_store.live_instances[Collection.block_repr][1].ports
+        # Check they are in the database
+        assert len(context.data_store.live_instances[Collection.block]) == 1
+        assert len(context.data_store.live_instances[Collection.block_repr]) == 1
+
+    @test
+    def edit_block_name():
+        """ Create a block, edit the 'name' field.
+            Use the property editor, check changes are reflected in the diagram.
+        """
+        context = IntegrationContext(hierarchy=[
+            client.BlockDefinitionDiagram(Id=1, name="diagram").asdict(),
+        ])
+        # Open the diagram in the display and add a block
+        context.explorer.dblclick_element(mid=1)
+        context.diagrams.create_block(client.Block)
+        # Open the property editor for this block
+        context.diagrams.click_block(rid=1)
+        # Change the name and save it.
+        name = 'test block'
+        context.property_editor.set_field(name=name)
+        context.property_editor.save()
+        assert context.diagrams.block_text(rid=1) == name
 
 if __name__ == '__main__':
-    #run_tests('integration_tests.*')
+    run_tests('*.edit_ports')
     run_tests()

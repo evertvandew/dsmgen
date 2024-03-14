@@ -159,7 +159,8 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     def get_parameter_specs(self) -> Dict[str, type]:
         field_specs = getattr(self, self.get_parameter_spec_fields())
         if isinstance(field_specs, str):
-            field_specs = dict(name_type.split(':') for name_type in field_specs.split(','))
+            fs = field_specs.strip('{}')
+            field_specs = dict(name_type.split(':') for name_type in fs.split(',')) if fs else {}
         keys_types = {k.strip(): parameter_types[t.strip()] for k, t in field_specs.items()}
         return keys_types
 

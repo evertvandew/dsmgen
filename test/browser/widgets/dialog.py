@@ -9,13 +9,13 @@ class Dialog(DIV):
         self.panel = DIV(Class='brython-dialog-panel')
         self <= self.panel
         if ok_cancel is True:
-            self.ok_button = BUTTON(text='OK')
+            self.ok_button = BUTTON(text='OK', Class='brython-dialog-button')
             self <= self.ok_button
-            self <= BUTTON(text='Cancel')
+            self <= BUTTON(text='Cancel', Class='brython-dialog-button')
         elif isinstance(ok_cancel, Iterable) and len(ok_cancel) == 2:
-            self.ok_button = BUTTON(text=ok_cancel[0])
+            self.ok_button = BUTTON(text=ok_cancel[0], Class='brython-dialog-button')
             self <= self.ok_button
-            self <= BUTTON(text=ok_cancel[1])
+            self <= BUTTON(text=ok_cancel[1], Class='brython-dialog-button')
         # Ensure the dialog is in the DOM
         document <= self
 

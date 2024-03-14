@@ -2,8 +2,7 @@
 from browser import html, console, bind, document
 from browser.widgets.dialog import Dialog, EntryDialog, InfoDialog
 
-from typing import List, Dict, Any, Type
-from dataclasses import asdict
+from typing import Type
 from data_store import DataStore, ExtendibleJsonEncoder
 import json
 
@@ -81,7 +80,7 @@ def make_explorer(holder, api: DataStore, allowed_children):
             data = json.loads(json_string)
             # Ask the user if this is what he intends to do
             dialog = Dialog("Please Confirm", ok_cancel=True)
-            dialog.panel <= f"Do you want to move {data.get('name')} to inside {data_element.name}?"
+            _ = dialog.panel <= f"Do you want to move {data.get('name')} to inside {data_element.name}?"
 
             @bind(dialog.ok_button, "click")
             def entry(ev):
@@ -99,7 +98,7 @@ def make_explorer(holder, api: DataStore, allowed_children):
             ev.preventDefault()
             document[context_menu_name].close()
             d = Dialog(f'Delete {type(data_element).__name__}', ok_cancel=True)
-            d.panel <= f'Delete {type(data_element).__name__} "{data_element.name}"'
+            _ = d.panel <= f'Delete {type(data_element).__name__} "{data_element.name}"'
 
             @bind(d.ok_button, "click")
             def ok(ev):
@@ -133,7 +132,7 @@ def make_explorer(holder, api: DataStore, allowed_children):
             default_obj = etype()
             d = Dialog(f'Add {etype.__name__}', ok_cancel=True)
             parameters = default_obj.get_editable_parameters()
-            d.panel <= dataClassEditorForm(None, parameters, api)
+            _ = d.panel <= dataClassEditorForm(None, parameters, api)
 
             @bind(d.ok_button, 'click')
             def on_ok(ev):
@@ -141,7 +140,7 @@ def make_explorer(holder, api: DataStore, allowed_children):
                 new_object = etype(parent=parent, **data)
                 api.add(new_object)
                 html = render_hierarchy([new_object])
-                html_element <= html
+                _ = html_element <= html
                 d.close()
 
         def mk_menu_item(text, action):
@@ -158,19 +157,19 @@ def make_explorer(holder, api: DataStore, allowed_children):
             ev.stopPropagation()
             ev.preventDefault()
             createmenu = html.LI('Create')
-            createmenu <= html.UL([bind_add_action(t) for t in create])
+            _ =createmenu <= html.UL([bind_add_action(t) for t in create])
             menu = html.UL(Class='contextmenu')
-            menu <= createmenu
-            menu <= html.HR()
-            menu <= mk_menu_item('Rename', on_rename)
-            menu <= html.HR()
-            menu <= mk_menu_item('Remove', on_delete)
+            _ = menu <= createmenu
+            _ = menu <= html.HR()
+            _ = menu <= mk_menu_item('Rename', on_rename)
+            _ = menu <= html.HR()
+            _ = menu <= mk_menu_item('Remove', on_delete)
             #d = Dialog("", ok_cancel=True)
             if context_menu_name in document:
                 del document[context_menu_name]
             d = html.DIALOG(id=context_menu_name)
-            d <= menu
-            html_element <= d
+            _ = d <= menu
+            _ = html_element <= d
             d.showModal()
 
     def render_hierarchy(data_list):
@@ -180,12 +179,12 @@ def make_explorer(holder, api: DataStore, allowed_children):
             de = html.DIV()
             icon = element.get_icon()
             if (children := getattr(element, 'children', None)) is not None:
-                de <= html.SPAN(Class="caret fa fa-caret-right", style={"width": "1em"})
+                _ = de <= html.SPAN(Class="caret fa fa-caret-right", style={"width": "1em"})
             descriptor = html.SPAN(Class="description", draggable="true", data_modelid=str(element.Id),
                                    data_modelcls=type(element).__name__)
-            descriptor <= html.SPAN(Class=f"fa fa-{icon}", style={"margin-left":"1em"})
-            descriptor <= html.SPAN(format_name(getattr(element, 'name', type(element).__name__)), Class=name_cls)
-            de <= descriptor
+            _ = descriptor <= html.SPAN(Class=f"fa fa-{icon}", style={"margin-left":"1em"})
+            _ = descriptor <= html.SPAN(format_name(getattr(element, 'name', type(element).__name__)), Class=name_cls)
+            _ = de <= descriptor
 
             d = html.DIV(de, Class=line_cls, id=element.Id)
             d.value = element
@@ -196,7 +195,7 @@ def make_explorer(holder, api: DataStore, allowed_children):
                 ch = render_hierarchy(element.children)
                 for c in ch:
                     c.style['display'] = 'none'
-                d <= ch
+                _ = d <= ch
             results.append(d)
 
             for c in de.select('.caret'):
@@ -205,7 +204,7 @@ def make_explorer(holder, api: DataStore, allowed_children):
         return results
 
     def start(elements):
-        holder <= render_hierarchy(elements)
+        _ = holder <= render_hierarchy(elements)
 
     api.get_hierarchy(start)
 

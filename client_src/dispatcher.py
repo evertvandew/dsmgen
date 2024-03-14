@@ -1,8 +1,7 @@
 
 from dataclasses import dataclass
-from typing import Callable, Any, Dict, Optional
+from typing import Callable, Any, Dict, Optional, List
 from fnmatch import fnmatch
-from weakref import ref
 
 @dataclass
 class EventSubscription:
@@ -17,7 +16,7 @@ class EventSubscription:
 
 class EventDispatcher:
     def __init__(self):
-        self.subscriptions: EventSubscription = []
+        self.subscriptions: List[EventSubscription] = []
     def trigger_event(self, event_name, source, **details):
         for sub in self.subscriptions:
             if fnmatch(event_name, sub.path):

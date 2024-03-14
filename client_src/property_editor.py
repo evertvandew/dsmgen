@@ -107,9 +107,9 @@ def getInputForValue(name: str, field_type: type, value: Any):
                 input <= html.OPTION(option.name, value=option.value)
         return input
     if field_type == longstr:
-        value = value_formatter[field_type](getattr(o, name) if o else '')
+        v = value_formatter[field_type](value if value else '')
         input = html.TEXTAREA(id=f"edit_{name}", name=name)
-        input <= value
+        input <= v
         input.className = 'form-control'
         return input
     if field_type in type2HtmlInput:
@@ -194,12 +194,13 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
     def fillTable():
         table.clear()
         sorted_ports: List[ModelEntity] = sorted(getattr(o, field.name), key = lambda p: 100*int(p.orientation) + p.order)
-        for item in sorted_ports:
-            row = html.TR()
+        for i, item in enumerate(sorted_ports):
+            row = html.TR(Class='port_row', data_mid=item.Id)
             for f in item.get_editable_parameters():
                 row <= html.TD(str(f.current_value))
             # Add a delete button for each port
-            delete = html.BUTTON('X', style="background-color:red; color:white", type='button')
+            delete = html.BUTTON('X', style="background-color:red; color:white", type='button',
+                                 id=f'delete_port_{i}')
             row <= delete
             table <= row
             bindRowToEditor(row, item, delete)
@@ -213,7 +214,7 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
             """ Delete the item """
             getattr(o, field.name).remove(item)
             row.remove()
-            data_store.update_data(o, div)
+            data_store.update(o)
             d.close()
 
 
@@ -242,7 +243,7 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
                 setattr(current, k, v)
 
             getattr(o, field.name)[port_index] = current
-            data_store.update_data(o, div)
+            data_store.update_data(o)
 
             d.close()
             fillTable()
@@ -252,8 +253,8 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
         if len(port_types) == 1:
             # Just add the new port to the block and be done with it.
             # Use the default values for each of the attributes of the port.
-            getattr(o, field.name).append(port_types[0])
-            data_store.update_data(o, div)
+            getattr(o, field.name).append(port_types[0](parent=o.Id))
+            data_store.update(o)
             fillTable()
             return
 
@@ -264,7 +265,7 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
 
         # Determine which possible fields are available
         # We make a single dict of all editable options.
-        port_selector = html.SELECT()
+        port_selector = html.SELECT(id="port_selector")
         for i, port_class in enumerate(port_types):
             port_selector <= html.OPTION(port_class.__name__, value=i)
 
@@ -276,14 +277,14 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
             # Determine what type the user selected
             index = int(port_selector.value)
             # Add a new instance to the block filled with detail values
-            getattr(o, field.name).append(port_types[index]())
-            data_store.update_data(o, div)
+            getattr(o, field.name).append(port_types[index](parent=o.Id))
+            data_store.update(o)
             d.close()
             fillTable()
 
 
     fillTable()
-    addb = html.BUTTON("+", type="button")
+    addb = html.BUTTON("+", type="button", id="add_port")
     addb.bind("click", onAdd)
     _ = div <= addb
     return div
@@ -355,7 +356,7 @@ def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameter
         if callable(update):
             update(json.dumps(update_data, cls=ExtendibleJsonEncoder))
 
-    b = html.BUTTON("Save", type="button")
+    b = html.BUTTON("Save", type="button", id='save_properties')
     b.className = "btn btn-primary"
     b.bind("click", onSave)
     return form, b

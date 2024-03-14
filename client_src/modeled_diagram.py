@@ -56,7 +56,18 @@ class ModeledDiagram(Diagram):
                         self.datastore.add(p)
                         r.shape.updateShape()
 
+        def deleteAction(event, source: StorableElement, ds, details):
+            if type(source).__name__ in datastore.configuration.port_entities:
+                # Find any representations of this port
+                reprs = [p for c in self.children for p in getattr(c, 'ports', []) if p.model_entity.Id == source.Id]
+                for r in reprs:
+                    r.shape.remove()
+                    self.datastore.delete(r)
+                    parent = self.datastore.get(Collection.block_repr, r.parent)
+                    parent.ports.remove(r)
+
         datastore.subscribe('add/*', self, addAction)
+        datastore.subscribe('delete/*', self, deleteAction)
 
     @classmethod
     def get_allowed_blocks(cls, block_cls_name: str, for_drop=False) -> Dict[str, Type[ModelEntity]]:

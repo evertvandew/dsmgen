@@ -217,10 +217,13 @@ class DataStore(EventDispatcher):
         else:
             data = json.dumps(record, cls=ExtendibleJsonEncoder)
             def on_complete(update):
-                record.Id = update.json['Id']
-                assert self.update_cache(record) is record
+                if update.status < 300:
+                    record.Id = update.json['Id']
+                    assert self.update_cache(record) is record
             ajax.post(f'/data/{type(record).__name__}', blocking=True, data=data, oncomplete=on_complete,
                       mode='json', headers={"Content-Type": "application/json"})
+            if record.Id < 1:
+                raise RuntimeError("Could not add record")
             self.add_data(record)
             return record
 
@@ -282,6 +285,32 @@ class DataStore(EventDispatcher):
                 ajax.post(f'{self.configuration.base_url}/{type(record).__name__}/{record.Id}', blocking=True,
                           data=data, oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
                 self.update_data(record)
+            # If the record has ports, check these as well for updates.
+            # Ports are not included in the comparison above, the 'ports' field is not persisted.
+            if hasattr(record, 'ports'):
+                orig_ports = original.ports
+                new_ports = record.ports
+                if orig_ports != new_ports:
+                    lu_orig = {p.Id: p for p in orig_ports}
+                    lu_new = {p.Id: p for p in new_ports}
+                    deleted = set(lu_orig) - set(lu_new)
+                    added = set(lu_new) - set(lu_orig)
+                    updated = [i for i in (set(lu_new) & set(lu_orig)) if lu_orig[i] != lu_new[i]]
+                    for i in deleted:
+                        p = lu_orig[i]
+                        self.delete(p)
+                    for i in added:
+                        p = lu_new[i]
+                        # Set fields refering to the context of the port
+                        p.parent = record.Id
+                        # Store the new port
+                        self.add(p)
+                    for i in updated:
+                        self.update(lu_new[i])
+
+                    # The update should be stored in the cache.
+                    self.update_cache(record)
+
 
 
 
@@ -420,6 +449,7 @@ class DataStore(EventDispatcher):
                 '_RelationshipRepresentation': ReprCategory.relationship,
                 '_MessageRepresentation': ReprCategory.message,
                 '_BlockInstanceRepresentation': ReprCategory.block,
+                '_BlockRepresentation': ReprCategory.block
             }[data['__classname__']]
         representation_cls = model_instance.get_representation_cls(repr_category)
         repr = representation_cls.from_dict(self, model_entity=model_instance, **data)

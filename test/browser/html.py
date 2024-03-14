@@ -1,6 +1,6 @@
 """ Stub of the Brython HTML interface """
 
-from typing import Self, Iterable, List, Dict, Callable, Optional, Any, Tuple
+from typing import Self, Iterable, List, Dict, Callable, Optional, Any, Tuple, Union
 from enum import Enum
 import re
 from copy import copy
@@ -269,7 +269,7 @@ class tag:
         children = ''.join(str(c) for c in self.children)
         return f"{self.tagname()}({self.text} {children})"
 
-    def __le__(self, other: Self|str|Iterable):
+    def __le__(self, other: Union['tag', str, Iterable]) -> None:
         if isinstance(other, tag):
             # Check if the element is moved to another place.
             if other.parent:
@@ -351,7 +351,7 @@ class tag:
             while self in self.parent.children:
                 self.parent.children.remove(self)
 
-    def select(self, key):
+    def select(self, key) -> List["tag"]:
         return self.get(selector=key)
 
     def select_one(self, key):
