@@ -77,6 +77,9 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
             internal_fields['children'] = ('shapes.HIDDEN', 'field(default_factory=list)')
 
+        text_fields = [f.name for f in fields(entity)
+                       if generator.field_is_type(f.type, str) or generator.field_is_type(f.type, mdef.longstr)]
+
 %>
     % for key, (type_, default) in internal_fields.items():
     ## All elements must have a default value so they can be created from scratch
@@ -152,6 +155,15 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
     %endif
 
+    def get_nr_texts(self) -> int:
+        return ${len(text_fields)}
+
+    def get_text(self, index: int) -> str:
+        % for i, f in enumerate(text_fields):
+        if index == ${i}:
+            return self.${f}
+        % endfor
+        return ''
 
     def get_parameter_spec_fields(self) -> List[str]:
         return "${generator.get_spec_fields(entity)}"

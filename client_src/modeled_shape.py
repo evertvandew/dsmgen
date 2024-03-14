@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 import json
 from browser import svg, console
 from diagrams import shapes, Shape, Relationship, CP, Point, Orientations
+from browser.html import tag
 from data_store import StorableElement, Collection, ReprCategory, from_dict, ExtendibleJsonEncoder, DataStore
 from point import load_waypoints
 from enum import IntEnum, auto
@@ -30,7 +31,7 @@ class EditableParameterDetails:
 
 class ModelEntity:
     """ An interface class describing the behaviour of an item represented in a diagram. """
-    def get_text(self, index: int):
+    def get_text(self, index: int) -> str:
         """ Retrieve a specific string associated with the item that is needed in the diagram. """
         return self.name
     def get_nr_texts(self) -> int:
@@ -73,14 +74,8 @@ class ModelRepresentation(StorableElement):
     def repr_category(cls) -> ReprCategory:
         raise NotImplementedError()
 
-    def getShape(self):
-        shape = self.getShape()
-        shape.attrs['id'] = self.Id
-        shape.attrs['data-modelid'] = str(self.model_entity.Id)
-        shape.attrs['data-reprid'] = str(self.Id)
-        shape.attrs['data-reprcls'] = type(self).__name__
-        shape.attrs['data-modelcls'] = type(self.model_entity).__name__
-        return shape
+    def getShape(self) -> tag:
+        raise NotImplementedError()
 
 
 @dataclass
@@ -88,7 +83,11 @@ class ModeledShape(Shape, ModelRepresentation):
     parent: Optional[int] = None        # For hierarchical shapes (inner block & ports): the owner of this repr.
 
     default_style = dict(blockcolor='#FFFBD6')
-    TextWidget = shapes.Text('description')
+    TextWidget = shapes.Text('text')
+
+    @property
+    def text(self):
+        return self.model_entity.get_text(0)
 
     def asdict(self) -> Dict[str, Any]:
         details = StorableElement.asdict(self, ignore=['model_entity', 'ports'])
@@ -97,7 +96,7 @@ class ModeledShape(Shape, ModelRepresentation):
             del details['children']
         return details
 
-    def getShape(self):
+    def getShape(self) -> tag:
         # This shape consists of two parts: the text and the outline.
         shape_type = self.getShapeDescriptor()
         g = svg.g()
@@ -145,7 +144,7 @@ class Port(CP, ModelRepresentation):
     block: int = 0                  # The ID of the model_entity for this port.
     parent: Optional[int] = None    # The block this port belongs to.
 
-    def getShape(self):
+    def getShape(self) -> tag:
         p = self.pos
         shape = svg.rect(x=p.x-5, y=p.y-5, width=10, height=10, stroke_width=1, stroke='black', fill='lightgreen')
         shape.attrs['data-class'] = type(self).__name__
@@ -200,7 +199,7 @@ class ModeledShapeAndPorts(ModeledShape):
             case Orientations.BOTTOM:
                 return lambda i: Point(x=self.x + self.width / len(ports) / 2 * (2 * i + 1), y=self.y + self.height)
 
-    def getShape(self):
+    def getShape(self) -> tag:
         g = svg.g()
         # Add the core rectangle
         shape_type = self.getShapeDescriptor()

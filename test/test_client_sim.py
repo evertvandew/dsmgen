@@ -295,6 +295,16 @@ class IntegrationContext:
                 assert len(expected_responses) == 0
                 assert not unexpected_requests
 
+            def block_text(self, rid: int) -> str:
+                """ Returns the text currently being displayed in a block.
+                    If there are multiple text blocks associated with the block, return the first.
+                """
+                repr = integration_context.data_store.live_instances[Collection.block_repr][rid]
+                txt = repr.shape.select('text')
+                if txt:
+                    return ' '.join(t.text for t in txt)
+                return ''
+
         class PropertyEditorApi(HtmlApi):
             parent: html.tag = d['details']
 
@@ -351,6 +361,11 @@ class IntegrationContext:
 
             def count_ports(self):
                 return len(self.parent.select('[id^="delete_port_"]'))
+
+            def set_field(self, **kwargs):
+                """ Set the value of one or more fields in the record currently being edited in property editor. """
+                for key, value in kwargs.items():
+                    self.find_element(f'#edit_{key}').value = str(value)
 
 
         self.explorer = ExplorerApi()
@@ -1074,5 +1089,5 @@ def integration_tests():
         assert context.diagrams.block_text(rid=1) == name
 
 if __name__ == '__main__':
-    run_tests('*.edit_ports')
+    run_tests('*.edit_block_name')
     run_tests()

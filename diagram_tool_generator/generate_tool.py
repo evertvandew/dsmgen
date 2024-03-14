@@ -147,7 +147,7 @@ class Generator:
 
 
 
-    def get_type(self, field_type):
+    def get_type(self, field_type) -> str:
         """ Return the type of an attribute for use in the client """
         if isinstance(field_type, tuple):
             possible_types = [t for t in field_type if not (isinstance(t, type) and issubclass(t, mdef.OptionalAnnotation)) ]
@@ -179,6 +179,12 @@ class Generator:
         if isinstance(field_type, list) or isinstance(field_type, tuple):
             return [o for t in field_type for o in Generator.get_type_options(t)]
         return [field_type] if isinstance(field_type, type) and issubclass(field_type, mdef.OptionalAnnotation) else []
+
+    def field_is_type(self, field_type, the_type) -> bool:
+        if isinstance(field_type, list) or isinstance(field_type, tuple):
+            return any(t == the_type for t in field_type)
+        return field_type == the_type
+
 
     def get_inner_types(self, owner, field_type):
         def get_type(field_type):
