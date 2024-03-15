@@ -240,17 +240,6 @@ class tag:
         self.parent = None
         self.subscribers: Dict[str, List[Callable]] = {}
         self.style = Style({})
-        if content:
-            if isinstance(content, str):
-                if '<' in content:
-                    raise RuntimeError("HTML content is not (yet) supported by this mockup")
-                self.text = content
-            elif isinstance(content, tag):
-                self.children = [content]
-            elif isinstance(content, Iterable):
-                self.children = list(content)
-            else:
-                raise RuntimeError("Unrecognized content")
         if 'className' in kwargs:
             kwargs['Class'] = kwargs['className']
         if 'text' in kwargs:
@@ -264,6 +253,17 @@ class tag:
             else:
                 assert isinstance(kwargs['style'], dict)
                 self.style = Style(kwargs['style'])
+        if content:
+            if isinstance(content, str):
+                if '<' in content:
+                    raise RuntimeError("HTML content is not (yet) supported by this mockup")
+                self.text = content
+            elif isinstance(content, tag):
+                self <= content
+            elif isinstance(content, Iterable):
+                self <= content
+            else:
+                raise RuntimeError("Unrecognized content")
 
     def __repr__(self):
         children = ''.join(str(c) for c in self.children)
@@ -282,6 +282,7 @@ class tag:
                 raise RuntimeError("HTML content is not (yet) supported by this mockup")
             else:
                 self.attrs['text'] = other
+                self.text = other
         elif isinstance(other, Iterable):
             for item in other:
                 self.__le__(item)
@@ -336,7 +337,8 @@ class tag:
     def get(self, **kwargs):
         if 'selector' in kwargs:
             selector = parse_selector(kwargs['selector'])
-            return list(set(selector.filter(self)))
+            # Filter the elements, and ensure each element is unique
+            return list(dict.fromkeys(selector.filter(self)))
         items = list(flatten(self.children))
         for key, value in kwargs.items():
             items = [c for c in items if getattr(c, key, '') == value]

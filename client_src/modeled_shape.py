@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 import json
 from browser import svg, console
 from diagrams import shapes, Shape, Relationship, CP, Point, Orientations
-from browser.html import tag
 from data_store import StorableElement, Collection, ReprCategory, from_dict, ExtendibleJsonEncoder, DataStore
 from point import load_waypoints
 from enum import IntEnum, auto
@@ -74,7 +73,7 @@ class ModelRepresentation(StorableElement):
     def repr_category(cls) -> ReprCategory:
         raise NotImplementedError()
 
-    def getShape(self) -> tag:
+    def getShape(self):
         raise NotImplementedError()
 
 
@@ -96,7 +95,7 @@ class ModeledShape(Shape, ModelRepresentation):
             del details['children']
         return details
 
-    def getShape(self) -> tag:
+    def getShape(self):
         # This shape consists of two parts: the text and the outline.
         shape_type = self.getShapeDescriptor()
         g = svg.g()
@@ -144,7 +143,7 @@ class Port(CP, ModelRepresentation):
     block: int = 0                  # The ID of the model_entity for this port.
     parent: Optional[int] = None    # The block this port belongs to.
 
-    def getShape(self) -> tag:
+    def getShape(self):
         p = self.pos
         shape = svg.rect(x=p.x-5, y=p.y-5, width=10, height=10, stroke_width=1, stroke='black', fill='lightgreen')
         shape.attrs['data-class'] = type(self).__name__
@@ -199,7 +198,7 @@ class ModeledShapeAndPorts(ModeledShape):
             case Orientations.BOTTOM:
                 return lambda i: Point(x=self.x + self.width / len(ports) / 2 * (2 * i + 1), y=self.y + self.height)
 
-    def getShape(self) -> tag:
+    def getShape(self):
         g = svg.g()
         # Add the core rectangle
         shape_type = self.getShapeDescriptor()
@@ -233,6 +232,7 @@ class ModeledShapeAndPorts(ModeledShape):
         shape_type.updateShape(rect, self)
         text = shape.children[1]
         self.TextWidget.updateShape(text, self)
+        print('SHAPE:', shape)
 
         # Update the ports
         sorted_ports = {orientation: sorted([p for p in self.ports if p.orientation == orientation], key=lambda x: x.order) \

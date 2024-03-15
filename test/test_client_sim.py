@@ -136,6 +136,10 @@ diagram_w_instance = [
 class IntegrationContext:
 
     def get_new_id(self, block_cls: Type[StorableElement]) -> int:
+        if block_cls.get_collection() in [Collection.block, Collection.hierarchy]:
+            return max(list(self.data_store.live_instances[Collection.hierarchy]) +
+                       list(self.data_store.live_instances[Collection.block]) +
+                       [0]) + 1
         return max(list(self.data_store.live_instances[block_cls.get_collection()]) + [0]) + 1
 
     def __init__(self, hierarchy=None):
@@ -176,6 +180,10 @@ class IntegrationContext:
                 return len(elements)
             def dblclick_element(self, mid: int):
                 self.dblclick(self.find_element(f'[data-modelid="{mid}"]'))
+            def name(self, mid: int):
+                """ Return the name of the element `mid` as shown in the explorer. """
+                el = self.find_element(f'[data-modelid="{mid}"] .ename')
+                return el.text[9:]
 
         class DiagramsApi(HtmlApi):
             parent: html.tag = d['canvas']
@@ -830,7 +838,7 @@ def simulated_explorer_tests():
         add_expected_response('/data/BlockDefinitionDiagram', 'post', Response(201, json={'Id': 3}))
         button.dispatchEvent(events.Click())
         lines = d.get(selector='.eline [draggable="true"]')
-        assert len(lines) == 3
+        assert len(lines) == 4
 
     @test
     def left_click():
@@ -1062,7 +1070,7 @@ def integration_tests():
         assert len(context.diagrams.ports(rid=1)) == 0
         # Check they are no more in the database
         assert len(context.data_store.live_instances[Collection.block]) == 1
-        assert not context.data_store.live_instances[Collection.block][1].ports
+        assert not context.data_store.live_instances[Collection.block][2].ports
         assert len(context.data_store.live_instances[Collection.block_repr]) == 1
         assert not context.data_store.live_instances[Collection.block_repr][1].ports
         # Check they are in the database
@@ -1072,7 +1080,7 @@ def integration_tests():
     @test
     def edit_block_name():
         """ Create a block, edit the 'name' field.
-            Use the property editor, check changes are reflected in the diagram.
+            Use the property editor, check changes are reflected in the diagram & explorer.
         """
         context = IntegrationContext(hierarchy=[
             client.BlockDefinitionDiagram(Id=1, name="diagram").asdict(),
@@ -1080,6 +1088,8 @@ def integration_tests():
         # Open the diagram in the display and add a block
         context.explorer.dblclick_element(mid=1)
         context.diagrams.create_block(client.Block)
+        # Check the block is in the explorer as a child of the diagram
+        assert context.explorer.count() == 2
         # Open the property editor for this block
         context.diagrams.click_block(rid=1)
         # Change the name and save it.
@@ -1087,7 +1097,8 @@ def integration_tests():
         context.property_editor.set_field(name=name)
         context.property_editor.save()
         assert context.diagrams.block_text(rid=1) == name
+        assert context.explorer.name(mid=2) == name
 
 if __name__ == '__main__':
-    run_tests('*.edit_block_name')
+    #run_tests('*.edit_block_name')
     run_tests()

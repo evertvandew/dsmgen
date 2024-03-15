@@ -60,8 +60,7 @@ def Text(text_attr):
         @classmethod
         def updateShape(cls, shape, details):
             # Simply delete the previous text and write anew.
-            for line in shape.children:
-                line.remove()
+            shape.clear()
             shape <= renderText(getattr(details, text_attr, ''), details)
     return TextWidget
 

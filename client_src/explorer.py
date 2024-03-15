@@ -3,11 +3,11 @@ from browser import html, console, bind, document
 from browser.widgets.dialog import Dialog, EntryDialog, InfoDialog
 
 from typing import Type
-from data_store import DataStore, ExtendibleJsonEncoder
+from data_store import DataStore, ExtendibleJsonEncoder, StorableElement
 import json
 
 from property_editor import dataClassEditorForm, getFormValues
-from modeled_shape import ModelEntity
+from modeled_shape import ModelEntity, ModelRepresentation
 
 line_cls = 'eline'
 name_cls = 'ename'
@@ -206,5 +206,37 @@ def make_explorer(holder, api: DataStore, allowed_children):
     def start(elements):
         _ = holder <= render_hierarchy(elements)
 
-    api.get_hierarchy(start)
+    def onAdd(event, source: StorableElement, ds, details):
+        """ Add new elements to the explorer as the user creates them in diagrams or the property editor.
+        """
+        # Exclude representation records and records without a `parent` field.
+        if isinstance(source, ModelRepresentation) or not hasattr(source, 'parent'):
+            return
+        assert source.Id
+        # Exclude records that are already in the hierarchy
+        if holder.select(f'[data-modelid="{source.Id}"]'):
+            return
+        # Find the insertion point for the new record
+        if source.parent:
+            parent = holder.select_one(f'[data-modelid="{source.parent}"]').parent.parent
+        else:
+            parent = holder
+        # Add the new element
+        _ = parent <= render_hierarchy([source])
 
+    def onUpdate(event, source: StorableElement, ds, details):
+        """ Update an element in the hierarchy. This code currently can only change the text for the element. """
+        # Exclude representation records and records without a `parent` field.
+        if isinstance(source, ModelRepresentation) or not hasattr(source, 'parent'):
+            return
+        # Get hold of the text
+        name_field = holder.select_one(f'[data-modelid="{source.Id}"] .{name_cls}')
+        if name_field:
+            name_field.clear()
+            _ = name_field <= format_name(getattr(source, 'name', type(source).__name__))
+            pass
+
+
+    api.get_hierarchy(start)
+    api.subscribe('add/*', None, onAdd)
+    api.subscribe('update/*', None, onUpdate)
