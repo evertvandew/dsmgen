@@ -694,7 +694,7 @@ class BlockCreateWidget:
             entity = block_cls()
             repr_cls = entity.get_representation_cls(ReprCategory.block)
             representation = repr_cls(x=self.margin, y=i*(self.height+self.margin)+self.margin,
-                         height=self.height, width=1.6*self.height)
+                         height=self.height, width=1.6*self.height, model_entity=entity)
             representation.logical_class = block_cls
             shape = representation.getShape()
             shape.attrs['id'] = f'create_{name}_btn'

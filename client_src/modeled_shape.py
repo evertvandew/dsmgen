@@ -62,6 +62,14 @@ class ModelEntity:
         for k, v in data.items():
             setattr(self, k, v)
 
+    @classmethod
+    def getDefaultStyle(cls):
+        shape_name = cls.default_styling.get('shape', 'rect')
+        shape_type = shapes.BasicShape.getDescriptor(shape_name)
+        style = cls.default_styling.copy()
+        style.update(shape_type.getDefaultStyle())
+        return style
+
 
 ###############################################################################
 @dataclass
@@ -108,13 +116,11 @@ class ModeledShape(Shape, ModelRepresentation):
         shape_type.updateShape(shape.children[0], self)
         self.TextWidget.updateShape(shape.children[1], self)
 
-    @classmethod
-    def getDefaultStyle(cls):
+    def getDefaultStyle(self):
         style = {}
-        shape_type = cls.getShapeDescriptor()
-        style.update(shape_type.getDefaultStyle())
-        style.update(cls.TextWidget.getDefaultStyle())
-        style.update(cls.default_style.copy())
+        style.update(self.model_entity.getDefaultStyle())
+        style.update(self.TextWidget.getDefaultStyle())
+        style.update(self.default_style.copy())
         return style
 
     @classmethod
@@ -125,9 +131,9 @@ class ModeledShape(Shape, ModelRepresentation):
     def is_instance_of(cls) -> bool:
         return False
 
-    @classmethod
-    def getShapeDescriptor(cls) -> shapes.BasicShape:
-        return shapes.BasicShape.getDescriptor('Note')
+    def getShapeDescriptor(self) -> shapes.BasicShape:
+        shape_name = self.model_entity.getDefaultStyle().get('shape', 'rect')
+        return shapes.BasicShape.getDescriptor(shape_name)
 
     @classmethod
     def get_collection(cls) -> Collection:
@@ -268,10 +274,9 @@ class ModeledShapeAndPorts(ModeledShape):
     def isConnected(self, target):
         return (target == self) or target in self.ports
 
-    @classmethod
-    def getDefaultStyle(cls):
+    def getDefaultStyle(self):
         defaults = super().getDefaultStyle()
-        defaults.update(cls.default_style)
+        defaults.update(self.default_style)
         return defaults
 
     @classmethod

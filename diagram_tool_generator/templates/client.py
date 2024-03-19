@@ -85,6 +85,8 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     ${key}: ${generator.get_html_type(type_)} = ${default}
     % endfor
 
+    default_styling = ${repr(generator.styling[entity.__name__])}
+
     def __eq__(self, other) -> bool:
         if type(self) != type(other):
             return False

@@ -1205,7 +1205,22 @@ def integration_tests():
         assert len(context.diagrams.current_diagram().connections) == 1
         assert isinstance(context.diagrams.current_diagram().connections[0], modeled_shape.Relationship)
 
+    @test
+    def test_other_shape():
+        """ Test is a block with another shape than a rect of note is displayed properly.
+            We test using the UseCase block, which is supposed to be represented with an ellipse.
+        """
+        # First create and open a UseCaseDiagram
+        context = IntegrationContext(hierarchy=[
+            client.UseCaseDiagram(Id=1, name="Requirements").asdict(),
+        ])
+        add_expected_response('/data/diagram_contents/1', 'get', Response(200, json=[]))
+        context.explorer.dblclick_element(mid=1)
+        context.diagrams.create_block(client.UseCase)
+        shape = context.diagrams.current_diagram().children[0].shape
+        assert shape.select('ellipse')
+
 
 if __name__ == '__main__':
-    run_tests('*.edit_definition_and_instance')
+    run_tests('*.test_other_shape')
     run_tests()

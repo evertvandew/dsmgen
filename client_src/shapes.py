@@ -150,9 +150,8 @@ class Stylable:
         details = json.loads(s)
         self.styling = details
 
-    @classmethod
-    def getStyleKeys(cls):
-        keys = list(cls.getDefaultStyle())
+    def getStyleKeys(self):
+        keys = list(self.getDefaultStyle())
         keys.sort()
         return keys
 

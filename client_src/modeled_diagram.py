@@ -133,8 +133,7 @@ class ModeledDiagram(Diagram):
             return
 
         block_cls = allowed_blocks[data['__classname__']]
-        repr_cls = block_cls.get_representation_cls(ReprCategory.block)
-        default_style = repr_cls.getDefaultStyle()
+        default_style = block_cls.getDefaultStyle()
         drop_details = dict(
             x=loc.x, y=loc.y,
             width=int(default_style.get('width', 64)), height=int(default_style.get('height', 40)),

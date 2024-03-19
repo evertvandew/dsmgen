@@ -128,12 +128,17 @@ class BlockDefinitionDiagram:
 ###############################################################################
 ## Entities for requirements
 @md.Entity(styling = "shape:ellipse;structure:Block;icon:file-lines")
-class Requirement:
+class UseCase:
     parent: XRef('children', Self, FunctionalModel, hidden)
     name: str
     description: (longstr, detail)
     priority: (selection("NotApplicable Must Should Could Would"), detail)
     category: (str, detail)
+
+@md.BlockDiagram(UseCase, Note, Constraint, styling='icon:image')
+class UseCaseDiagram:
+    parent: XRef('children', Block, FunctionalModel, hidden)
+    name: str
 
 
 md.initial_state([
