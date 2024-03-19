@@ -21,9 +21,8 @@ from browser import document, console, html, svg, bind, ajax
 import json
 from explorer import Element, make_explorer, context_menu_name
 from dataclasses import dataclass, field, is_dataclass, asdict, fields
-from typing import Self, List, Dict, Any, Callable, Type, Optional, Union
+from typing import Self, List, Dict, Any, Callable, Type, Optional, Union, Tuple
 from collections.abc import Iterable
-import typing
 import types
 from enum import IntEnum
 from inspect import getmro
@@ -409,11 +408,10 @@ data_config = DataConfiguration(
         base_url='/data'
     )
 
-def run(explorer: str, canvas: str, details: str):
+def run(explorer: str, canvas: str, details: str) -> Tuple[DataStore, TabView]:
     config = data_config
 
     data_store = DataStore(config)
-
 
     blank = document[explorer]
     diagram_tabview = TabView(canvas)

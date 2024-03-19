@@ -158,7 +158,7 @@ class DataStore(EventDispatcher):
         self.configuration = configuration
         self.shadow_copy: Dict[Collection, Dict[int: StorableElement]] = {k: {} for k in Collection}
         self.live_instances: Dict[Collection, Dict[int: StorableElement]] = {k: {} for k in Collection}
-        self.all_classes = configuration.all_classes
+        self.all_classes: Dict[str, Type[StorableElement]] = configuration.all_classes
         self.repr_collection_urls = {
             Collection.relation_repr: '_RelationshipRepresentation',
             Collection.block_repr: '_BlockRepresentation',
@@ -439,7 +439,17 @@ class DataStore(EventDispatcher):
         """ Create a representation object out of a data dictionary """
         model_cls = self.all_classes[data['_entity']['__classname__']]
         details = data['_entity'].copy()
-        model_instance = self.update_cache(model_cls.from_dict(self, **details))
+        model_instance = model_cls.from_dict(self, **details)
+        assert model_instance.Id, f"Model instance {type(model_instance).__name__} is not created properly."
+        if not self.is_cached(model_instance):
+            # A new instance was added: let the rest of the app know.
+            # Update the cache first
+            model_instance = self.update_cache(model_instance)
+            # Dispatch the add event.
+            self.add_data(model_instance)
+        else:
+            # Make sure the shadow copy is in sync with this object, to prevent unnecessary updates.
+            model_instance = self.update_cache(model_instance)
         if 'children' in data:
             data['children'] = [self.decode_representation(ch) for ch in data.get('children', [])]
         if 'category' in data:
@@ -465,6 +475,10 @@ class DataStore(EventDispatcher):
             self.update_cache(instance)
             records.append(instance)
         return records
+
+    def is_cached(self, record: StorableElement) -> bool:
+        collection = record.get_collection()
+        return record.Id in self.live_instances[collection]
 
     def update_cache(self, records: List[StorableElement] | StorableElement):
         if isinstance(records, Iterable):
