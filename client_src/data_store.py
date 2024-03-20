@@ -203,7 +203,7 @@ class DataStore(EventDispatcher):
 
             def on_complete(update: JsonResponse):
                 if update.status > 299:
-                    console.alert("Block could not be created")
+                    alert("Block could not be created")
                 else:
                     # Set the ID of the object that was added.
                     record.Id = update.json['Id']

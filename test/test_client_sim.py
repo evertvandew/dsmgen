@@ -275,8 +275,15 @@ class IntegrationContext:
                 mid = integration_context.get_new_id(block_cls)
                 repr_cls = block_cls.get_representation_cls(modeled_shape.ReprCategory.block)
                 rid = integration_context.get_new_id(repr_cls)
-                add_expected_response(f'/data/{block_cls.__name__}', 'post',  Response(201, json={'Id': mid}))
-                add_expected_response(f'/data/_BlockRepresentation', 'post', Response(201, json={'Id': rid}))
+                add_expected_response(
+                    f'/data/{block_cls.__name__}', 'post',
+                    Response(201, json={'Id': mid})
+                )
+                add_expected_response(
+                    f'/data/_BlockRepresentation', 'post',
+                    Response(201, json={'Id': rid}),
+                    expect_values={'category': 2}
+                )
 
                 # Find the create widget
                 btn = self.find_element(f'#create_{block_cls.__name__}_btn')
@@ -1222,5 +1229,5 @@ def integration_tests():
 
 
 if __name__ == '__main__':
-    run_tests('*.test_other_shape')
+    run_tests('*.edit_subdiagram')
     run_tests()

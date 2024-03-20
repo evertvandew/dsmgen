@@ -711,7 +711,8 @@ class BlockCreateWidget:
             return
         # Simply create a new block at the default position.
         cls = type(representation)
-        instance = cls(x=300, y=300, height=self.height, width=int(1.6*self.height), diagram=self.diagram_id)
+        instance = cls(x=300, y=300, height=self.height, width=int(1.6*self.height), diagram=self.diagram_id,
+                       category=ReprCategory.block)
         instance.model_entity = representation.logical_class(parent=self.diagram_id)
         diagram.datastore.add(instance)
         diagram.addBlock(instance)

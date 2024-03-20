@@ -149,7 +149,7 @@ def data_store_tests():
             return Response(201, json={'Id': 123})
 
         def check_request_repr(url, method, kwargs):
-            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "diagram": 456, "block": 123, "parent": None, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "__classname__": "ModeledShapeAndPorts"}
+            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "category": 2, "diagram": 456, "block": 123, "parent": None, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "__classname__": "ModeledShapeAndPorts"}
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/Block', 'post', get_response=check_request_model)
@@ -185,13 +185,13 @@ def data_store_tests():
         def check_request_model(url, method, kwargs):
             data = json.loads(kwargs['data'])
             assert data["stereotype"] == 2
-            assert data["source_id"] == 101
-            assert data["target_id"] == 102
+            assert data["source"] == 101
+            assert data["target"] == 102
             assert data["__classname__"] == "BlockReference"
             return Response(201, json={'Id': 123})
 
         def check_request_repr(url, method, kwargs):
-            assert json.loads(kwargs['data']) == {'Id': 0, "diagram": 456, "relationship": 123, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]", "z": 0.0, "styling": {}, '__classname__': 'ModeledRelationship'}
+            assert json.loads(kwargs['data']) == {'Id': 0, "category": 4, "diagram": 456, "relationship": 123, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]", "z": 0.0, "styling": {}, '__classname__': 'ModeledRelationship'}
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/BlockReference', 'post', get_response=check_request_model)
@@ -379,5 +379,4 @@ def data_store_tests():
 
 
 if __name__ == '__main__':
-    run_tests('*.add_modelitem')
     run_tests()

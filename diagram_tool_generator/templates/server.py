@@ -263,7 +263,7 @@ def add_entity_data(path):
     if not (table := dm.__dict__.get(path, '')):
         return flask.make_response('Not found', 404)
     data = get_request_data()
-    data = {k:v for k, v in data.items() if k not in ['children', '__classname__']}
+    data = {k:v for k, v in data.items() if k not in ['children', '__classname__', 'Id']}
     if issubclass(table, dm.Base):
         with dm.session_context() as session:
             record = table(**data)

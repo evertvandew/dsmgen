@@ -209,10 +209,8 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
             ${",\n            ".join((f'"{k}": self.{k}') for k in persistent_fields.keys())}
         }
     % if generator.md.is_relationship(entity):
-        details['source_id'] = self.source.Id if self.source else None
-        details['target_id'] = self.target.Id if self.target else None
-        del details['source']
-        del details['target']
+        details['source'] = self.source.Id if self.source else None
+        details['target'] = self.target.Id if self.target else None
     %endif
     % if generator.md.is_instance_of(entity):
         details['definition'] = self.definition.Id
@@ -261,7 +259,6 @@ class PortLabel(ms.ModeledShape):
     block: shapes.HIDDEN = None
     parent: shapes.HIDDEN = None
     diagram: shapes.HIDDEN = None
-    name: str = ''
 
     logical_class = None
 

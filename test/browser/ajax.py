@@ -83,7 +83,14 @@ def delete(url, **kwargs):
 
 
 def add_expected_response(url, method, response: Optional[Response]=None, get_response: Optional[Callable]=None,
-                          reuse=False, check_request: Optional[Callable]=None):
+                          reuse=False, check_request: Optional[Callable]=None, expect_values=None):
+    if expect_values:
+        def check_func(url, method, kwargs):
+            data = json.loads(kwargs['data'])
+            for k, v in expect_values.items():
+                assert data.get(k, None) == v, f"Expected {v} for key {k}, got {kwargs.get(k, None)}"
+        check_request = check_func
+
     expected_responses.append(ExpectedResponse(url, method, get_response, check_request, response, reuse))
 
 

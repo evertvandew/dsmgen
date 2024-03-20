@@ -91,6 +91,7 @@ class ModeledShape(Shape, ModelRepresentation):
 
     default_style = dict(blockcolor='#FFFBD6')
     TextWidget = shapes.Text('text')
+    category: ReprCategory = ReprCategory.block
 
     @property
     def text(self):
@@ -148,6 +149,7 @@ class Port(CP, ModelRepresentation):
     # the same table as regular blocks, so that connections can be made to them.
     block: int = 0                  # The ID of the model_entity for this port.
     parent: Optional[int] = None    # The block this port belongs to.
+    category: ReprCategory = ReprCategory.block
 
     def getShape(self):
         p = self.pos
@@ -291,6 +293,7 @@ class ModeledShapeAndPorts(ModeledShape):
 class ModeledRelationship(Relationship, ModelRepresentation):
     start: ModeledShape = None
     finish: ModeledShape = None
+    category: ReprCategory = ReprCategory.relationship
 
     @staticmethod
     def from_dict(data_store: DataStore, **details) -> Self:
