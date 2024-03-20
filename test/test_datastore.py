@@ -377,6 +377,5 @@ def data_store_tests():
         assert 65 not in ds.shadow_copy[Collection.block_repr]
         assert 155 not in ds.shadow_copy[Collection.block]
 
-
 if __name__ == '__main__':
     run_tests()

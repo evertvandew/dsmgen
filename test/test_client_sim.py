@@ -14,6 +14,7 @@ from typing import List, Dict, Any, Type, Tuple, Optional
 from shapes import Shape, Relationship, Point, HIDDEN
 from unittest.mock import Mock, MagicMock
 import diagrams
+from modeled_diagram import ModeledDiagram
 import explorer
 from data_store import ExtendibleJsonEncoder, DataStore, DataConfiguration, Collection, StorableElement, ReprCategory
 from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses, \
@@ -253,7 +254,7 @@ class IntegrationContext:
         class DiagramsApi(HtmlApi):
             parent: html.tag = d['canvas']
 
-            def current_diagram(self):
+            def current_diagram(self) -> ModeledDiagram:
                 return integration_context.diagram_tabview.current_diagram
 
             def count(self):
@@ -1227,7 +1228,22 @@ def integration_tests():
         shape = context.diagrams.current_diagram().children[0].shape
         assert shape.select('ellipse')
 
+    @test
+    def load_subdiagram():
+        """ Test loading a subdiagram from the API.
+            This particular case has caused trouble in the past...
+        """
+        context = IntegrationContext(hierarchy=[
+            client.SubProgramDefinition(Id=5, name="Requirements").asdict(),
+        ])
+        data = '''[{"Id": 1, "diagram": 5, "block": 6, "parent": null, "x": 347.0, "y": 188.0, "z": 0.0, "width": 64.0, "height": 40.0, "order": 0, "orientation": null, "styling": "", "category": 2, "_entity": {"order": 0, "orientation": 4, "Id": 6, "name": "", "parent": 5, "__classname__": "FlowPort"}, "__classname__": "_BlockRepresentation"}, {"Id": 2, "diagram": 5, "block": 7, "parent": null, "x": 253.0, "y": 531.0, "z": 0.0, "width": 64.0, "height": 40.0, "order": 0, "orientation": null, "styling": "", "category": 2, "_entity": {"order": 0, "Id": 7, "description": "", "parent": 5, "__classname__": "Note"}, "__classname__": "_BlockRepresentation"}, {"Id": 1, "diagram": 5, "relationship": 1, "source_repr_id": 2, "target_repr_id": 1, "routing": "[]", "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 1, "source": 7, "target": 6, "name": "", "__classname__": "Anchor"}}]'''
+        add_expected_response('/data/diagram_contents/5', 'get', Response(200, json=json.loads(data)))
+        context.explorer.dblclick_element(mid=5)
+        # Check the diagram is properly displayed
+        diagram: ModeledDiagram = context.diagrams.current_diagram()
+        assert len(diagram.children) == 2
+        assert len(diagram.connections) == 1
 
 if __name__ == '__main__':
-    run_tests('*.edit_subdiagram')
+    run_tests('*.load_subdiagram')
     run_tests()

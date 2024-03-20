@@ -263,8 +263,8 @@ class PortLabel(ms.ModeledShape):
     logical_class = None
 
     @classmethod
-    def repr_category(cls):
-        return 'block'
+    def repr_category(cls) -> ms.ReprCategory:
+        return ms.ReprCategory.block
 
     @classmethod
     def getShapeDescriptor(cls):

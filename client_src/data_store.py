@@ -387,7 +387,15 @@ class DataStore(EventDispatcher):
                     rel = auto()
 
                 def classify_representation(data: Dict[str, Any]) -> repr_class:
-                    if 'rel_cls' in data:
+                    if 'category' in data:
+                        r = {
+                            ReprCategory.block: repr_class.block,
+                            ReprCategory.port: repr_class.port,
+                            ReprCategory.relationship: repr_class.rel
+                        }.get(data['category'], None)
+                        if r:
+                            return r
+                    if 'relationship' in data:
                         return repr_class.rel
                     elif data.get('block_cls', '') == 'Port':
                         return repr_class.port
@@ -397,8 +405,12 @@ class DataStore(EventDispatcher):
                         if classify_representation(r) == c:
                             yield r
 
-                for filter in [repr_class.block, repr_class.port, repr_class.rel]:
-                    for d in filter_reprs(response.json, filter):
+                blocks = list(filter_reprs(response.json, repr_class.block))
+                ports = list(filter_reprs(response.json, repr_class.port))
+                rels = list(filter_reprs(response.json, repr_class.rel))
+
+                for filtered in [blocks, ports, rels]:
+                    for d in filtered:
                         entity = self.decode_representation(d)
                         representations.append(entity)
 
