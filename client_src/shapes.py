@@ -169,6 +169,13 @@ class Shape(Stylable):
     default_style = dict()
     owner = None
 
+    def __post_init__(self):
+        if not isinstance(self.styling, dict):
+            if not self.styling:
+                self.styling = {}
+            else:
+                self.styling = json.loads(self.styling)
+
     def isResizable(self) -> bool:
         return True
 
@@ -276,10 +283,14 @@ class Shape(Stylable):
         # Don't return the original, to prevent unwanted changes that affect all instances.
         return dict(cls.default_style)
 
-    def updateStyle(self, **updates):
-        d = dict(self.styling)
-        d.update(updates)
-        self.styling = d
+    def updateStyle(self, **updates) -> bool:
+        """ Returns True if the style was actually changed. """
+        current_style = self.getDefaultStyle()
+        current_style.update(self.styling)
+        update = {k:v for k, v in updates.items() if current_style.get(k, None) != v}
+        if update:
+            self.styling.update(update)
+            self.updateShape(self.shape)
 
     @classmethod
     def getShapeDescriptor(cls):

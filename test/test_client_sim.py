@@ -186,6 +186,8 @@ class IntegrationContext:
                 return len(elements)
             def dblclick_element(self, mid: int):
                 self.dblclick(self.find_element(f'[data-modelid="{mid}"]'))
+            def click_element(self, mid: int):
+                self.click(self.find_element(f'[data-modelid="{mid}"]'))
             def name(self, mid: int):
                 """ Return the name of the element `mid` as shown in the explorer. """
                 el = self.find_element(f'[data-modelid="{mid}"] .ename')
@@ -458,6 +460,11 @@ class IntegrationContext:
                 """ Set the value of one or more fields in the record currently being edited in property editor. """
                 for key, value in kwargs.items():
                     self.find_element(f'#edit_{key}').value = str(value)
+
+            def set_style(self, **kwargs):
+                """ Set the value of one or more style items """
+                for key, value in kwargs.items():
+                    self.find_element(f'#styling_{key}').value = str(value)
 
 
         self.explorer = ExplorerApi()
@@ -1117,6 +1124,8 @@ def integration_tests():
         assert len([p for p in context.data_store.ports if p.parent == 3]) == 2
         # There should be two relationships to the block
         assert len(context.data_store.relationships) == 2
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
 
     @test
     def edit_ports():
@@ -1161,6 +1170,8 @@ def integration_tests():
         # Check they are in the database
         assert len(context.data_store.live_instances[Collection.block]) == 1
         assert len(context.data_store.live_instances[Collection.block_repr]) == 1
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
 
     @test
     def edit_block_name():
@@ -1185,6 +1196,8 @@ def integration_tests():
         context.property_editor.save()
         assert context.diagrams.block_text(rid=1) == name
         assert context.explorer.name(mid=2) == name
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
 
     @test
     def edit_definition_and_instance():
@@ -1212,6 +1225,8 @@ def integration_tests():
         # Check there is a relationship representation in the diagram.
         assert len(context.diagrams.current_diagram().connections) == 1
         assert isinstance(context.diagrams.current_diagram().connections[0], modeled_shape.Relationship)
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
 
     @test
     def test_other_shape():
@@ -1225,14 +1240,18 @@ def integration_tests():
         add_expected_response('/data/diagram_contents/1', 'get', Response(200, json=[]))
         context.explorer.dblclick_element(mid=1)
         context.diagrams.create_block(client.UseCase)
+        # Check the shape is rendered using an ellipse, not a rect.
         shape = context.diagrams.current_diagram().children[0].shape
         assert shape.select('ellipse')
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
 
     @test
     def load_subdiagram():
         """ Test loading a subdiagram from the API.
             This particular case has caused trouble in the past...
         """
+        # Create a diagram with a block and load it from the database
         context = IntegrationContext(hierarchy=[
             client.SubProgramDefinition(Id=5, name="Requirements").asdict(),
         ])
@@ -1243,7 +1262,38 @@ def integration_tests():
         diagram: ModeledDiagram = context.diagrams.current_diagram()
         assert len(diagram.children) == 2
         assert len(diagram.connections) == 1
+        assert not unexpected_requests
+        assert len(expected_responses) == 0
+
+    @test
+    def change_styling():
+        """ Change the style of a block through the property editor, and check the block is updated. """
+        # Create a diagram with a block and display it
+        context = IntegrationContext(hierarchy=[
+            client.SubProgramDefinition(Id=5, name="Requirements").asdict(),
+            client.FlowPort(Id=6, parent=5, orientation=4).asdict()
+        ])
+        data = {"Id": 1, "diagram": 5, "block": 6, "parent": None, "x": 347.0, "y": 188.0, "z": 0.0, "width": 64.0, "height": 40.0, "order": 0, "orientation": 4, "styling": "", "category": 2, "_entity": {"order": 0, "orientation": 4, "Id": 6, "name": "", "parent": 5, "__classname__": "FlowPort"}, "__classname__": "_BlockRepresentation"}
+        add_expected_response('/data/diagram_contents/5', 'get', Response(200, json=[data]))
+        context.explorer.dblclick_element(mid=5)
+        # Click the block so it is displayed in the properties editor.
+        context.diagrams.click_block(rid=1)
+        # Change the fill color for the block
+        add_expected_response('/data/_BlockRepresentation/1', 'post', Response(200, []))
+        color = '#1A5FB4'  # A nice blue color that I REALLY want my block to have.
+        context.property_editor.set_style(blockcolor=color)
+        context.property_editor.save()
+        # Check the block in the diagram has a different color now.
+        shape = context.diagrams.blocks()[0].shape
+        assert shape.select_one('polyline').style['fill'].upper() == color.upper()
+
+        # Check the AJAX requests were consumed.
+        assert len(expected_responses) == 0
+        assert not unexpected_requests
+
 
 if __name__ == '__main__':
-    run_tests('*.load_subdiagram')
+    #import cProfile
+    run_tests('*.edit_ports')
     run_tests()
+    #cProfile.run('run_tests()', sort='tottime')

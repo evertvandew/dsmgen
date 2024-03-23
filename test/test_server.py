@@ -392,5 +392,5 @@ def test_server():
         assert results['_definition']['parameters'] == ''
 
 if __name__ == '__main__':
-    run_tests('*.test_diagram_contents')
+    run_tests('*.test_create_instance_no_parameters')
     run_tests()

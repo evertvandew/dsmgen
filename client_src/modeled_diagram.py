@@ -26,17 +26,16 @@ class ModeledDiagram(Diagram):
                 for r in reprs:
                     repr_cls = source.get_representation_cls(ReprCategory.port)
                     # Check it is in the ports collection of each model_entity
-                    if source not in r.model_entity.ports:
-                        r.model_entity.ports.append(source)
+                    #if source not in r.model_entity.ports:
+                    #    r.model_entity.ports.append(source)
                     # Check it is represented in each representation
-                    if not source in [p.model_entity for p in r.ports]:
+                    if not any(source.Id == p.model_entity.Id for p in r.ports):
                         p = repr_cls(block=source.Id, parent=r.Id, model_entity=source, diagram=self.diagram_id)
                         self.datastore.add(p)
-                        r.ports.append(p)
                         # Redraw the shape
                         r.updateShape(r.shape)
 
-                # Check if it is owned by a diagram block whose diagram is shown here
+                # Check if we need to create a PortLabel -- i.e. for a port owned by the diagram, not a block.
                 if source.parent == self.diagram_id:
                     # Now we need to create a PortLabel
                     repr_cls = source.get_representation_cls(ReprCategory.block)
@@ -58,6 +57,9 @@ class ModeledDiagram(Diagram):
 
         def deleteAction(event, source: StorableElement, ds, details):
             if type(source).__name__ in datastore.configuration.port_entities:
+                # Remove the port from its parent `ports` collection.
+                model_parent = self.datastore.get(Collection.block, source.parent)
+                model_parent.ports.remove(source)
                 # Find any representations of this port
                 reprs = [p for c in self.children for p in getattr(c, 'ports', []) if p.model_entity.Id == source.Id]
                 for r in reprs:
@@ -65,6 +67,7 @@ class ModeledDiagram(Diagram):
                     self.datastore.delete(r)
                     parent = self.datastore.get(Collection.block_repr, r.parent)
                     parent.ports.remove(r)
+                    self.datastore.update_cache(parent)
 
         def updateAction(event, source: StorableElement, ds, details):
             if type(source).__name__ in datastore.configuration.block_entities:
@@ -73,6 +76,7 @@ class ModeledDiagram(Diagram):
                 # Update the shapes
                 for r in reprs:
                     r.updateShape(r.shape)
+
 
 
         datastore.subscribe('add/*', self, addAction)
@@ -157,8 +161,13 @@ class ModeledDiagram(Diagram):
             new_values = json.loads(new_data)
             old_values = widget.asdict()
             widget.model_entity.update(new_values)
+            # The styling of the widget can also be updated.
+            if 'styling' in new_values:
+                widget.updateStyle(**new_values['styling'])
             # Inform the datastore of any change
-            self.datastore and self.datastore.update(widget.model_entity)
+            self.datastore.update(widget.model_entity)
+            if 'styling' in new_values:
+                self.datastore.update(widget)
 
         super().mouseDownChild(widget, ev, uf)
 

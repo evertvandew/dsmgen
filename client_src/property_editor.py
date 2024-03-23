@@ -62,7 +62,7 @@ def type2Constructor(t: type):
     elif t == HIDDEN:
         return str
     elif isinstance(t, enum.EnumType):
-        return lambda v: t(int(v if v else 0))
+        return lambda v: t(int(v if v else list(t)[0]))
     elif t == longstr:
         return str
     elif t == int:
@@ -193,7 +193,7 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
 
     def fillTable():
         table.clear()
-        sorted_ports: List[ModelEntity] = sorted(getattr(o, field.name), key = lambda p: 100*int(p.orientation) + p.order)
+        sorted_ports: List[ModelEntity] = sorted(data_store.get_ports(o), key = lambda p: 100*int(p.orientation) + p.order)
         for i, item in enumerate(sorted_ports):
             row = html.TR(Class='port_row', data_mid=item.Id)
             for f in item.get_editable_parameters():
@@ -212,9 +212,8 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
         @bind(d.ok_button, "click")
         def yes(ev):
             """ Delete the item """
-            getattr(o, field.name).remove(item)
             row.remove()
-            data_store.update(o)
+            data_store.delete(item)
             d.close()
 
 
@@ -237,12 +236,12 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
         def ok(ev):
             """InfoDialog with text depending on user entry, at the same position as the
             original box."""
-            port_index = getattr(o, field.name).index(current)
+            port_index = data_store.get_ports(o).index(current)
             values = {f.name: converters[f.name](d.panel.select_one(f'#edit_{f.name}').value) for f in all_editables}
             for k, v in values.items():
                 setattr(current, k, v)
 
-            getattr(o, field.name)[port_index] = current
+            data_store.get_ports(o)[port_index] = current
             data_store.update_data(o)
 
             d.close()
@@ -251,10 +250,9 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
     def onAdd(ev):
         """ If there is a choice, select the type of port. """
         if len(port_types) == 1:
-            # Just add the new port to the block and be done with it.
+            # Just add the new port to database, its logic will cause it to be added to relevant collections.
             # Use the default values for each of the attributes of the port.
-            getattr(o, field.name).append(port_types[0](parent=o.Id))
-            data_store.update(o)
+            data_store.add(port_types[0](parent=o.Id))
             fillTable()
             return
 
@@ -276,9 +274,7 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
         def ok(ev):
             # Determine what type the user selected
             index = int(port_selector.value)
-            # Add a new instance to the block filled with detail values
-            getattr(o, field.name).append(port_types[index](parent=o.Id))
-            data_store.update(o)
+            data_store.add(port_types[index](parent=o.Id))
             d.close()
             fillTable()
 
@@ -322,7 +318,8 @@ def stylingEditorForm(o: ModeledShape):
             _ = form <= html.BR()
     return form
 
-def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[EditableParameterDetails]):
+def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[EditableParameterDetails],
+                  repr: Optional[ModeledShape]=None):
     """ Returns a dictionary with the current values in the form edits. """
     console.log(f"Form: {form}")
     update_data = {}
@@ -331,7 +328,7 @@ def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[Editable
         constructor = type2Constructor(field.type)
         update_data[field.name] = constructor(form.select_one(f'#edit_{field.name}').value)
 
-    if isStylable(o):
+    if repr and isStylable(repr):
         defaults = o.getDefaultStyle()
         new_style = {key: createFromValue(type(default))(document[f'styling_{key}'].value) for key, default in defaults.items()}
         update_data['styling'] = new_style
@@ -341,18 +338,22 @@ def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[Editable
 
 # Add the logic to edit parameters
 # When a block is selected, the canvas throws an event with the details
-def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameterDetails], data_store: DataStore, update=None):
+def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameterDetails], data_store: DataStore,
+                    repr: Optional[ModeledShape]=None, update=None):
     """ Create a detail-editor, with a save button for the user to click..
         o: Optional object with the current values of the fields.
         parameters: List of descriptors of all the fields.
         data_store: REST api client that persists the object being edited / created.
+        repr: A representation of the model Entity that
     """
     form = dataClassEditorForm(o, parameters, data_store)
+    if repr and isStylable(repr):
+        _ = form <= stylingEditorForm(repr)
     # Add a SAVE button
     def onSave(_):
         # Because this is a Closure, we can use the captured variables
         # Get the new values for the editable fields
-        update_data = getFormValues(form, o, parameters)
+        update_data = getFormValues(form, o, parameters, repr)
         if callable(update):
             update(json.dumps(update_data, cls=ExtendibleJsonEncoder))
 

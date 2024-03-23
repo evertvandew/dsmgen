@@ -30,6 +30,7 @@ class EditableParameterDetails:
 
 class ModelEntity:
     """ An interface class describing the behaviour of an item represented in a diagram. """
+    default_styling = {}
     def get_text(self, index: int) -> str:
         """ Retrieve a specific string associated with the item that is needed in the diagram. """
         return self.name
@@ -64,11 +65,7 @@ class ModelEntity:
 
     @classmethod
     def getDefaultStyle(cls):
-        shape_name = cls.default_styling.get('shape', 'rect')
-        shape_type = shapes.BasicShape.getDescriptor(shape_name)
-        style = cls.default_styling.copy()
-        style.update(shape_type.getDefaultStyle())
-        return style
+        return cls.default_styling.copy()
 
 
 ###############################################################################

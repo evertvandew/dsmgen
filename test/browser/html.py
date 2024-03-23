@@ -229,6 +229,8 @@ class Style:
         if default is not None:
             return getattr(self, key, default)
         return getattr(self, key)
+    def __str__(self):
+        return str(self.__dict__)
 
 class tag:
     """ Base class for all tags.

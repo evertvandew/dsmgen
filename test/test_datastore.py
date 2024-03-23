@@ -324,14 +324,12 @@ def data_store_tests():
         ds.update_cache(item)
 
         # Now add a port and try to save it.
-        p1 = Port(model_entity=client.FlowPort())
-        ds.update_cache(p1)
-        item.ports.append(p1)
+        p1 = Port(model_entity=client.FlowPort(parent=model.Id), diagram=item.diagram, parent=item.Id)
         add_expected_response('/data/FlowPort', 'post', Response(201, json={'Id': 155}),
                               check_request=check_request_data)
         add_expected_response('/data/_BlockRepresentation', 'post', Response(201, json={'Id': 65}),
                               check_request=check_request_data)
-        ds.update(item)
+        ds.add(p1)
         # Expect the most important fields to be set by the datastore
         assert p1.block == 155
         assert p1.parent == 121
@@ -339,9 +337,10 @@ def data_store_tests():
         # Expect a new Port to be created as well as its representation.
         assert 155 in ds.shadow_copy[Collection.block]
         assert 65 in ds.shadow_copy[Collection.block_repr]
-        assert p1.block == 155
-        assert p1.parent == 121
+        assert item.ports == [p1]
+        assert model.ports == [p1.model_entity]
         assert len(ds.shadow_copy[Collection.block_repr][121].ports) == 1
+        assert len(ds.shadow_copy[Collection.block][123].ports) == 1
         for k in ['diagram', 'parent', 'block', 'orientation']:
             assert getattr(ds.shadow_copy[Collection.block_repr][121].ports[0], k) == getattr(p1, k)
         assert not unexpected_requests
@@ -354,7 +353,7 @@ def data_store_tests():
         # Update the representation of the port
         p1.styling = {'color': 'yellow'}
         add_expected_response('/data/_BlockRepresentation/65', 'post', Response(201))
-        ds.update(item)
+        ds.update(p1)
         assert not unexpected_requests
         assert len(expected_responses) == 0
         assert ds.shadow_copy[Collection.block_repr][65].styling == {'color': 'yellow'}
@@ -362,20 +361,24 @@ def data_store_tests():
         # Update the model part of the port
         p1.model_entity.name = 'Output'
         add_expected_response('/data/FlowPort/155', 'post', Response(201))
-        ds.update(item)
+        ds.update(p1)
         assert not unexpected_requests
         assert len(expected_responses) == 0
         assert ds.shadow_copy[Collection.block][155].name == 'Output'
 
         # Now delete the port
-        item.ports = []
+        item.model_entity.ports = []
         add_expected_response('/data/FlowPort/155', 'delete', Response(204))
         add_expected_response('/data/_BlockRepresentation/65', 'delete', Response(204))
-        ds.update(item)
+        ds.update(item.model_entity)
         assert not unexpected_requests
         assert len(expected_responses) == 0
         assert 65 not in ds.shadow_copy[Collection.block_repr]
         assert 155 not in ds.shadow_copy[Collection.block]
 
+        assert len(expected_responses) == 0
+        assert not unexpected_requests
+
 if __name__ == '__main__':
+    run_tests('*.test_ports')
     run_tests()

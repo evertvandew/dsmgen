@@ -8,7 +8,18 @@ class svg_tag(SVG):
     def __setitem__(self, key, value):
         if key in self.int_values:
             assert type(value) in [int, str], f"Attribute {key} of {self.svg_values} must be either an int or a str"
-        self.attrs[key] = value
+        if key == 'style':
+            if value and isinstance(value, str):
+                if '{' in value:
+                    for k, v in json.loads(value).items():
+                        self.style[k] = v
+                else:
+                    for k, v in [item.split(':') for item in value.split(';')]:
+                        self.style[k.strip()] = v.strip()
+            elif isinstance(value, dict):
+                self.style.update(value)
+        else:
+            self.attrs[key] = value
     def __getitem__(self, key):
         return self.attrs[key]
 

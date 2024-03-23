@@ -5,7 +5,7 @@ It has a buffer for all data items that are used in the application.
 """
 from enum import Enum, IntEnum, auto
 import json
-from copy import deepcopy
+from copy import deepcopy, copy
 from dataclasses import dataclass, is_dataclass, asdict, fields, field, Field
 from typing import Dict, Callable, List, Any, Iterable, Tuple, Optional, Self
 from dispatcher import EventDispatcher
@@ -55,7 +55,7 @@ def from_dict(cls, **details) -> Self:
 class StorableElement:
     Id: int = 0
     @classmethod
-    def get_collection(cls):
+    def get_collection(cls) -> Collection:
         raise NotImplementedError()
     @classmethod
     def from_dict(cls, data_store: "DataStore", **details) -> Self:
@@ -177,6 +177,13 @@ class DataStore(EventDispatcher):
         """ Return all relationship elements in the current model """
         return list(self.live_instances[Collection.relation].values())
 
+    def get_ports(self, o: StorableElement):
+        if o.get_collection() == Collection.block:
+            return getattr(o, 'ports', [])
+        elif o.get_collection() == Collection.block_repr:
+            if o.repr_category() == ReprCategory.block:
+                return getattr(o, 'ports', [])
+
 
     def add(self, record: StorableElement) -> StorableElement:
         """ Persist a new element """
@@ -189,7 +196,8 @@ class DataStore(EventDispatcher):
             # Check if this is a new model item (they can be created inside a diagram)
             if not model.Id:
                 # Insert this model item as a child of the diagram (diagrams are also folders in the explorer).
-                model.parent = record.diagram
+                if not getattr(model, 'parent', True):
+                    model.parent = record.diagram
                 # Add the model item
                 self.add(model)
                 # Take out the new Id of the model item
@@ -213,6 +221,13 @@ class DataStore(EventDispatcher):
             ajax.post(f'{self.configuration.base_url}/{collection_url}', blocking=True, data=data,
                       oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
             self.add_data(record)
+            # For ports, also update the ports collections in the parent block.
+            if record.repr_category() == ReprCategory.port:
+                repr_parent = self.live_instances[Collection.block_repr][record.parent]
+                if record not in repr_parent.ports:
+                    repr_parent.ports.append(record)
+                    self.update_cache(repr_parent)
+                    self.update_data(repr_parent)
             return record
         else:
             data = json.dumps(record, cls=ExtendibleJsonEncoder)
@@ -225,6 +240,13 @@ class DataStore(EventDispatcher):
             if record.Id < 1:
                 raise RuntimeError("Could not add record")
             self.add_data(record)
+            # For ports, also update the ports collections in the parent block.
+            if type(record).__name__ in self.configuration.port_entities:
+                parent_block = self.live_instances[Collection.block][record.parent]
+                if record not in parent_block.ports:
+                    parent_block.ports.append(record)
+                    self.update_cache(parent_block)
+                    self.update_data(parent_block)
             return record
 
     def update(self, record: StorableElement):
@@ -265,8 +287,6 @@ class DataStore(EventDispatcher):
                     for i in deleted:
                         p = lu_orig[i]
                         self.delete(p)
-                        # For Port representations are always directly linked to models.
-                        self.delete(self.shadow_copy[Collection.block][p.block])
                     for i in added:
                         p = lu_new[i]
                         # Set fields refering to the context of the port
@@ -316,6 +336,24 @@ class DataStore(EventDispatcher):
 
     def delete(self, record: StorableElement):
         collection = record.get_collection()
+
+        # Find any dependencies and delete these first.
+        to_delete = []
+        if collection == Collection.block_repr:
+            to_delete.extend(c for c in self.live_instances[Collection.block_repr].values() if c.parent == record.Id)
+        if collection == Collection.block:
+            to_delete.extend(c for c in self.live_instances[Collection.block].values() if c.parent == record.Id)
+            to_delete.extend(r for r in self.live_instances[Collection.block_repr].values() if r.model_entity.Id == record.Id)
+            # Delete relationships connected to this block
+            to_delete.extend(r for r in self.live_instances[Collection.relation].values() if r.source_id == record.Id)
+            to_delete.extend(r for r in self.live_instances[Collection.relation].values() if r.target_id == record.Id)
+            # Don't do the representations of these relations, they will be deleted at another point.
+        if collection == Collection.relation:
+            to_delete.extend(r for r in self.live_instances[Collection.relation_repr].values() if r.relation == record.Id)
+        for d in to_delete:
+            self.delete(d)
+
+        # Now delete the actual entities.
         def on_complete(update: JsonResponse):
             if update.status < 300:
                 del self.shadow_copy[collection][record.Id]
@@ -405,12 +443,8 @@ class DataStore(EventDispatcher):
                         if classify_representation(r) == c:
                             yield r
 
-                blocks = list(filter_reprs(response.json, repr_class.block))
-                ports = list(filter_reprs(response.json, repr_class.port))
-                rels = list(filter_reprs(response.json, repr_class.rel))
-
-                for filtered in [blocks, ports, rels]:
-                    for d in filtered:
+                for filter in [repr_class.block, repr_class.port, repr_class.rel]:
+                    for d in filter_reprs(response.json, filter):
                         entity = self.decode_representation(d)
                         representations.append(entity)
 
@@ -499,7 +533,7 @@ class DataStore(EventDispatcher):
             record = records
             cls_name = type(record).__name__
             collection = record.get_collection()
-            self.shadow_copy[collection][record.Id] = deepcopy(record)
+            self.shadow_copy[collection][record.Id] = copy(record)
 
             # Check if we already have an instance of this record. If so, reuse it.
             collection_records = self.live_instances[collection]

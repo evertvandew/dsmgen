@@ -79,6 +79,8 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         text_fields = [f.name for f in fields(entity)
                        if generator.field_is_type(f.type, str) or generator.field_is_type(f.type, mdef.longstr)]
 
+        base_shape_name = generator.styling.get('shape', 'rect')
+
 %>
     % for key, (type_, default) in internal_fields.items():
     ## All elements must have a default value so they can be created from scratch
@@ -86,6 +88,11 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     % endfor
 
     default_styling = ${repr(generator.styling[entity.__name__])}
+    % if generator.md.is_relationship(entity):
+    default_styling.update(shapes.Relationship.getDefaultStyle())
+    % else:
+    default_styling.update(shapes.BasicShape.getDescriptor("${base_shape_name}").getDefaultStyle())
+    % endif
 
     def __eq__(self, other) -> bool:
         if type(self) != type(other):
@@ -357,8 +364,7 @@ def on_diagram_selection(_e_name, _e_source, data_store, details):
     for e in properties_div.children:
         e.remove()
     properties_div.children = []
-    _ = properties_div <= dataClassEditor(model, model.get_editable_parameters(), data_store, update=update)
-    _ = properties_div <= stylingEditorForm(repr)
+    _ = properties_div <= dataClassEditor(model, model.get_editable_parameters(), data_store, repr=repr, update=update)
 
 
 def on_explorer_click(_event_name, _event_source, data_store, details):

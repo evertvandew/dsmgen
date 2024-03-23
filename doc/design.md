@@ -233,3 +233,17 @@ package inner_diagram {
 # Design choices
 * For now, CompoundEntities only have BlockDiagram inner diagrams, not laned diagrams.
 
+## The "ports" collections
+For easy rendering of the blocks & connections, blocks maintain a collection of ports.
+This is NOT how the ports are stored in the database, there ports have a reference to the owning block.
+Managing such a structure that does NOT represent the underlying data model, is very tricky. 
+To manage this complexity, the following design choices are used:
+
+* When the client queries the server for a diagram's contents, the response contains filled `ports` fields.
+* During editing, only the `ModelledDiagram` class will modify the `ports` fields, in answer to events it gets
+  from the data store component.
+* The data store has a function to determine which ports belong to a block, for use by e.g. the properties editor.
+* The properties editor only interacts with the ports themselves. Changes will trigger events, which will be
+  handled by the `ModelledDiagram`.
+
+
