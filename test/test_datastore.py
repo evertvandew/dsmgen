@@ -367,10 +367,9 @@ def data_store_tests():
         assert ds.shadow_copy[Collection.block][155].name == 'Output'
 
         # Now delete the port
-        item.model_entity.ports = []
         add_expected_response('/data/FlowPort/155', 'delete', Response(204))
         add_expected_response('/data/_BlockRepresentation/65', 'delete', Response(204))
-        ds.update(item.model_entity)
+        ds.delete(p1.model_entity)
         assert not unexpected_requests
         assert len(expected_responses) == 0
         assert 65 not in ds.shadow_copy[Collection.block_repr]

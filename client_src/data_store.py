@@ -273,30 +273,6 @@ class DataStore(EventDispatcher):
                           oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
                 self.update_data(repr)
 
-            # Handle any ports
-            if collection == Collection.block_repr and hasattr(record, 'ports'):
-                orig_ports = org_repr.ports
-                new_ports = record.ports
-                if orig_ports != new_ports:
-                    lu_orig = {p.Id: p for p in orig_ports}
-                    lu_new = {p.Id: p for p in new_ports}
-                    deleted = set(lu_orig) - set(lu_new)
-                    added = set(lu_new) - set(lu_orig)
-                    updated = [i for i in (set(lu_new) & set(lu_orig)) if lu_orig[i] != lu_new[i]]
-
-                    for i in deleted:
-                        p = lu_orig[i]
-                        self.delete(p)
-                    for i in added:
-                        p = lu_new[i]
-                        # Set fields refering to the context of the port
-                        p.parent = record.Id
-                        p.diagram = record.diagram
-                        # Store the new port
-                        self.add(p)
-                    for i in updated:
-                        self.update(lu_new[i])
-                    assert self.update_cache(record) == record
         else:
             # Handle non-representations
             original = self.shadow_copy[collection][record.Id]
@@ -305,34 +281,6 @@ class DataStore(EventDispatcher):
                 ajax.post(f'{self.configuration.base_url}/{type(record).__name__}/{record.Id}', blocking=True,
                           data=data, oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
                 self.update_data(record)
-            # If the record has ports, check these as well for updates.
-            # Ports are not included in the comparison above, the 'ports' field is not persisted.
-            if hasattr(record, 'ports'):
-                orig_ports = original.ports
-                new_ports = record.ports
-                if orig_ports != new_ports:
-                    lu_orig = {p.Id: p for p in orig_ports}
-                    lu_new = {p.Id: p for p in new_ports}
-                    deleted = set(lu_orig) - set(lu_new)
-                    added = set(lu_new) - set(lu_orig)
-                    updated = [i for i in (set(lu_new) & set(lu_orig)) if lu_orig[i] != lu_new[i]]
-                    for i in deleted:
-                        p = lu_orig[i]
-                        self.delete(p)
-                    for i in added:
-                        p = lu_new[i]
-                        # Set fields refering to the context of the port
-                        p.parent = record.Id
-                        # Store the new port
-                        self.add(p)
-                    for i in updated:
-                        self.update(lu_new[i])
-
-                    # The update should be stored in the cache.
-                    self.update_cache(record)
-
-
-
 
     def delete(self, record: StorableElement):
         collection = record.get_collection()
