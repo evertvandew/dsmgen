@@ -35,6 +35,7 @@ from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder, Coll
 from svg_shapes import getMarkerDefinitions
 from tab_view import TabView
 from point import load_waypoints
+from copy import deepcopy, copy
 
 
 def resolve(name: str) -> Type[ms.ModelEntity]:
@@ -99,6 +100,11 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
             return False
         return (
             ${' and\n            '.join(f'self.{name} == other.{name}' for name in persistent_fields.keys())}
+        )
+
+    def copy(self) -> Self:
+        return type(self)(
+            ${',\n            '.join(f'{k}= copy(getattr(self, "{k}"))' for k in persistent_fields.keys())}
         )
 
     def get_icon(self):

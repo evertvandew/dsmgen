@@ -16,6 +16,7 @@ def test_styling():
     @test
     def shape_styling():
         item = TestShape()
+        item.shape = item.getShape()
         assert item.getDefaultStyle() == {'color': 'white', 'stroke': 'black'}
         assert item.getStyleKeys() == ['color', 'stroke']
 

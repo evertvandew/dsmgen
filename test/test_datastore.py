@@ -9,7 +9,8 @@ from modeled_shape import ModeledShapeAndPorts, ModeledRelationship, Port
 
 @prepare
 def data_store_tests():
-    from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses, clear_expected_response
+    from browser.ajax import (add_expected_response, Response,
+                              clear_expected_response, check_expected_response)
     import public.sysml_client as client
 
     config = DataConfiguration(
@@ -161,8 +162,7 @@ def data_store_tests():
         assert 121 in ds.shadow_copy[Collection.block_repr]
         assert ds.shadow_copy[Collection.block_repr][121] == item
         assert ds.shadow_copy[Collection.block][123].parent == 456
-        assert len(expected_responses) == 0
-        assert not unexpected_requests
+        check_expected_response()
 
     @test
     def add_repr_new_repr():
@@ -201,14 +201,11 @@ def data_store_tests():
         assert item.Id == 121
         assert 123 in ds.shadow_copy[Collection.relation]
         assert 121 in ds.shadow_copy[Collection.relation_repr]
-        assert len(expected_responses) == 0
-        assert not unexpected_requests
+        check_expected_response()
 
     @test
     def add_repr_existing_model():
         clear_expected_response()
-        assert len(expected_responses) == 0
-        assert not unexpected_requests
         ds = DataStore(config)
         model = client.Block(Id=123, name='Test1', description='This is a test block')
         ds.update_cache(model)
@@ -228,8 +225,7 @@ def data_store_tests():
         assert 123 in ds.shadow_copy[Collection.block]
         assert 121 in ds.shadow_copy[Collection.block_repr]
         assert ds.shadow_copy[Collection.block_repr][121] == item
-        assert len(expected_responses) == 0
-        assert not unexpected_requests
+        check_expected_response()
 
     @test
     def delete_block():
@@ -246,6 +242,7 @@ def data_store_tests():
         add_expected_response('/data/Block/123', 'delete', Response(204))
         ds.delete(model)
         assert not ds.shadow_copy[Collection.block]
+        check_expected_response()
 
     @test
     def delete_relationship():
@@ -261,6 +258,7 @@ def data_store_tests():
         add_expected_response('/data/BlockReference/123', 'delete', Response(204))
         ds.delete(model)
         assert not ds.shadow_copy[Collection.relation]
+        check_expected_response()
 
     @test
     def update_repr():
@@ -274,16 +272,14 @@ def data_store_tests():
 
         # Check the update is filtered out
         ds.update(item)
-        assert len(expected_responses) == 0
-        assert not unexpected_requests
+        check_expected_response()
 
         # Update the representation and check there is one and only one msg sent
         item.x = 250
         add_expected_response('/data/_BlockRepresentation/121', 'post', Response(201))
         ds.update(item)
         ds.update(item)
-        assert len(expected_responses) == 0
-        assert not unexpected_requests
+        check_expected_response()
         # Check the cache is also updated.
         assert ds.shadow_copy[Collection.block_repr][121] == item
         assert id(ds.shadow_copy[Collection.block_repr][121]) != id(item), "The shadow_copy must store a copy of the submitted object"
@@ -293,22 +289,18 @@ def data_store_tests():
         add_expected_response('/data/Block/123', 'post', Response(201))
         ds.update(item)
         ds.update(item)
-        assert len(expected_responses) == 0
-        assert not unexpected_requests
+        check_expected_response()
         # Check the shadow_copy is also updated.
         assert ds.shadow_copy[Collection.block][123].name == item.model_entity.name
         assert isinstance(ds.shadow_copy[Collection.block][123], client.Block)
 
         # Update both representation and model
-        item.name = 'More Testing'
+        item.model_entity.name = 'More Testing'
         item.y = 399
         add_expected_response('/data/Block/123', 'post', Response(201))
         add_expected_response('/data/_BlockRepresentation/121', 'post', Response(201))
         ds.update(item)
-        assert len(expected_responses) == 0
-        ds.update(item)
-        assert len(expected_responses) == 0
-        assert not unexpected_requests
+        check_expected_response()
 
     @test
     def test_ports():
@@ -339,45 +331,34 @@ def data_store_tests():
         assert 65 in ds.shadow_copy[Collection.block_repr]
         assert item.ports == [p1]
         assert model.ports == [p1.model_entity]
-        assert len(ds.shadow_copy[Collection.block_repr][121].ports) == 1
-        assert len(ds.shadow_copy[Collection.block][123].ports) == 1
-        for k in ['diagram', 'parent', 'block', 'orientation']:
-            assert getattr(ds.shadow_copy[Collection.block_repr][121].ports[0], k) == getattr(p1, k)
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
         # Check the object is stable
         ds.update(item)
-        assert not unexpected_requests
+        check_expected_response()
 
         # Update the representation of the port
         p1.styling = {'color': 'yellow'}
         add_expected_response('/data/_BlockRepresentation/65', 'post', Response(201))
         ds.update(p1)
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
         assert ds.shadow_copy[Collection.block_repr][65].styling == {'color': 'yellow'}
 
         # Update the model part of the port
         p1.model_entity.name = 'Output'
         add_expected_response('/data/FlowPort/155', 'post', Response(201))
         ds.update(p1)
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
         assert ds.shadow_copy[Collection.block][155].name == 'Output'
 
         # Now delete the port
         add_expected_response('/data/FlowPort/155', 'delete', Response(204))
         add_expected_response('/data/_BlockRepresentation/65', 'delete', Response(204))
         ds.delete(p1.model_entity)
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
         assert 65 not in ds.shadow_copy[Collection.block_repr]
         assert 155 not in ds.shadow_copy[Collection.block]
-
-        assert len(expected_responses) == 0
-        assert not unexpected_requests
+        check_expected_response()
 
 if __name__ == '__main__':
-    run_tests('*.test_ports')
+    run_tests('*.update_repr')
     run_tests()

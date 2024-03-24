@@ -64,8 +64,9 @@ class ModeledDiagram(Diagram):
                 reprs = [p for c in self.children for p in getattr(c, 'ports', []) if p.model_entity.Id == source.Id]
                 for r in reprs:
                     r.shape.remove()
-                    self.datastore.delete(r)
                     parent = self.datastore.get(Collection.block_repr, r.parent)
+                    # The representation doesn't need deleting: that is done by the data_store.
+                    # Only remove them from the ports collection maintained by this class
                     parent.ports.remove(r)
                     self.datastore.update_cache(parent)
 

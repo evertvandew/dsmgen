@@ -41,6 +41,17 @@ def clear_expected_response():
     expected_responses = []
     unexpected_requests = []
 
+def check_expected_response():
+    global expected_responses, unexpected_requests
+    if expected_responses:
+        print(f"There are unconsumed responses: {expected_responses}")
+    if unexpected_requests:
+        print(f"There are unexpected requests: {unexpected_requests}")
+    try:
+        assert not expected_responses and not unexpected_requests
+    finally:
+        clear_expected_response()
+
 def determine_response(url, method, kwargs):
     if DO_NOT_SIMULATE:
         func = {'get': requests.get, 'post': requests.post, 'delete': requests.delete, 'put': requests.put}[method.lower()]

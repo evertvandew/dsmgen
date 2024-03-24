@@ -6,7 +6,7 @@ from browser import svg, console
 from diagrams import shapes, Shape, Relationship, CP, Point, Orientations
 from data_store import StorableElement, Collection, ReprCategory, from_dict, ExtendibleJsonEncoder, DataStore
 from point import load_waypoints
-from enum import IntEnum, auto
+from copy import deepcopy, copy
 
 
 
@@ -81,6 +81,11 @@ class ModelRepresentation(StorableElement):
     def getShape(self):
         raise NotImplementedError()
 
+    def copy(self, ignore=None) -> Self:
+        ignore = ignore or ['model_entity', 'id']
+        result = type(self)(**{f.name: copy(getattr(self, f.name)) for f in self.fields() if f.name not in ignore})
+        result.model_entity = self.model_entity
+        return result
 
 @dataclass
 class ModeledShape(Shape, ModelRepresentation):
@@ -187,6 +192,12 @@ class ModeledShapeAndPorts(ModeledShape):
         details = super().asdict()
         return details
 
+    def copy(self) -> Self:
+        result = super().copy(ignore=['ports', 'children', 'model_entity', 'id'])
+        result.ports = self.ports
+        result.children = self.children
+        return result
+
     @classmethod
     def getShapeDescriptor(cls):
         return shapes.BasicShape.getDescriptor("rect")
@@ -291,6 +302,12 @@ class ModeledRelationship(Relationship, ModelRepresentation):
     start: ModeledShape = None
     finish: ModeledShape = None
     category: ReprCategory = ReprCategory.relationship
+
+    def copy(self) -> Self:
+        result = super().copy(ignore=['start', 'finish', 'model_entity', 'id'])
+        result.start = self.start
+        result.finish = self.finish
+        return result
 
     @staticmethod
     def from_dict(data_store: DataStore, **details) -> Self:

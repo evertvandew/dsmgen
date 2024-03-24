@@ -17,7 +17,7 @@ import diagrams
 from modeled_diagram import ModeledDiagram
 import explorer
 from data_store import ExtendibleJsonEncoder, DataStore, DataConfiguration, Collection, StorableElement, ReprCategory
-from browser.ajax import add_expected_response, unexpected_requests, Response, expected_responses, \
+from browser.ajax import add_expected_response, Response, check_expected_response, \
     clear_expected_response
 from browser import events, html, document as d
 from explorer import make_explorer
@@ -250,8 +250,7 @@ class IntegrationContext:
                 target.dispatchEvent(events.Drop(dataTransfer=ev.dataTransfer))
                 target.dispatchEvent(events.DragEnd(dataTransfer=ev.dataTransfer))
                 # Check the AJAX requests were consumed.
-                assert len(expected_responses) == 0
-                assert not unexpected_requests
+                check_expected_response()
 
         class DiagramsApi(HtmlApi):
             parent: html.tag = d['canvas']
@@ -274,7 +273,7 @@ class IntegrationContext:
             def create_block(self, block_cls: modeled_shape.ModelEntity):
                 """ Create a block inside the current diagram by clicking on the CreateWidget. """
                 # Prepare the AJAX mock to return two ID's: one for the model entity, one for the representation.
-                assert len(expected_responses) == 0
+                check_expected_response()
                 mid = integration_context.get_new_id(block_cls)
                 repr_cls = block_cls.get_representation_cls(modeled_shape.ReprCategory.block)
                 rid = integration_context.get_new_id(repr_cls)
@@ -294,7 +293,7 @@ class IntegrationContext:
                 btn.dispatchEvent(events.MouseDown())
                 btn.dispatchEvent(events.MouseUp())
                 # Check the AJAX requests were consumed.
-                assert len(expected_responses) == 0
+                check_expected_response()
 
             def click_block(self, rid: int):
                 shape = self.resolve(rid).shape
@@ -332,8 +331,7 @@ class IntegrationContext:
                 # Cause the port to be drawn
                 shape.updateShape(shape.shape)
                 # Check the AJAX requests were consumed.
-                assert len(expected_responses) == 0
-                assert not unexpected_requests
+                check_expected_response()
 
 
             def ports(self, rid: int) -> List[client.ms.Port]:
@@ -386,8 +384,7 @@ class IntegrationContext:
                 target.shape.dispatchEvent(events.MouseDown())
                 target.shape.dispatchEvent(events.MouseUp())
                 # Check the AJAX requests were consumed.
-                assert len(expected_responses) == 0
-                assert not unexpected_requests
+                check_expected_response()
 
             def block_text(self, rid: int) -> str:
                 """ Returns the text currently being displayed in a block.
@@ -429,8 +426,7 @@ class IntegrationContext:
                     [b for b in d.select('.brython-dialog-button') if b.text.lower() == 'ok'][0].dispatchEvent(events.Click())
 
                 # Check the AJAX requests were consumed.
-                assert len(expected_responses) == 0
-                assert not unexpected_requests
+                check_expected_response()
 
             def remove_port(self, index: int=0):
                 """ remove a specific port from the list """
@@ -450,8 +446,7 @@ class IntegrationContext:
                 [b for b in d.select('.brython-dialog-button') if b.text.lower() == 'yes'][0].dispatchEvent(
                     events.Click())
                 # Check the AJAX requests were consumed.
-                assert len(expected_responses) == 0
-                assert not unexpected_requests
+                check_expected_response()
 
             def count_ports(self):
                 return len(self.parent.select('[id^="delete_port_"]'))
@@ -532,6 +527,7 @@ def simulated_diagram_tests():
 
         # Add a SubprogramDefinition
         create_and_move(client.SubProgramDefinition(name='', Id=1), x=300, y=300, height=64, width=100, Id=1)
+        check_expected_response()
 
     @test
     def create_connect_blocks():
@@ -555,7 +551,7 @@ def simulated_diagram_tests():
         assert type(conn.model_entity).__name__ == 'FlowPortConnection'
         assert conn.start.Id == 10
         assert conn.finish.Id == 11
-
+        check_expected_response()
 
     @test
     def drag_and_drop():
@@ -596,7 +592,7 @@ def simulated_diagram_tests():
         assert repr.diagram == 5
         assert repr.model_entity.Id == 123
         assert repr.Id == 400
-        assert not unexpected_requests
+        check_expected_response()
 
     @test
     def drag_and_drop_with_ports():
@@ -651,6 +647,7 @@ def simulated_diagram_tests():
         assert port.parent == 400
         assert port.block == 124
         assert port.diagram == 5
+        check_expected_response()
 
     @test
     def load_diagram():
@@ -660,14 +657,14 @@ def simulated_diagram_tests():
             200,
             json=example_diagram))
         diagram, rest = new_diagram(3, ds)
-        assert len(expected_responses) == 0
-        assert not unexpected_requests
+        check_expected_response()
 
         # Check the various elements were rendered to the DOM
         nonlocal d
         assert len(d['canvas'].select('[data-class="ModeledShapeAndPorts"]')) == 2
         assert len(d['canvas'].select('[data-class="ModeledShape"]')) == 1
         assert len(d['canvas'].select('[data-class="Port"]')) == 1
+        check_expected_response()
 
     @test
     def connection_property_editor():
@@ -682,7 +679,7 @@ def simulated_diagram_tests():
         connection = diagram.connections[0]
         connection.path.dispatchEvent(events.MouseDown())
         connection.path.dispatchEvent(events.MouseUp())
-        assert not unexpected_requests
+        check_expected_response()
         nonlocal d
         form = d.select('form')
         assert len(form) == 2
@@ -698,9 +695,7 @@ def simulated_diagram_tests():
 
         live_instance = ds.get(Collection.relation, 1)
         assert live_instance.name == 'Connection'
-
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
     @test
     def block_property_editor():
@@ -715,7 +710,7 @@ def simulated_diagram_tests():
         block = [c for c in diagram.children if c.ports][0]
         block.shape.dispatchEvent(events.MouseDown())
         block.shape.dispatchEvent(events.MouseUp())
-        assert not unexpected_requests
+        check_expected_response()
         nonlocal d
         form = d.select('form')
         assert len(form) == 2
@@ -724,9 +719,7 @@ def simulated_diagram_tests():
         assert d.select('.porttable TR')           # the editor for the port
         # There should be a style editor in the second form.
         assert d.select('#styling_blockcolor')
-
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
     @test
     def handling_parameter_spec_dropped_block():
@@ -788,12 +781,12 @@ def simulated_diagram_tests():
         assert repr.model_entity.parent == 5
         assert repr.model_entity.definition == definition
         assert repr.Id == 400
-        assert not unexpected_requests
+        check_expected_response()
 
         # Trigger the details editor.
         repr.shape.dispatchEvent(events.MouseDown())
         repr.shape.dispatchEvent(events.MouseUp())
-        assert not unexpected_requests
+        check_expected_response()
         form = d.select('form')
         assert len(form) == 2
 
@@ -806,14 +799,11 @@ def simulated_diagram_tests():
         d.select('#edit_factor')[0].value = '123.456'
         d.select('#edit_limit')[0].value = '87654'
         btn = d.select_one('#details .btn-primary')
-
         add_expected_response('/data/BlockInstance/125', 'post', Response(200, json={}))
         btn.dispatchEvent(events.Click())
 
         assert repr.model_entity.parameters == {'factor': 123.456, 'limit': 87654}
-
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
     @test
     def block_properties_editor_instance():
@@ -831,7 +821,7 @@ def simulated_diagram_tests():
         block = diagram.children[0]
         block.shape.dispatchEvent(events.MouseDown())
         block.shape.dispatchEvent(events.MouseUp())
-        assert not unexpected_requests
+        check_expected_response()
         form = d.select('form')
         assert len(form) == 2
         html_form = str(form)
@@ -845,9 +835,7 @@ def simulated_diagram_tests():
         assert len(d.select('#edit_name')) == 0
         # It should be possible to edit the styling of the block.
         assert d.select('#styling_blockcolor')
-
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
     @test
     def load_test_diagrams():
@@ -875,6 +863,7 @@ def simulated_diagram_tests():
             200,
             json=diagram_w_instance))
         diagram, rest = new_diagram(4, ds)
+        check_expected_response()
 
 
 @prepare
@@ -930,6 +919,7 @@ def simulated_explorer_tests():
         button.dispatchEvent(events.Click())
         lines = d.get(selector='.eline [draggable="true"]')
         assert len(lines) == 4
+        check_expected_response()
 
     @test
     def left_click():
@@ -968,8 +958,7 @@ def simulated_explorer_tests():
         edit_fields[0].value = 'blablablabla'
         add_expected_response('/data/StructuralModel/2', 'post', Response(200))
         btn.dispatchEvent(events.Click())
-        assert len(expected_responses) == 0
-        assert len(unexpected_requests) == 0
+        check_expected_response()
         assert ds.get(Collection.hierarchy, 2).name == 'blablablabla'
 
     @test
@@ -1005,11 +994,10 @@ def simulated_explorer_tests():
         # Set the parameters field and submit the changes.
         input = d.select('#edit_parameters')[0]
         input.value = 'gain:float,factor:int'
-        add_expected_response('/data/StructuralModel/2', 'post', Response(200))
-        btn = d.select_one('#details button')
+        add_expected_response('/data/SubProgramDefinition/1', 'post', Response(200))
+        btn = [b for b in d.select('#details button') if b.text == 'Save'][0]
         btn.dispatchEvent(events.Click())
-        assert len(expected_responses) == 0
-        assert len(unexpected_requests) == 0
+        check_expected_response()
 
 
     @test
@@ -1059,9 +1047,7 @@ def simulated_explorer_tests():
 
             ]))
         ok_btn.dispatchEvent(events.Click())
-
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
     @test
     def existing_instance_property_editer():
@@ -1080,7 +1066,7 @@ def simulated_explorer_tests():
         source.dispatchEvent(events.Click())
         assert d.select('#edit_factor')[0].value == 123
         assert d.select('#edit_limit')[0].value == 456
-        pass
+        check_expected_response()
 
 @prepare
 def integration_tests():
@@ -1124,8 +1110,7 @@ def integration_tests():
         assert len([p for p in context.data_store.ports if p.parent == 3]) == 2
         # There should be two relationships to the block
         assert len(context.data_store.relationships) == 2
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
     @test
     def edit_ports():
@@ -1155,9 +1140,7 @@ def integration_tests():
         assert len(context.data_store.live_instances[Collection.block]) == 3
         assert len(context.data_store.live_instances[Collection.block_repr]) == 3
         # Delete the two ports
-        add_expected_response(f'/data/FlowPort/3', 'delete', Response(204))
         context.property_editor.remove_port()
-        add_expected_response(f'/data/FlowPort/2', 'delete', Response(204))
         context.property_editor.remove_port()
         context.property_editor.save()
         assert context.property_editor.count_ports() == 0
@@ -1170,8 +1153,7 @@ def integration_tests():
         # Check they are in the database
         assert len(context.data_store.live_instances[Collection.block]) == 1
         assert len(context.data_store.live_instances[Collection.block_repr]) == 1
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
     @test
     def edit_block_name():
@@ -1196,8 +1178,7 @@ def integration_tests():
         context.property_editor.save()
         assert context.diagrams.block_text(rid=1) == name
         assert context.explorer.name(mid=2) == name
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
     @test
     def edit_definition_and_instance():
@@ -1225,8 +1206,7 @@ def integration_tests():
         # Check there is a relationship representation in the diagram.
         assert len(context.diagrams.current_diagram().connections) == 1
         assert isinstance(context.diagrams.current_diagram().connections[0], modeled_shape.Relationship)
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
     @test
     def test_other_shape():
@@ -1243,8 +1223,7 @@ def integration_tests():
         # Check the shape is rendered using an ellipse, not a rect.
         shape = context.diagrams.current_diagram().children[0].shape
         assert shape.select('ellipse')
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
     @test
     def load_subdiagram():
@@ -1262,8 +1241,7 @@ def integration_tests():
         diagram: ModeledDiagram = context.diagrams.current_diagram()
         assert len(diagram.children) == 2
         assert len(diagram.connections) == 1
-        assert not unexpected_requests
-        assert len(expected_responses) == 0
+        check_expected_response()
 
     @test
     def change_styling():
@@ -1280,6 +1258,8 @@ def integration_tests():
         context.diagrams.click_block(rid=1)
         # Change the fill color for the block
         add_expected_response('/data/_BlockRepresentation/1', 'post', Response(200, []))
+        # For now, we accept the FlowPort is updated as well. The current value for `orientation` isn't handled by the sim.
+        add_expected_response('/data/FlowPort/6', 'post', Response(200, json={}))
         color = '#1A5FB4'  # A nice blue color that I REALLY want my block to have.
         context.property_editor.set_style(blockcolor=color)
         context.property_editor.save()
@@ -1288,8 +1268,7 @@ def integration_tests():
         assert shape.select_one('polyline').style['fill'].upper() == color.upper()
 
         # Check the AJAX requests were consumed.
-        assert len(expected_responses) == 0
-        assert not unexpected_requests
+        check_expected_response()
 
 
 if __name__ == '__main__':

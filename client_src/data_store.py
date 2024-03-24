@@ -81,6 +81,10 @@ class StorableElement:
     def is_instance_of(cls) -> bool:
         return False
 
+    def copy(self) -> Self:
+        # Create a deep copy from the persistent fields for this data structure.
+        return from_dict(type(self), **deepcopy(self.asdict()))
+
 
 class parameter_spec(str):
     """ A parameter spec is represented in the REST api as a string with this structure:
@@ -481,7 +485,7 @@ class DataStore(EventDispatcher):
             record = records
             cls_name = type(record).__name__
             collection = record.get_collection()
-            self.shadow_copy[collection][record.Id] = copy(record)
+            self.shadow_copy[collection][record.Id] = record.copy()
 
             # Check if we already have an instance of this record. If so, reuse it.
             collection_records = self.live_instances[collection]
