@@ -9,7 +9,7 @@ import json
 from typing import List, Dict
 from square_routing import routeSquare
 from point import Point
-from svg_shapes import (BasicShape, renderText, VAlign, HAlign)
+from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns)
 
 
 def getMousePos(ev):
@@ -586,9 +586,13 @@ class Relationship(Stylable):
         """ The default routing is center-to-center. """
         self.owner = owner
         # Create the line
-        self.path = svg.path(d="", stroke=self.getStyle('linecolor'), stroke_width=self.getStyle('linewidth'),
+        details = dict(d="", stroke=self.getStyle('linecolor'), stroke_width=self.getStyle('linewidth'),
                              marker_end=f"url(#{self.getStyle('endmarker')})",
                              marker_start=f"url(#{self.getStyle('startmarker')})", fill="none")
+        pattern = line_patterns[self.getStyle('pattern', 'solid')]
+        if pattern:
+            details['stroke_dasharray'] = pattern
+        self.path = svg.path(**details)
         self.path.attrs['data-class'] = type(self).__name__
         # Above the visible path, there is an invisible one used to give a wider selection region.
         self.selector = svg.path(d="", stroke="gray", stroke_width="10", fill="none", opacity="0.0")

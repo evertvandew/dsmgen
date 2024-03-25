@@ -534,13 +534,21 @@ class Label(Note):
 # Define possible line endings. 
 # Also open and closed variants are generated. Open ones are named "<name>open"
 
+# The strings to define endings follow SVG "Path" conventions.
+# The coordinates are as follows:
+#   * The x coordinate is in the direction to the line, the y perpendicular to it.
+#   * The line touches the connection point at (10, 5)
+#   * The marker is to be drawn inside the rectangle -5 <= x <= 10 and 0 <= y <= 10)
+
+
 closed_line_endings = {
     'arrow': "M 0 1.5 L 0 8.5 L 10 5 z",
     'halfarror': 'M 0 5 L 0 8.5 L 10 5 z',
     'pointer': "M 1 5 L 0 8 L 10 5 L 0 2 z",
     'triangle': "M 0 0 L 0 10 L 10 5 z",
     'diamond': "M 0 5 L 5 10 L 10 5 L 5 0 z",
-    'longdiamong': 'M -5 5 L 2.5 10 L 10 5 L 2.5 0 z'
+    'longdiamong': 'M -5 5 L 2.5 10 L 10 5 L 2.5 0 z',
+    'square': "M 0 0 L 0 10 L 10 10 L 10 0 z"
 }
 wire_line_endings = {
     'linearrow': 'M 10 5 L 0 10 M 10 5 L 0 0',
@@ -551,6 +559,12 @@ wire_line_endings = {
     'many': 'M 0 5 l 10 5 M 0 5 l 10 -5',
     'zero_or_many': 'M 0 5 l 10 5 M 0 5 l 10 -5 M -3 5 a 3,3 0 1,0 6,0 a 3,3 0 1,0 -6,0',
     'one_or_many': 'M 0 0 v 10 M 0 5 l 10 5 M 0 5 l 10 -5'
+}
+
+line_patterns = {
+    'dashed': 'stroke-dasharray="20,20"',
+    'dotted': 'stroke-dasharray="5,5"',
+    'solid': ''
 }
 
 all_line_endings = list(closed_line_endings) + [f'{n}open' for n in closed_line_endings] + list(wire_line_endings)
