@@ -11,7 +11,7 @@ if TOOL_HOME not in sys.path:
 
 
 # Do a basic check if the spec file compiles.
-import sysml_uml_spec
+import model_specification_spec
 print("The specification file can be parsed")
 
 import run_project
@@ -19,4 +19,4 @@ import run_project
 specs = glob.glob('*_spec.py')[0]
 project = os.path.basename(specs)[:-8]
 
-run_project.run(specs, project, 5103)
+run_project.run(specs, project, 5102)

@@ -112,14 +112,3 @@ md.initial_state([
     LibraryFolder('Library', 'Pre-defined blocks that can be used in programs.', None),
     ProgramFolder('Programs', 'Here be the programs.', None)
 ])
-
-
-"""
-VRAAG 1: Hoe representeren we de ports van een compound entity in het binnendiagram?
-Maken we speciale blokken voor de 4 typen poort die we instantieren en synchroon houden?
-We zouden eigenlijk een wederzijdse invariant moeten kunnen definieren die aangeeft dat wanneer er in een
-binnendiagram een poort bij komt of weggaat, alle representaties van die compound entiteit worden aangepast.
-
-VRAAG 3: Hoe kunnen we in de specificatie dit soort "specials" definieren op een manier die door het hele programma
-gebruikt kan worden?
-"""

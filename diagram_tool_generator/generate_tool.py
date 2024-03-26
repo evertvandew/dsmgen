@@ -32,13 +32,16 @@ class Generator:
     def __init__(self, config, module_name):
         self.config = config
         self.module_name = module_name
-
-        # Generate some look up tables and dependency lists
         md = sys.modules[module_name].md
         self.md = md
+
+        # Check for names that are duplicated
+        all_names = [c.__name__ for c in md.all_model_items]
+        duplicates = set([x for x in all_names if all_names.count(x) > 1])
+        assert not duplicates, f'Duplicate names in the definitions {duplicates}'
+        # Generate some look up tables and dependency lists
         all_names: dict[str, Any] = {c.__name__: c for c in md.all_model_items}
         # Check there are no duplicates in the names.
-        assert len(all_names) == len(md.all_model_items), 'Duplicate names in the definitions'
         self.all_names = all_names
 
         # Replace forward references and self-references to classes with the actual classes where relevant
@@ -309,7 +312,9 @@ class Generator:
     @staticmethod
     def load_from_config(config: Configuration):
         # Find and import the specified model
-        module_name = os.path.splitext(os.path.basename(config.model_def))[0].replace('spec', '')
+        module_name = os.path.splitext(os.path.basename(config.model_def))[0]
+        if module_name.endswith('spec'):
+            module_name = module_name[:-4]
         spec = importlib.util.spec_from_file_location(module_name, config.model_def)
         new_mod = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = new_mod

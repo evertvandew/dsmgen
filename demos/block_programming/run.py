@@ -17,6 +17,6 @@ print("The specification file can be parsed")
 import run_project
 
 specs = glob.glob('*_spec.py')[0]
-project = os.path.basename(specs).split('_spec')[0]
+project = os.path.basename(specs)[:-8]
 
 run_project.run(specs, project, 5101)

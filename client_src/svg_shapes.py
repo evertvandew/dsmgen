@@ -543,7 +543,7 @@ class Label(Note):
 
 closed_line_endings = {
     'arrow': "M 0 1.5 L 0 8.5 L 10 5 z",
-    'halfarror': 'M 0 5 L 0 8.5 L 10 5 z',
+    'halfarrow': 'M 0 5 L 0 8.5 L 10 5 z',
     'pointer': "M 1 5 L 0 8 L 10 5 L 0 2 z",
     'triangle': "M 0 0 L 0 10 L 10 5 z",
     'diamond': "M 0 5 L 5 10 L 10 5 L 5 0 z",
