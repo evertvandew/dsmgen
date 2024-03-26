@@ -139,8 +139,6 @@ def make_explorer(holder, api: DataStore, allowed_children):
                 data = getFormValues(d.panel, etype, parameters)
                 new_object = etype(parent=parent, **data)
                 api.add(new_object)
-                html = render_hierarchy([new_object])
-                _ = html_element <= html
                 d.close()
 
         def mk_menu_item(text, action):

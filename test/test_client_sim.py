@@ -165,6 +165,9 @@ class IntegrationContext:
             def dblclick(self, source):
                 """ Click on a specific items in the explorer."""
                 source.dispatchEvent(events.DblClick())
+            def rightclick(self, source):
+                """ Click on a specific items in the explorer."""
+                source.dispatchEvent(events.ContextMenu())
             def find_elements(self, selector='*', text=''):
                 """ Find all elements in the explorer fitting a specific selector and/or text."""
                 elements = self.parent.select(selector)
@@ -188,10 +191,25 @@ class IntegrationContext:
                 self.dblclick(self.find_element(f'[data-modelid="{mid}"]'))
             def click_element(self, mid: int):
                 self.click(self.find_element(f'[data-modelid="{mid}"]'))
+            def rightclick_element(self, mid: int):
+                self.rightclick(self.find_element(f'[data-modelid="{mid}"]'))
             def name(self, mid: int):
                 """ Return the name of the element `mid` as shown in the explorer. """
                 el = self.find_element(f'[data-modelid="{mid}"] .ename')
                 return el.text[9:]
+            def create_block(self, mid, cls, **details):
+                """ Create a block as child of block <mid>, of type cls, with attributes set to details. """
+                self.rightclick_element(mid)
+                # Click the action to create the right class block.
+                btn = [b for b in d.select(f'DIALOG .contextmenu li') if b.text == cls.__name__][0]
+                btn.dispatchEvent(events.Click())
+                # Set the details
+                for k, v in details.items():
+                    d.select_one(f'.brython-dialog-panel #edit_{k}').value = str(v)
+                # Click the OK button to create the block.
+                btn = [b for b in d.select('.brython-dialog-button') if b.text == 'OK'][0]
+                btn.dispatchEvent(events.Click())
+
             def drag_to_diagram(self, mid: int, drop_cls):
                 """ Drag the block identified by model Id mid to the current diagram.
                     :param drop_cls: the expected class for which a representation is requested.
@@ -918,7 +936,7 @@ def simulated_explorer_tests():
         add_expected_response('/data/BlockDefinitionDiagram', 'post', Response(201, json={'Id': 3}))
         button.dispatchEvent(events.Click())
         lines = d.get(selector='.eline [draggable="true"]')
-        assert len(lines) == 4
+        assert len(lines) == 3
         check_expected_response()
 
     @test
@@ -1270,9 +1288,20 @@ def integration_tests():
         # Check the AJAX requests were consumed.
         check_expected_response()
 
+    @test
+    def add_element_in_explorer():
+        context = IntegrationContext(hierarchy=[
+            client.StructuralModel(Id=1, name='Structural Model').asdict()
+        ])
+        add_expected_response('/data/StructuralModel', 'post', Response(201, json={'Id': 2}))
+        context.explorer.create_block(1, client.StructuralModel, name='testblock')
+        # Check there is only one representation in the hierarchy
+        assert len(context.explorer.find_elements(f'[data-modelid="2"] .ename')) == 1
+
+
 
 if __name__ == '__main__':
     #import cProfile
-    run_tests('*.edit_ports')
+    run_tests('*.add_element_in_explorer')
     run_tests()
     #cProfile.run('run_tests()', sort='tottime')
