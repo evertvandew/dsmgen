@@ -148,10 +148,12 @@ class ModelDefinition:
         self.type_conversions[cls.__name__] = conversion
 
 
-    def Entity(self, styling=''):
+    def Entity(self, styling='', parents=None):
         """ Definition of a thing rendered as a "shape": blocks, actors, objects, actions, etc, etc, etc """
         def decorate(cls):
             cls.categories = [ExplorableElement, RepresentableElement]
+            if parents:
+                cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
             self.styling_definition[cls.__name__] = split_styling(styling)
@@ -185,31 +187,37 @@ class ModelDefinition:
         return decorate
 
 
-    def Relationship(self, styling=''):
+    def Relationship(self, styling='', parents=None):
         """ Definition of a connection between entities. """
         def decorate(cls):
             cls.categories = [ConnectionElement, RepresentableElement]
+            if parents:
+                cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
             self.styling_definition[cls.__name__] = split_styling(styling)
             return cls
         return decorate
 
-    def Port(self, styling=''):
+    def Port(self, styling='', parents=None):
         """ Some entities can have IO "ports", or connection points. """
         def decorate(cls):
             cls.categories = [ExplorableElement, RepresentableElement, PortElement]
+            if parents:
+                cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
             self.styling_definition[cls.__name__] = split_styling(styling)
             return cls
         return decorate
 
-    def BlockDiagram(self, *entities, styling=''):
+    def BlockDiagram(self, *entities, styling='', parents=None):
         """ Diagram where entities can be placed anywhere on the grid, and connected freely. """
         def decorate(cls):
             cls.entities = entities
             cls.categories = [ExplorableElement, DiagramElement]
+            if parents:
+                cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
             self.styling_definition[cls.__name__] = split_styling(styling)
@@ -217,11 +225,13 @@ class ModelDefinition:
         return decorate
 
 
-    def LanedDiagram(self, *entities, styling=''):
+    def LanedDiagram(self, *entities, styling='', parents=None):
         """ A diagram with "lanes", e.g. an UML sequence diagram. """
         def decorate(cls):
             cls.entities = entities
             cls.categories = [ExplorableElement, DiagramElement]
+            if parents:
+                cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
             self.styling_definition[cls.__name__] = split_styling(styling)
@@ -229,10 +239,12 @@ class ModelDefinition:
 
         return decorate
 
-    def LogicalModel(self, styling=''):
+    def LogicalModel(self, styling='', parents=None):
         """ Part of the underlying logical model. The user can browse the data in the tool following these elements. """
         def decorate(cls):
             cls.categories = [ExplorableElement]
+            if parents:
+                cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
             self.styling_definition[cls.__name__] = split_styling(styling)

@@ -15,18 +15,17 @@ md.ModelVersion('0.1')
 class RootModel:
     pass
 
-@md.LogicalModel(styling='icon:folder')
+@md.LogicalModel(styling='icon:folder', parents=[Self, RootModel])
 class ModelCollection:
     name: str
     description: longstr
-    parent: XRef('children', Self, RootModel, hidden)
+    parent: XRef('children', hidden)
 
 ###############################################################################
 ## Entities for Notes & Constraints, which are used in all other diagrams
-@md.Entity(styling = "shape:note;structure:Note;icon:message")
+@md.Entity(styling = "shape:note;structure:Note;icon:message", parents=[Any])
 class Note:
     description: (longstr, required)
-    parent: XRef('children', Any, hidden)
 
 @md.Relationship(styling = "end:hat")
 class Anchor:
@@ -37,22 +36,19 @@ class Anchor:
 ###############################################################################
 ## Entities for diagrams
 
-@md.Entity(styling="shape:rect")
+@md.Entity(styling="shape:rect", parents=['SpecificationDiagram'])
 class ModelEntity:
-    parent: XRef('children', 'SpecificationDiagram', hidden)
     name: str
     description: (longstr, detail)
     styling: str
 
-@md.Entity(styling="shape:rect")
+@md.Entity(styling="shape:rect", parents=['SpecificationDiagram'])
 class RelationshipEntity:
-    parent: XRef('children', 'SpecificationDiagram', hidden)
     name: str
     styling: str
     
-@md.Entity(styling = "shape:rect;structure:Block;icon:square-full")
+@md.Entity(styling = "shape:rect;structure:Block;icon:square-full", parents=['SpecificationDiagram'])
 class PortEntity:
-    parent: XRef('children', 'SpecificationDiagram', hidden)
     name: str
     description: (longstr, detail)
     styling: str
@@ -70,24 +66,24 @@ class SelectionArgument:
 class SelectionOption:
     name: str
 
-@md.Entity(styling='shape:octagon')
+@md.Entity(styling='shape:octagon', parents=['SpecificationDiagram'])
 class DiagramEntity:
     name: str
     type: selection("blockdiagram")
 
-@md.Entity(styling='shape:rect')
+@md.Entity(styling='shape:rect', parents=['SpecificationDiagram'])
 class CompoundEntity:
     name: str
     description: (longstr, detail)
     styling: str
 
-@md.Entity(styling='shape:rect')
+@md.Entity(styling='shape:rect', parents=['SpecificationDiagram'])
 class InstanceEntity:
     name: str
     description: (longstr, detail)
     styling: str
 
-@md.Entity(styling='shape:folder')
+@md.Entity(styling='shape:folder', parents=['SpecificationDiagram'])
 class HierarchyEntity:
     name: str
     description: (longstr, detail)
@@ -101,7 +97,7 @@ class Page:
     name: str
 
 @md.BlockDiagram(ModelEntity, RelationshipEntity, PortEntity, Attribute, SelectionArgument, SelectionOption,
-              Page, styling="icon:image")
+              Page, styling="icon:image", parents=[ModelCollection])
 class SpecificationDiagram:
     name: str
     description: (longstr, detail)

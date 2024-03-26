@@ -23,29 +23,25 @@ md.ModelVersion('0.1')
 class RootModel:
     pass
 
-@md.LogicalModel(styling='icon:folder')
+@md.LogicalModel(styling='icon:folder', parents=[Self, RootModel])
 class FunctionalModel:
     name: str
     description: longstr
-    parent: XRef('children', Self, RootModel, hidden)
 
-@md.LogicalModel(styling='icon:folder')
+@md.LogicalModel(styling='icon:folder', parents=[Self, RootModel])
 class StructuralModel:
     name: str
     description: longstr
-    parent: XRef('children', Self, RootModel, hidden)
 
 ###############################################################################
 ## Entities for Notes & Constraints, which are used in all other diagrams
-@md.Entity(styling = "shape:note;structure:Note;icon:message")
+@md.Entity(styling = "shape:note;structure:Note;icon:message", parents=[Any])
 class Note:
     description: (longstr, required)
-    parent: XRef('children', Any, hidden)
 
-@md.Entity(styling = "shape:note;structure:Note;icon:note-sticky")
+@md.Entity(styling = "shape:note;structure:Note;icon:note-sticky", parents=[Any])
 class Constraint:
     description: (longstr, required)
-    parent: XRef('children', Any, hidden)
 
 @md.Relationship(styling = "end:hat")
 class Anchor:
@@ -61,25 +57,21 @@ class ProtocolDefinition:
     definition: longstr
 
 
-@md.Entity(styling='shape:folder')
+@md.Entity(styling='shape:folder', parents=[Self, StructuralModel])
 class Package:
-    parent: XRef('children', Self, StructuralModel, hidden)
     name: str
 
-@md.Entity(styling="shape:rect")
+@md.Entity(styling="shape:rect", parents=[Self, StructuralModel])
 class Class:
-    parent: XRef('children', Self, StructuralModel, hidden)
     name: str
     description: (longstr, detail)
 
 @md.BlockInstance(parents=[Any], definitions=[Class])
 class ObjectInstance:
-    parent: XRef('children', Class, StructuralModel, hidden)
     name: str
     
-@md.Entity(styling = "shape:rect;structure:Block;icon:square-full")
+@md.Entity(styling = "shape:rect;structure:Block;icon:square-full", parents=[Self, StructuralModel])
 class Block:
-    parent: XRef('children', Self, StructuralModel, hidden)
     name: str
     description: (longstr, detail)
 
@@ -88,17 +80,15 @@ class Actor:
     name: str
     description: longstr
 
-@md.Port(styling = "shape:square;fill:green;icon:arrows-alt-h")
+@md.Port(styling = "shape:square;fill:green;icon:arrows-alt-h", parents=[Block])
 class FullPort:
     name: str
-    parent: XRef('ports', Block, hidden)
     provides: XRef('producers', ProtocolDefinition, hidden)
     requires: XRef('consumers', ProtocolDefinition, hidden)
 
-@md.Port(styling = "shape:square;fill:blue;icon:arrows-alt-h")
+@md.Port(styling = "shape:square;fill:blue;icon:arrows-alt-h", parents=[Block])
 class FlowPort:
     name: str
-    parent: XRef('ports', Block, hidden)
     inputs: XRef('consumers', ProtocolDefinition, hidden)
     outputs: XRef('producers', ProtocolDefinition, hidden)
 
@@ -148,21 +138,18 @@ class LifeLine:
     target: XRef('b', Actor, ObjectInstance, hidden)
     name: str
 
-@md.BlockDiagram(Block, Actor, Note, Constraint, styling='icon:image')
+@md.BlockDiagram(Block, Actor, Note, Constraint, styling='icon:image', parents=[Block, StructuralModel])
 class BlockDefinitionDiagram:
-    parent: XRef('children', Block, StructuralModel, hidden)
     name: str
 
-@md.BlockDiagram(ObjectInstance, Actor, Note, Constraint, styling='icon:image')
+@md.BlockDiagram(ObjectInstance, Actor, Note, Constraint, styling='icon:image', parents=[Block, FunctionalModel])
 class CommunicationDiagram:
-    parent: XRef('children', Block, FunctionalModel, hidden)
     name: str
 
 ###############################################################################
 ## Entities for requirements
-@md.Entity(styling = "shape:ellipse;structure:Block;icon:file-lines")
+@md.Entity(styling = "shape:ellipse;structure:Block;icon:file-lines", parents=[Self, FunctionalModel])
 class Requirement:
-    parent: XRef('children', Self, FunctionalModel, hidden)
     name: str
     description: (longstr, detail)
     priority: (selection("NotApplicable Must Should Could Would"), detail)
@@ -171,7 +158,7 @@ class Requirement:
 
 ###############################################################################
 ## Use Case diagram
-@md.Entity(styling="shape:ellipse")
+@md.Entity(styling="shape:ellipse", parents=[FunctionalModel])
 class UseCase:
     name: str
     description: longstr
@@ -202,17 +189,17 @@ class Association:
 
 ###############################################################################
 ## State diagram
-@md.Entity(styling="shape:ellipse")
+@md.Entity(styling="shape:ellipse", parents=[Class, Self, Block, UseCase])
 class State:
     name: str
     description: longstr
 
-@md.Entity(styling="shape:ringedclosedcircle")
+@md.Entity(styling="shape:ringedclosedcircle", parents=[Class, Block, Self, UseCase])
 class EndState:
     name: str
     description: longstr
 
-@md.Entity(styling="shape:closedcircle")
+@md.Entity(styling="shape:closedcircle", parents=[Class, Block, Self, UseCase])
 class StartState:
     name: str
     description: longstr
@@ -223,9 +210,8 @@ class Transition:
     target: XRef('to', State, EndState, hidden)
     name: str
 
-@md.BlockDiagram(State, Note, Constraint, styling='icon:image')
+@md.BlockDiagram(State, Note, Constraint, styling='icon:image', parents=[FunctionalModel, Class, Block, Self, UseCase, Package])
 class UseCaseDiagram:
-    parent: XRef('children', FunctionalModel, UseCase, Class, Block, State, Package)
     name: str
 
 ###############################################################################

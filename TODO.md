@@ -10,13 +10,6 @@
 * Double-click on a subprogram doesn't open the associated diagram.
 * When dragging an object, escape does not stop the behaviour if the mouse is not pressed down.
 
-
-
-# TODO for the First Viable Product Release:
-* Make a demo of the block_programming model.
-* Make a collection of diagrams, supporting at least UML and SYSML.
-  - For now, except the sequence diagram because it requires laneing support.
-
 # Refactoring
 * Rename fields used for internal purposes with underscores so there can be no clashes with user-named fields.
 * Refactor the typing system in the specification files, so that it is class-based for all types with
@@ -27,6 +20,7 @@
 * Get rid of mechanisms where the presence of an attribute decides actions. Replace these with (member) functions.
 
 # Future enhancements
+* Do not allow the root item to be deleted. Or alternatively, spawn a new one if necessary.
 * Make it possible for library blocks to create inputs based on configuration. This requires a new mechanism.
   Probably in the function `addAction` in `modeled_diagram.py`.
 * Make transactions of what happens in an event handler, so that if an exception occurs, the system stays in a known 
