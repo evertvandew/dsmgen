@@ -237,7 +237,6 @@ class DiagramApi(RestApi):
         return result
     def update_element(self, details: IRepresentationSerializer):
         """ Update the representation of an object. """
-        console.log(f'Get model id for {type(details).__name__}')
         if details.repr_category() == 'block':
             model_item = details.extract_model(self.blocks[details.block])
         else:

@@ -2,15 +2,12 @@
 
 # Bugs:
 * Check that closing a tab will activate the right one of the remaining diagrams.
-* When adding or removing ports to a definition, its representations in Implementations aren't updated.
-* When editing the name of a block or adding one, the explorer is not updated.
+* When editing the name of a block the explorer shows the text &mdash instead of a dash.
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
-* Some exceptions occur when manipulating connections.
-* Use `get_type_hints` instead of raw `__annotations__`.
-* Double-click on a subprogram doesn't open the associated diagram.
 * When dragging an object, escape does not stop the behaviour if the mouse is not pressed down.
 
 # Refactoring
+* Use `get_type_hints` instead of raw `__annotations__`.
 * Rename fields used for internal purposes with underscores so there can be no clashes with user-named fields.
 * Refactor the typing system in the specification files, so that it is class-based for all types with
   simple functions to determine concrete types in various contexts, conversions between them and default values.
@@ -25,7 +22,7 @@
   Probably in the function `addAction` in `modeled_diagram.py`.
 * Make transactions of what happens in an event handler, so that if an exception occurs, the system stays in a known 
   state.
-* Allow extra details to be shown around a relationship.
+* Allow extra details (texts) to be shown around a relationship.
 * When a user adds a connection that already exists, that should be reused.
 * Allow conversion of one type element to another
 * Allow conversion of one relationship to another
@@ -46,7 +43,7 @@
 * Allow combinations of point-2-point routed and square routed connections.
 * Implement a proper Z-order in the diagrams.
 * The explorer should handle create and rename events from entities created while editing a diagram.
-* Port to an environment where the javascript is pre-compiled. Probably pyjamas or pyjaco? Or perhaps to Kotlin?
+* Port to an environment where the javascript is pre-compiled. Probably pyjamas or pyjaco? Or perhaps to Kotlin? Rust wasm?
 * Automatic alignment and sizing of blocks.
 * Scrolling of the diagram viewer.
 * Resizing of the frames in the tool (explorer / diagram / details).
@@ -86,3 +83,6 @@
 * Replace the REST "API" stuff with simple forwarding scheme. Letting objects maintain their own dirty state is a bad idea.
   Use a more centralized approach where actions are detected and lead to centralized sequences being run to handle the change.
 
+# Solved issues:
+* When adding or removing ports to a definition, its representations in Implementations aren't updated.
+* Double-click on a subprogram in a diagram doesn't open the associated diagram.

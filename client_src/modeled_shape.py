@@ -145,6 +145,7 @@ class ModeledShape(Shape, ModelRepresentation):
     def get_editable_parameters(self):
         return self.model_entity.get_editable_parameters()
 
+
 @dataclass
 class Port(CP, ModelRepresentation):
     # These two items have slightly illogical names. That is because they are stored in the database in
@@ -218,7 +219,6 @@ class ModeledShapeAndPorts(ModeledShape):
         g = svg.g()
         # Add the core rectangle
         shape_type = self.getShapeDescriptor()
-        console.log(f'Getting shape for {shape_type} {self}')
         _ = g <= shape_type.getShape(self)
         # Add the text
         _ = g <= self.TextWidget.getShape(self)

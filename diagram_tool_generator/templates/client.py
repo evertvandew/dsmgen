@@ -397,6 +397,8 @@ def on_explorer_dblclick(data_store, details, tabview):
     target_dbid: int = details['target_dbid']
     target_type: str = details['target_type']
 
+    console.log(f"DBLCLICK {target_dbid} - {target_type}")
+
     # If a diagram is double-clicked, open it.
     if target_type in diagram_classes:
         svg_tag = html.SVG(id=target_dbid)

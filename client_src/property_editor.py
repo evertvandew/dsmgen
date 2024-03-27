@@ -321,7 +321,6 @@ def stylingEditorForm(o: ModeledShape):
 def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[EditableParameterDetails],
                   repr: Optional[ModeledShape]=None):
     """ Returns a dictionary with the current values in the form edits. """
-    console.log(f"Form: {form}")
     update_data = {}
     for field in editable_fields:
         # Use the standard constructor for the type to do the conversion

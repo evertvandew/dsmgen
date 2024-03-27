@@ -185,3 +185,6 @@ class ModeledDiagram(Diagram):
         super().trigger_event(widget, event_name, event_detail)
         self.datastore and self.datastore.trigger_event(event_name, widget, **event_detail)
 
+    def dblclickChild(self, widget, ev):
+        self.datastore.trigger_event('dblclick', self, target_dbid=widget.model_entity.Id,
+                                     target_type=type(widget.model_entity).__name__)

@@ -393,7 +393,6 @@ class DiagramConfiguration:
     connections_from: Dict[type, Dict[type, List[type]]]
 
     def get_allowed_connections(self, blocka_cls, blockb_cls) -> List[type]:
-        console.log(f"getting connections for {blocka_cls} -> {blockb_cls}")
         return self.connections_from.get(blocka_cls, {}).get(blockb_cls, [])
 
 
@@ -522,6 +521,9 @@ class Diagram(OwnerInterface):
         pos = getMousePos(ev)
         self.takeOwnership(widget, pos, self)
 
+    def dblclickChild(self, widget, ev):
+        # To be overloaded by child classes
+        pass
 
     def mouseDownChild(self, widget, ev, update_func=None):
         if not self.mouse_events_fsm:

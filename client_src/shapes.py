@@ -78,6 +78,8 @@ class OwnerInterface:
     """
     def clickChild(self, widget, ev):
         raise NotImplementedError
+    def dblclickChild(self, widget, ev):
+        raise NotImplementedError
     def mouseDownChild(self, widget, ev):
         raise NotImplementedError
     def mouseDownConnection(self, connection, ev):
@@ -217,6 +219,10 @@ class Shape(Stylable):
         if owner := self.owner():
             owner.clickChild(self, ev)
 
+    def onDblClick(self, ev):
+        if owner := self.owner():
+            owner.dblclickChild(self, ev)
+
     def onMouseDown(self, ev):
         if owner := self.owner():
             owner.mouseDownChild(self, ev)
@@ -241,6 +247,7 @@ class Shape(Stylable):
 
         self.shape.bind('click', self.onClick)
         self.shape.bind('mousedown', self.onMouseDown)
+        self.shape.bind('dblclick', self.onDblClick)
 
     def destroy(self):
         pass

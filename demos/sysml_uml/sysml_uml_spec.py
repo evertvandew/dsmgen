@@ -8,7 +8,6 @@ md = ModelDefinition()
 md.ModelVersion('0.1')
 
 """ TODO: 
-* Use Case diagram
 * Sequence diagram
 * Collaboration diagram
 * Requirement diagram
@@ -57,6 +56,7 @@ class ProtocolDefinition:
     definition: longstr
 
 
+@md.CompoundEntity(parents=[StructuralModel, FunctionalModel], elements=[Note, Self], styling = "shape:rect;structure:Block;blockcolor:yellow;icon:square-full;icon:image")
 @md.Entity(styling='shape:folder', parents=[Self, StructuralModel])
 class Package:
     name: str
