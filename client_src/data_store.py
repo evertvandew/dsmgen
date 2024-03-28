@@ -297,8 +297,8 @@ class DataStore(EventDispatcher):
             to_delete.extend(c for c in self.live_instances[Collection.block].values() if c.parent == record.Id)
             to_delete.extend(r for r in self.live_instances[Collection.block_repr].values() if r.model_entity.Id == record.Id)
             # Delete relationships connected to this block
-            to_delete.extend(r for r in self.live_instances[Collection.relation].values() if r.source_id == record.Id)
-            to_delete.extend(r for r in self.live_instances[Collection.relation].values() if r.target_id == record.Id)
+            to_delete.extend(r for r in self.live_instances[Collection.relation].values() if r.source == record.Id)
+            to_delete.extend(r for r in self.live_instances[Collection.relation].values() if r.target == record.Id)
             # Don't do the representations of these relations, they will be deleted at another point.
         if collection == Collection.relation:
             to_delete.extend(r for r in self.live_instances[Collection.relation_repr].values() if r.relation == record.Id)

@@ -347,7 +347,11 @@ class tag:
         return items
 
     def clear(self):
+        self.text = ''
         self.children = []
+        self.parent = None
+        self.subscribers: Dict[str, List[Callable]] = {}
+        self.style = Style({})
 
     def remove(self):
         # Unlink this element from the document DOM.

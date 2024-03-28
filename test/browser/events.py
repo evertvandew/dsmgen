@@ -38,6 +38,7 @@ class MouseEvent(Event):
     metaKey: bool = False
     relatedTarget: 'tag' = None
     shiftKey: bool = False
+    key: str = ''
 
     @property
     def button(self):
@@ -72,6 +73,8 @@ class MouseMove(MouseEvent): pass
 class MouseOut(MouseEvent): pass
 class MouseOver(MouseEvent): pass
 class MouseUp(MouseEvent): pass
+class KeyDown(MouseEvent): pass
+class KeyUp(MouseEvent): pass
 
 @dataclass
 class DragDataTransfer:

@@ -204,6 +204,10 @@ class IntegrationContext:
                     Response(response_code, json=response_json))
                 add_expected_response(url, method, response, check_request=checker)
 
+            def press_ok(self):
+                btn = [b for b in d.select('.brython-dialog-button') if b.text.lower() == 'ok'][0]
+                btn.dispatchEvent(events.Click())
+
         class ExplorerApi(HtmlApi):
             parent = d['explorer']
             def count(self):
@@ -232,6 +236,15 @@ class IntegrationContext:
                 # Click the OK button to create the block.
                 btn = [b for b in d.select('.brython-dialog-button') if b.text == 'OK'][0]
                 btn.dispatchEvent(events.Click())
+            def delete_block(self, mid: int):
+                self.rightclick_element(mid)
+                model_item = integration_context.data_store.get(Collection.block, mid)
+                add_expected_response(f'/data/{type(model_item).__name__}/{mid}', 'delete', Response(204, json=None))
+                # Navigate the right-click menu
+                btn = [b for b in d.select(f'DIALOG .contextmenu li') if b.text.lower() == 'remove'][0]
+                btn.dispatchEvent(events.Click())
+                self.press_ok()
+                check_expected_response()
 
             def drag_to_diagram(self, mid: int, drop_cls):
                 """ Drag the block identified by model Id mid to the current diagram.
@@ -356,7 +369,16 @@ class IntegrationContext:
                 shape.dispatchEvent(events.MouseDown(offsetX=0, offsetY=0))
                 shape.dispatchEvent(events.MouseMove(offsetX=cood[0], offsetY=cood[1]))
                 shape.dispatchEvent(events.MouseUp(offsetX=cood[0], offsetY=cood[1]))
-
+            def delete_block(self, rid: int):
+                """ Delete a block """
+                # The block must first be selected, then the delete key pressed.
+                self.click_block(rid)
+                assert self.current_diagram().mouse_events_fsm.state == diagrams.ResizeStates.DECORATED
+                self.parent.parent.dispatchEvent(events.KeyDown(key='Delete'))
+                # The user is presented with an acknowledgement diagram
+                add_expected_response('/data/_BlockRepresentation/4', 'delete', Response(204))
+                self.press_ok()
+                check_expected_response()
             def add_port(self, rid, port_cls, **kwargs):
                 """ Add a port to a block. This is simply done by manipulating the data structure,
                     as this is what happens in real life (by the properties editor).
@@ -1382,8 +1404,11 @@ def integration_tests():
         check_expected_response()
 
     @test
-    def load_styled_relationship():
-        """ See if JSON with a faulty routing_method for the relationship loads successfully. """
+    def add_block_delete():
+        """ See if JSON with a faulty routing_method for the relationship loads successfully.
+            Then, add a block to the diagram, and delete it again.
+            Deleting a block in a diagram does not remove it from the model, this is done separately.
+        """
         context = IntegrationContext(hierarchy=[
             client.SubProgramDefinition(Id=3, name="Requirements").asdict()
         ])
@@ -1406,9 +1431,15 @@ def integration_tests():
         ]
         add_expected_response('/data/diagram_contents/3', 'get', Response(200, json=data))
         context.explorer.dblclick_element(mid=3)
+        context.diagrams.create_block(client.Block)
+        # Delete the representation
+        context.diagrams.delete_block(rid=4)
+        # Delete the underlying model item.
+        context.explorer.delete_block(mid=6)
+        check_expected_response()
 
 if __name__ == '__main__':
     #import cProfile
-    run_tests('*.load_styled_relationship')
+    run_tests('*.add_block_delete')
     run_tests()
     #cProfile.run('run_tests()', sort='tottime')

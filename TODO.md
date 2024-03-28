@@ -1,7 +1,6 @@
 
 
 # Bugs:
-* Relationships can not be selected anymore...
 * closing a tab does not activate the right one of the remaining diagrams.
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
 * When dragging an object, escape does not stop the behaviour if the mouse is not pressed down.
@@ -17,6 +16,7 @@
 * Get rid of mechanisms where the presence of an attribute decides actions. Replace these with (member) functions.
 
 # Future enhancements
+* Honour the `pattern` style for blocks and relationships. Perhaps rename to `linepattern`.
 * Do not allow the root item to be deleted. Or alternatively, spawn a new one if necessary.
 * Make it possible for library blocks to create inputs based on configuration. This requires a new mechanism.
   Probably in the function `addAction` in `modeled_diagram.py`.
