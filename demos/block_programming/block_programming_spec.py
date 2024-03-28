@@ -28,7 +28,7 @@ class Note:
     description: (longstr, required)
     parent: XRef('children', Any, hidden)
 
-@md.Relationship(styling = "end:hat")
+@md.Relationship(styling = "endmarker:hat")
 class Anchor:
     source: XRef('owner', Note, hidden)
     target: XRef('notes', Any, hidden)
@@ -87,12 +87,12 @@ class AsyncOutput:
     name: str
     parent: XRef('ports', SubProgram, SubProgramDefinition, BlockDefinition, hidden)
 
-@md.Relationship()
+@md.Relationship(styling='endmarker:arrow')
 class SynchronousChannel:
     source: XRef('source', Output)
     target: XRef('target', Input)
 
-@md.Relationship()
+@md.Relationship(styling='endmarker:arrowopen')
 class AsyncChannel:
     source: XRef('source', AsyncOutput)
     target: XRef('target', AsyncInput)

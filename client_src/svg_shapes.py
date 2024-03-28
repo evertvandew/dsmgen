@@ -551,6 +551,7 @@ closed_line_endings = {
     'square': "M 0 0 L 0 10 L 10 10 L 10 0 z"
 }
 wire_line_endings = {
+    'hat': 'M 10 5 L 5 10 M 10 5 L 5 0',
     'linearrow': 'M 10 5 L 0 10 M 10 5 L 0 0',
     'halflinearror': 'M 10 5 L 0 10',
     'one': 'M 5 0 v 10',

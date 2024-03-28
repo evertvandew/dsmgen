@@ -187,12 +187,16 @@ class ModelDefinition:
         return decorate
 
 
-    def Relationship(self, styling='', parents=None):
+    def Relationship(self, styling='', parents=None, source=None, target=None):
         """ Definition of a connection between entities. """
         def decorate(cls):
             cls.categories = [ConnectionElement, RepresentableElement]
             if parents:
                 cls.__annotations__['parent'] = XRef('children', *parents, hidden)
+            if source:
+                cls.__annotations__['source'] = XRef('relations', *source, hidden)
+            if target:
+                cls.__annotations__['source'] = XRef('relations', *target, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
             self.styling_definition[cls.__name__] = split_styling(styling)

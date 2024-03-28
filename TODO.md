@@ -1,8 +1,8 @@
 
 
 # Bugs:
-* Check that closing a tab will activate the right one of the remaining diagrams.
-* When editing the name of a block the explorer shows the text &mdash instead of a dash.
+* Relationships can not be selected anymore...
+* closing a tab does not activate the right one of the remaining diagrams.
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
 * When dragging an object, escape does not stop the behaviour if the mouse is not pressed down.
 
@@ -86,3 +86,4 @@
 # Solved issues:
 * When adding or removing ports to a definition, its representations in Implementations aren't updated.
 * Double-click on a subprogram in a diagram doesn't open the associated diagram.
+* When editing the name of a block the explorer shows the text &mdash instead of a dash.

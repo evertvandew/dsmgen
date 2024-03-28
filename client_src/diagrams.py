@@ -2,7 +2,7 @@ from browser import document, svg, console, window, bind, html
 from browser.widgets.dialog import Dialog, InfoDialog
 
 
-from typing import Any, Self, List, Dict, Type
+from typing import Any, Self, List, Dict, Type, Optional
 from dataclasses import dataclass, field, asdict, is_dataclass, fields
 from weakref import ref
 import enum
@@ -92,6 +92,9 @@ class BehaviourFSM:
     def delete(self, diagram):
         """ Called when the FSM is about to be deleted"""
         pass
+    def is_at_rest(self):
+        """ Returns True if the state machine is not in the middle of something. """
+        return True
 
 
 class ResizeStates(enum.IntEnum):
@@ -107,6 +110,9 @@ class ResizeFSM(BehaviourFSM):
         self.diagram = diagram
         self.widget: Shape | List[Shape] = None
         self.decorators = {}
+
+    def is_at_rest(self):
+        return self.state == ResizeStates.NONE
 
     def mouseDownShape(self, diagram, widget, ev):
         if self.state != ResizeStates.NONE and self.widget != widget:
@@ -243,6 +249,9 @@ class RerouteStates(BehaviourFSM):
         self.decorators = []
         self.dragged_index = None
 
+    def is_at_rest(self):
+        return self.state == self.States.NONE
+
     def mouseDownShape(self, diagram, widget, ev):
         # We need to change the state machine
         if self.state != self.States.NONE:
@@ -342,7 +351,7 @@ class ConnectionEditor(BehaviourFSM):
     def __init__(self):
         self.state = self.States.NONE
         self.a_party = None
-        self.connection = None
+        self.connection: Optional[Relationship] = None
         self.b_connection_role = None
         self.path = None
     def mouseDownShape(self, diagram, widget, ev):
@@ -356,7 +365,7 @@ class ConnectionEditor(BehaviourFSM):
                         case self.ConnectionRoles.START:
                             self.connection.start = party
                         case self.ConnectionRoles.FINISH:
-                            self.connection.start = party
+                            self.connection.finish = party
                     diagram.reroute(self.connection)
 
                 self.path.remove()
@@ -469,16 +478,8 @@ class Diagram(OwnerInterface):
         return connection
 
     def connect(self, a, b):
-        ta, tb = type(a.model_entity), type(b.model_entity)
-        clss = self.config.get_allowed_connections(ta, tb) + self.config.get_allowed_connections(ta, Any)
-        if not clss:
-            d = InfoDialog('Can not connect', f"A {type(a).__name__} can not be connected to a {type(b).__name__}")
-            return
-        if len(clss) > 1:
-            # Let the user select Connection type
-            self.selectConnectionClass(clss, lambda cls: self.connect_specific(a, b, cls))
-        else:
-            self.connect_specific(a, b, clss[0])
+        """ Connect two blocks a and b.. """
+        raise NotImplementedError()
 
     def changeFSM(self, fsm):
         if self.mouse_events_fsm is not None:
@@ -556,7 +557,7 @@ class Diagram(OwnerInterface):
 
 
     def mouseDownConnection(self, connection, ev, update_function=None):
-        if not self.mouse_events_fsm:
+        if not self.mouse_events_fsm or self.mouse_events_fsm.is_at_rest():
             self.mouse_events_fsm = RerouteStates(self)
         self.mouse_events_fsm.mouseDownConnection(self, connection, ev)
 
@@ -623,7 +624,7 @@ class Diagram(OwnerInterface):
         """ Function that builds a dialog for selecting a specific connection type.
             When a selection is made, a callback is called with the selected class.
         """
-        d = Dialog()
+        d = Dialog('Select relationship')
         d.panel <= html.DIV("Please select the type of connection")
         l = html.UL()
         selection = None

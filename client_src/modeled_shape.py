@@ -114,7 +114,8 @@ class ModeledShape(Shape, ModelRepresentation):
         _ = g <= self.TextWidget.getShape(self)
         return g
 
-    def updateShape(self, shape):
+    def updateShape(self, shape=None):
+        shape = shape or self.shape
         shape_type = self.getShapeDescriptor()
         shape_type.updateShape(shape.children[0], self)
         self.TextWidget.updateShape(shape.children[1], self)
@@ -159,7 +160,8 @@ class Port(CP, ModelRepresentation):
         shape = svg.rect(x=p.x-5, y=p.y-5, width=10, height=10, stroke_width=1, stroke='black', fill='lightgreen')
         shape.attrs['data-class'] = type(self).__name__
         return shape
-    def updateShape(self, shape):
+    def updateShape(self, shape=None):
+        shape = shape or self.shape
         p = self.pos
         shape['x'], shape['y'], shape['width'], shape['height'] = int(p.x-5), int(p.y-5), 10, 10
 
@@ -241,7 +243,8 @@ class ModeledShapeAndPorts(ModeledShape):
         # Return the group of objects
         return g
 
-    def updateShape(self, shape):
+    def updateShape(self, shape=None):
+        shape = shape or self.shape
         # Update the rect
         rect = shape.children[0]
         shape_type = self.getShapeDescriptor()
@@ -315,10 +318,11 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         self.start = data_store.get(Collection.block_repr, details['source_repr_id'])
         self.finish = data_store.get(Collection.block_repr, details['target_repr_id'])
         self.waypoints = load_waypoints(details['routing'])
+        self.category = ReprCategory.relationship
         return self
 
     def asdict(self) -> Dict[str, Any]:
-        details = StorableElement.asdict(self, ignore=['model_entity', 'start', 'finish', 'waypoints', 'id'])
+        details = StorableElement.asdict(self, ignore=['model_entity', 'start', 'finish', 'waypoints', 'id', 'category'])
         details['relationship'] = self.model_entity.Id
         details['source_repr_id'] = self.start.Id
         details['target_repr_id'] = self.finish.Id

@@ -42,7 +42,7 @@ class Note:
 class Constraint:
     description: (longstr, required)
 
-@md.Relationship(styling = "end:hat")
+@md.Relationship(styling = "endmarker:hat")
 class Anchor:
     source: XRef('owner', Note, Constraint, hidden)
     target: XRef('notes', Any, hidden)
@@ -92,14 +92,14 @@ class FlowPort:
     inputs: XRef('consumers', ProtocolDefinition, hidden)
     outputs: XRef('producers', ProtocolDefinition, hidden)
 
-@md.Relationship(styling="end:hat;pattern:dashed")
+@md.Relationship(styling="endmarker:hat;pattern:dashed")
 class Dependency:
     stereotype: str
     source: XRef('associations', Block, Actor, hidden)
     target: XRef('associations', Block, Actor, hidden)
     
 
-@md.Relationship(styling = "end:funccall(end)")
+@md.Relationship(styling = "endmarker:funccall(end)")
 class BlockReference:
     stereotype: selection("None Association Aggregation Composition")
     source: XRef('associations', Block, hidden)
@@ -115,18 +115,18 @@ class BlockReference:
             'Composition': 'closeddiamond'
         }[self.stereotype]
 
-@md.Relationship(styling = "end:opentriangle")
+@md.Relationship(styling = "endmarker:opentriangle")
 class BlockGeneralization:
     source: XRef('parent', Block, hidden)
     target: XRef('children', Block, hidden)
 
-@md.Relationship(styling = "end:hat")
+@md.Relationship(styling = "endmarker:hat")
 class FullPortConnection:
     source: XRef('consumers', FullPort, hidden)
     target: XRef('producers', FullPort, hidden)
     name: str
 
-@md.Relationship(styling = "end:hat")
+@md.Relationship(styling = "endmarker:hat")
 class FlowPortConnection:
     source: XRef('consumers', FlowPort, hidden)
     target: XRef('producers', FlowPort, hidden)
@@ -163,7 +163,7 @@ class UseCase:
     name: str
     description: longstr
 
-@md.Relationship(styling = "end:opentriangle;pattern:dashed")
+@md.Relationship(styling = "endmarker:opentriangle;pattern:dashed")
 class Extends:
     source: XRef('extended', UseCase, hidden)
     target: XRef('extending', UseCase, hidden)
@@ -175,13 +175,13 @@ class Includes:
     target: XRef('addition', UseCase, hidden)
     name: str
 
-@md.Relationship(styling='end:hat;pattern:dashed')
+@md.Relationship(styling='endmarker:hat;pattern:dashed')
 class InheritUseCase:
     source: XRef('child', UseCase, hidden)
     target: XRef('parent', UseCase, hidden)
     name: str
 
-@md.Relationship(styling='end:hat')
+@md.Relationship(styling='endmarker:hat')
 class Association:
     source: XRef('actor', Actor, Class, Package, hidden)
     target: XRef('usecase', UseCase, hidden)
@@ -204,7 +204,7 @@ class StartState:
     name: str
     description: longstr
 
-@md.Relationship(styling='end:arrow')
+@md.Relationship(styling='endmarker:arrow')
 class Transition:
     source: XRef('from', State, StartState, hidden)
     target: XRef('to', State, EndState, hidden)

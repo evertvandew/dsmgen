@@ -356,6 +356,7 @@ class DataStore(EventDispatcher):
             if response.status >= 200 and response.status < 300:
                 records = []
                 # Reconstruct the entities the diagram refers to and cache them
+                console.log(f'{repr(response.json)}')
                 for e in response.json:
                     model_details = e['_entity']
                     model_cls = self.all_classes[model_details['__classname__']]

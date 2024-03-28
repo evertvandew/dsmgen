@@ -39,7 +39,7 @@ class Constraint:
     description: (longstr, required)
     parent: XRef('children', Any, hidden)
 
-@md.Relationship(styling = "end:hat")
+@md.Relationship(styling = "endmarker:hat")
 class Anchor:
     source: XRef('owner', Note, Constraint, hidden)
     target: XRef('notes', Any, hidden)
@@ -78,7 +78,7 @@ class FlowPort:
     inputs: XRef('consumers', ProtocolDefinition, optional)
     outputs: XRef('producers', ProtocolDefinition, optional)
 
-@md.Relationship(styling = "end:funccall(end)")
+@md.Relationship(styling = "endmarker:funccall(end)", )
 class BlockReference:
     stereotype: selection("None Association Aggregation Composition")
     source: XRef('associations', Block, hidden)
@@ -94,28 +94,22 @@ class BlockReference:
             'Composition': 'closeddiamond'
         }[self.stereotype]
 
-@md.Relationship()
+@md.Relationship(styling="endmarker:opentriangle")
 class BlockGeneralization:
     source: XRef('parent', Block, hidden)
     target: XRef('children', Block, hidden)
 
-    styling = "end:opentriangle"
-
-@md.Relationship()
+@md.Relationship(styling='endmarker:hat')
 class FullPortConnection:
     source: XRef('consumers', FullPort, hidden)
     target: XRef('producers', FullPort, hidden)
     name: str
 
-    styling = "end:hat"
-
-@md.Relationship()
+@md.Relationship(styling='endmarker:hat')
 class FlowPortConnection:
     source: XRef('consumers', FlowPort, hidden)
     target: XRef('producers', FlowPort, hidden)
     name: str
-
-    styling = "end:hat"
 
 @md.BlockInstance(parents=[Any], definitions=[SubProgramDefinition])
 class BlockInstance: pass

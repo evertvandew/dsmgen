@@ -105,38 +105,43 @@ class SpecificationDiagram:
 ###############################################################################
 ## Relationships between entities
 
-@md.Relationship(styling = "end:hat")
+@md.Relationship(styling = "endmarker:hat")
 class RelationshipSource:
     source: XRef('entity', ModelEntity, PortEntity, CompoundEntity, InstanceEntity, hidden)
     target: XRef('relationship', RelationshipEntity, hidden)
 
-@md.Relationship(styling = "end:hat")
+@md.Relationship(styling = "startmarker:hat")
 class RelationshipTarget:
     source: XRef('entity', RelationshipEntity, hidden)
     target: XRef('relationship', ModelEntity, PortEntity, CompoundEntity, InstanceEntity, hidden)
 
-@md.Relationship(styling = "end:square")
+@md.Relationship(styling = "startmarker:hat;endmarker:hat")
+class RelationshipBothEnds:
+    source: XRef('entity', ModelEntity, PortEntity, CompoundEntity, InstanceEntity, hidden)
+    target: XRef('relationship', RelationshipEntity, hidden)
+
+@md.Relationship(styling = "endmarker:square")
 class EntityAttribute:
     source: XRef('entity', ModelEntity, PortEntity, RelationshipEntity, DiagramEntity, HierarchyEntity, CompoundEntity, InstanceEntity, hidden)
     target: XRef('attribute', Attribute, SelectionArgument, hidden)
 
-@md.Relationship(styling = "end:square")
+@md.Relationship(styling = "endmarker:square")
 class SelectionOptionLink:
     source: XRef('argument', SelectionArgument, hidden)
     target: XRef('option', SelectionOption, hidden)
 
-@md.Relationship(styling = "end:hat")
+@md.Relationship(styling = "endmarker:hat")
 class DiagramEntityLink:
     source: XRef('entity', ModelEntity, CompoundEntity, InstanceEntity, hidden)
     target: XRef('diagram', DiagramEntity, hidden)
 
-@md.Relationship(styling = "end:diamond")
+@md.Relationship(styling = "endmarker:diamond")
 class PortEntityLink:
     source: XRef('entity', ModelEntity, CompoundEntity, hidden)
     target: XRef('port', PortEntity, hidden)
 
 
-@md.Relationship(styling = "end:hat;start:")
+@md.Relationship(styling = "endmarker:hat;startmarker:square")
 class EntityInstantation:
     source: XRef('entity', ModelEntity, CompoundEntity, hidden)
     target: XRef('instance', InstanceEntity, hidden)

@@ -38,7 +38,7 @@ def toggle_caret(ev):
 
 def format_name(name):
     """ Do additional formatting for a name displayed in the explorer """
-    return f' &mdash; {name}'
+    return f' — {name}'
 
 
 def make_explorer(holder, api: DataStore, allowed_children):

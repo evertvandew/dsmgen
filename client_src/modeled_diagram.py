@@ -1,6 +1,6 @@
 
 import json
-from typing import Dict, Type
+from typing import Dict, Type, Any
 from weakref import ref
 
 import data_store
@@ -156,7 +156,20 @@ class ModeledDiagram(Diagram):
         self.datastore.delete(block)
         super().deleteBlock(block)
 
-    def mouseDownChild(self, widget, ev):
+    def connect(self, a, b):
+        """ Connect two blocks a and b. If necessary, the right connection type is selected by the User. """
+        ta, tb = type(a.model_entity), type(b.model_entity)
+        clss = self.config.get_allowed_connections(ta, tb) + self.config.get_allowed_connections(ta, Any)
+        if not clss:
+            d = InfoDialog('Can not connect', f"A {type(a).__name__} can not be connected to a {type(b).__name__}")
+            return
+        if len(clss) > 1:
+            # Let the user select Connection type
+            self.selectConnectionClass(clss, lambda cls: self.connect_specific(a, b, cls))
+        else:
+            self.connect_specific(a, b, clss[0])
+
+    def mouseDownChild(self, widget: shapes.Shape, ev):
         def uf(new_data: str):
             # Store the existing values to see if anything actually changed.
             new_values = json.loads(new_data)
@@ -172,11 +185,14 @@ class ModeledDiagram(Diagram):
 
         super().mouseDownChild(widget, ev, uf)
 
-    def mouseDownConnection(self, connection, ev):
+    def mouseDownConnection(self, connection: shapes.Relationship, ev):
         def uf(new_data):
             # Store the existing values to see if anything actually changed.
             data = json.loads(new_data)
             connection.model_entity.update(data)
+            # The styling of the widget can also be updated.
+            if 'styling' in data:
+                connection.updateStyle(**data['styling'])
             # Inform the datastore of any change
             self.datastore and self.datastore.update(connection)
         super().mouseDownConnection(connection, ev, uf)

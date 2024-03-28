@@ -157,6 +157,17 @@ class Stylable:
         keys.sort()
         return keys
 
+    def updateShape(self):
+        raise NotImplementedError()
+
+    def updateStyle(self, **updates) -> bool:
+        """ Returns True if the style was actually changed. """
+        current_style = self.getDefaultStyle()
+        current_style.update(self.styling)
+        update = {k:v for k, v in updates.items() if current_style.get(k, None) != v}
+        if update:
+            self.styling.update(update)
+            self.updateShape()
 
 @dataclass
 class Shape(Stylable):
@@ -198,7 +209,8 @@ class Shape(Stylable):
         shape_type = self.getShapeDescriptor()
         return shape_type.getShape(self)
 
-    def updateShape(self, shape):
+    def updateShape(self, shape=None):
+        shape = shape or self.shape
         shape_type = self.getShapeDescriptor()
         shape_type.updateShape(shape, self)
 
@@ -290,15 +302,6 @@ class Shape(Stylable):
         # Don't return the original, to prevent unwanted changes that affect all instances.
         return dict(cls.default_style)
 
-    def updateStyle(self, **updates) -> bool:
-        """ Returns True if the style was actually changed. """
-        current_style = self.getDefaultStyle()
-        current_style.update(self.styling)
-        update = {k:v for k, v in updates.items() if current_style.get(k, None) != v}
-        if update:
-            self.styling.update(update)
-            self.updateShape(self.shape)
-
     @classmethod
     def getShapeDescriptor(cls):
         return BasicShape.getDescriptor("rect")
@@ -329,6 +332,7 @@ class CP:
         pass
 
 class RoutingStragegy:
+    handle_class = 'line_handle'
     def decorate(self, connection, canvas):
         raise NotImplementedError
     def route(self, shape, all_blocks):
@@ -372,7 +376,8 @@ class RouteCenterToCenter(RoutingStragegy):
 
     def decorate(self, connection, canvas):
         self.widget = connection
-        self.decorators = [svg.circle(cx=p.x, cy=p.y, r=5, stroke_width=0, fill="#29B6F2") for p in self.widget.waypoints]
+        self.decorators = [svg.circle(cx=p.x, cy=p.y, r=5, stroke_width=0, fill="#29B6F2", Class=self.handle_class)
+                           for p in self.widget.waypoints]
         def bind(i, d):
             d.bind('mousedown', lambda ev: self.mouseDownHandle(i, ev))
         for i, d in enumerate(self.decorators):
@@ -500,7 +505,8 @@ class RouteSquare(RoutingStragegy):
             p1 = c + 10 * n - 20 * vn
             p2 = c + 10 * n + 20 * vn
             self.original_handle_pos.append((p1, p2))
-            decorator = svg.line(x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, stroke_width=6, stroke="#29B6F2")
+            decorator = svg.line(x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, stroke_width=6, stroke="#29B6F2",
+                                 Class=self.handle_class)
             bind(len(self.decorators), decorator)
             self.initial_pos[len(self.decorators)] = c
             canvas <= decorator
@@ -542,7 +548,7 @@ class Relationship(Stylable):
 
     def __post_init__(self):
         # Also set the routing_method strategy object.
-        self.routing_method = router_classes[self.getStyle('routing_method')]
+        self.routing_method = router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)
 
     @property
     def canvas(self):
@@ -585,7 +591,7 @@ class Relationship(Stylable):
         return index
 
     def reroute(self, all_blocks):
-        router = getattr(self, 'router', None) or router_classes[self.getStyle('routing_method')]()
+        router = getattr(self, 'router', None) or router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)()
         router.route(self, all_blocks)
         self.router = router
 
