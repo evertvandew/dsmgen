@@ -11,7 +11,7 @@ from dataclasses import fields
 from property_editor import longstr
 from inspect import signature
 from typing import List, Dict, Any, Type, Tuple, Optional
-from shapes import Shape, Relationship, Point, HIDDEN
+from shapes import Shape, Relationship, Point, HIDDEN, handle_class
 from unittest.mock import Mock, MagicMock
 import diagrams
 from modeled_diagram import ModeledDiagram
@@ -50,6 +50,8 @@ def mk_ds():
     return ds
 
 
+
+
 example_diagram = [
     {"Id": 1, "diagram": 3, "block": 4, "x": 401.0, "y": 104.0, "z": 0.0, "width": 64.0, "height": 40.0,
      "styling": {"color": "yellow"}, "block_cls": "BlockRepresentation", "category": int(data_store.ReprCategory.block),
@@ -79,10 +81,13 @@ example_diagram = [
      "block_cls": "FlowPortRepresentation",
      "category": int(data_store.ReprCategory.port),
      "_entity": {"Id": 10, "parent": 5, "__classname__": "FlowPort"}
+     }, {
+        "Id": 2, "diagram": 3, "relationship": 2, "source_repr_id": 3, "target_repr_id": 2, "routing": "[]",
+         "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation",
+         "__classname__": '_RelationshipRepresentation',
+         "_entity": {"Id": 2, "source": 7, "target": 5, "__classname__": "Anchor"}
      }
 ]
-
-
 port2port = [
     {"Id": 1, "diagram": 3, "block": 4, "x": 401.0, "y": 104.0, "z": 0.0, "width": 64.0, "height": 40.0,
      "styling": {"color": "yellow"}, "block_cls": "ModeledShapeAndPorts", "parent": None,
@@ -237,6 +242,7 @@ class IntegrationContext:
                 btn = [b for b in d.select('.brython-dialog-button') if b.text == 'OK'][0]
                 btn.dispatchEvent(events.Click())
             def delete_block(self, mid: int):
+                assert integration_context.no_dialogs()
                 self.rightclick_element(mid)
                 model_item = integration_context.data_store.get(Collection.block, mid)
                 add_expected_response(f'/data/{type(model_item).__name__}/{mid}', 'delete', Response(204, json=None))
@@ -245,6 +251,7 @@ class IntegrationContext:
                 btn.dispatchEvent(events.Click())
                 self.press_ok()
                 check_expected_response()
+                assert integration_context.no_dialogs()
 
             def drag_to_diagram(self, mid: int, drop_cls):
                 """ Drag the block identified by model Id mid to the current diagram.
@@ -358,11 +365,17 @@ class IntegrationContext:
                 shape.dispatchEvent(events.MouseUp())
                 shape.dispatchEvent(events.Click())
 
+            def click_relation(self, rid: int):
+                shape = self.parent.select(f'[data-category="{ReprCategory.relationship}"][data-rid="{rid}"]')[0]
+                shape.dispatchEvent(events.MouseDown())
+                shape.dispatchEvent(events.MouseUp())
+                shape.dispatchEvent(events.Click())
+
             def move_block(self, rid: int, cood: Tuple[float,float] | Point):
                 """ Move the block by manipulating it through mouse events
                 """
                 # Expect an update of the representation to be sent to the server.
-                add_expected_response(f'/data/_BlockRepresentation/{rid}', 'post', Response(2001, json={'Id': rid}))
+                add_expected_response(f'/data/_BlockRepresentation/{rid}', 'post', Response(200, json=None))
                 # Find the shape involved.
                 shape = self.resolve(rid).shape
                 # Move it.
@@ -467,6 +480,10 @@ class IntegrationContext:
                     return ' '.join(t.text for t in txt)
                 return ''
 
+            def nr_block_decorated(self) -> bool:
+                handles = self.parent.select(f'.{handle_class}')
+                return len(handles)
+
         class PropertyEditorApi(HtmlApi):
             parent: html.tag = d['details']
 
@@ -542,6 +559,9 @@ class IntegrationContext:
 
         self.data_store, self.diagram_tabview = client.run('explorer', 'canvas', 'details')
 
+    def no_dialogs(self) -> bool:
+        """ Check there are no dialogs (i.e. all have been closed) """
+        return len(d.select('.brython-dialog-main')) == 0
 
 
 @prepare
@@ -1436,10 +1456,46 @@ def integration_tests():
         context.diagrams.delete_block(rid=4)
         # Delete the underlying model item.
         context.explorer.delete_block(mid=6)
+        assert context.no_dialogs()
         check_expected_response()
+
+    @test
+    def showing_and_hiding_handles():
+        """ In a diagram, shapes and connections have 'decorators', the handles used to manipulate them.
+            They are maintained by the diagram state machine, check these do their job correctly.
+        """
+        # Start with a diagram with three blocks and two connections.
+        context = IntegrationContext(hierarchy=[
+            client.SubProgramDefinition(Id=3, name="Requirements").asdict()
+        ])
+        add_expected_response('/data/diagram_contents/3', 'get', Response(200, json=example_diagram))
+        context.explorer.dblclick_element(mid=3)
+        # Move a block (using drag & drop) and check it is decorated.
+        context.diagrams.move_block(1, (100, 100))
+        assert context.diagrams.nr_block_decorated() == 8
+        # Click a second block
+        context.diagrams.move_block(2, (100, 100))
+        assert context.diagrams.nr_block_decorated() == 8
+        # Switch to a different event handling FSM (should remove handles)
+        context.diagrams.enter_connection_mode()
+        assert context.diagrams.nr_block_decorated() == 0
+        # Test switching between blocks and connections
+        context.diagrams.enter_block_mode()
+        context.diagrams.click_block(1)
+        assert context.diagrams.nr_block_decorated() == 8
+        context.diagrams.click_relation(1)
+        assert context.diagrams.nr_block_decorated() == 1
+        context.diagrams.click_block(2)
+        assert context.diagrams.nr_block_decorated() == 8
+        context.diagrams.click_relation(2)
+        assert context.diagrams.nr_block_decorated() == 3
+        context.diagrams.click_relation(1)
+        assert context.diagrams.nr_block_decorated() == 1
+        context.diagrams.enter_connection_mode()
+        assert context.diagrams.nr_block_decorated() == 0
 
 if __name__ == '__main__':
     #import cProfile
-    run_tests('*.add_block_delete')
+    run_tests('*.showing_and_hiding_handles')
     run_tests()
     #cProfile.run('run_tests()', sort='tottime')

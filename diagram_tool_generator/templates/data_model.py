@@ -450,11 +450,12 @@ class AMessage(ABlock):
     # Generated dataclasses
 % for entity in generator.ordered_items:
 <%
-    stereotype = 'AInstance' if entity in generator.md.instance_of else \
-                  'ABlock' if entity in generator.md.blocks else \
+    stereotype = 'ADiagram' if entity in generator.md.diagrams else \
+                 'AInstance' if entity in generator.md.instance_of else \
+                 'ABlock' if entity in generator.md.blocks else \
                  'ARelationship' if entity in generator.md.relationship else \
                  'APort' if entity in generator.md.port else \
-                 'ADiagram' if entity in generator.md.diagrams else 'ALogicalElement'
+                 'ALogicalElement'
 %>
 @dataclass
 class ${entity.__name__}(${stereotype}):

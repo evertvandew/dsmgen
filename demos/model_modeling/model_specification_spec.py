@@ -19,7 +19,6 @@ class RootModel:
 class ModelCollection:
     name: str
     description: longstr
-    parent: XRef('children', hidden)
 
 ###############################################################################
 ## Entities for Notes & Constraints, which are used in all other diagrams
@@ -27,10 +26,8 @@ class ModelCollection:
 class Note:
     description: (longstr, required)
 
-@md.Relationship(styling = "end:hat")
+@md.Relationship(styling = "end:hat", source=[None], target=[Any])
 class Anchor:
-    source: XRef('owner', Note, hidden)
-    target: XRef('notes', Any, hidden)
     name: str
 
 ###############################################################################
@@ -89,14 +86,18 @@ class HierarchyEntity:
     description: (longstr, detail)
     styling: str
 
+
+all_entities = [ModelEntity, RelationshipEntity, PortEntity, InstanceEntity, CompoundEntity, HierarchyEntity, DiagramEntity]
+
+
 @md.CompoundEntity(
     parents=[Self, 'SpecificationDiagram'],
-    elements=[ModelEntity, RelationshipEntity, PortEntity, Attribute, SelectionArgument, SelectionOption, Self],
+    elements=[*all_entities, Attribute, SelectionArgument, SelectionOption, Self],
     styling = "shape:folder;structure:Block;blockcolor:yellow;icon:square-full;icon:image")
 class Page:
     name: str
 
-@md.BlockDiagram(ModelEntity, RelationshipEntity, PortEntity, Attribute, SelectionArgument, SelectionOption,
+@md.BlockDiagram(*all_entities, Attribute, SelectionArgument, SelectionOption,
               Page, styling="icon:image", parents=[ModelCollection])
 class SpecificationDiagram:
     name: str
@@ -105,46 +106,46 @@ class SpecificationDiagram:
 ###############################################################################
 ## Relationships between entities
 
-@md.Relationship(styling = "endmarker:hat")
+@md.Relationship(styling = "endmarker:hat",
+                 source=all_entities,
+                 target=[RelationshipEntity])
 class RelationshipSource:
-    source: XRef('entity', ModelEntity, PortEntity, CompoundEntity, InstanceEntity, hidden)
-    target: XRef('relationship', RelationshipEntity, hidden)
+    pass
 
-@md.Relationship(styling = "startmarker:hat")
+@md.Relationship(styling = "startmarker:hat",
+                 source=[RelationshipEntity],
+                 target=all_entities)
 class RelationshipTarget:
-    source: XRef('entity', RelationshipEntity, hidden)
-    target: XRef('relationship', ModelEntity, PortEntity, CompoundEntity, InstanceEntity, hidden)
+    pass
 
-@md.Relationship(styling = "startmarker:hat;endmarker:hat")
+@md.Relationship(styling = "startmarker:hat;endmarker:hat",
+                 source=all_entities,
+                 target=[RelationshipEntity])
 class RelationshipBothEnds:
-    source: XRef('entity', ModelEntity, PortEntity, CompoundEntity, InstanceEntity, hidden)
-    target: XRef('relationship', RelationshipEntity, hidden)
+    pass
 
-@md.Relationship(styling = "endmarker:square")
+@md.Relationship(styling = "endmarker:square",
+                 source=all_entities,
+                 target=[Attribute, SelectionArgument])
 class EntityAttribute:
-    source: XRef('entity', ModelEntity, PortEntity, RelationshipEntity, DiagramEntity, HierarchyEntity, CompoundEntity, InstanceEntity, hidden)
-    target: XRef('attribute', Attribute, SelectionArgument, hidden)
+    pass
 
-@md.Relationship(styling = "endmarker:square")
+@md.Relationship(styling = "endmarker:square", source=[SelectionArgument], target=[SelectionOption])
 class SelectionOptionLink:
-    source: XRef('argument', SelectionArgument, hidden)
-    target: XRef('option', SelectionOption, hidden)
+    pass
 
-@md.Relationship(styling = "endmarker:hat")
+@md.Relationship(styling = "endmarker:hat", source=all_entities, target=[DiagramEntity])
 class DiagramEntityLink:
-    source: XRef('entity', ModelEntity, CompoundEntity, InstanceEntity, hidden)
-    target: XRef('diagram', DiagramEntity, hidden)
+    pass
 
-@md.Relationship(styling = "endmarker:diamond")
+@md.Relationship(styling = "endmarker:diamond", source=[ModelEntity, CompoundEntity], target=[PortEntity])
 class PortEntityLink:
-    source: XRef('entity', ModelEntity, CompoundEntity, hidden)
-    target: XRef('port', PortEntity, hidden)
+    pass
 
 
-@md.Relationship(styling = "endmarker:hat;startmarker:square")
+@md.Relationship(styling = "endmarker:hat;startmarker:square", source=[ModelEntity, CompoundEntity, PortEntity], target=[InstanceEntity])
 class EntityInstantation:
-    source: XRef('entity', ModelEntity, CompoundEntity, hidden)
-    target: XRef('instance', InstanceEntity, hidden)
+    pass
 
 ###############################################################################
 ##

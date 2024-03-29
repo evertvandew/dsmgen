@@ -11,6 +11,9 @@ from square_routing import routeSquare
 from point import Point
 from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns)
 
+# CSS class given to all handles shapes are decorated with.
+handle_class = 'line_handle'
+
 
 def getMousePos(ev):
     CTM = ev.target.getScreenCTM()
@@ -331,8 +334,7 @@ class CP:
     def onDrag(self):
         pass
 
-class RoutingStragegy:
-    handle_class = 'line_handle'
+class RoutingStrategy:
     def decorate(self, connection, canvas):
         raise NotImplementedError
     def route(self, shape, all_blocks):
@@ -340,7 +342,7 @@ class RoutingStragegy:
     def dragEnd(self, canvas):
         pass
 
-class RouteCenterToCenter(RoutingStragegy):
+class RouteCenterToCenter(RoutingStrategy):
     def __init__(self):
         self.decorators = []
         self.widget = None
@@ -376,7 +378,7 @@ class RouteCenterToCenter(RoutingStragegy):
 
     def decorate(self, connection, canvas):
         self.widget = connection
-        self.decorators = [svg.circle(cx=p.x, cy=p.y, r=5, stroke_width=0, fill="#29B6F2", Class=self.handle_class)
+        self.decorators = [svg.circle(cx=p.x, cy=p.y, r=5, stroke_width=0, fill="#29B6F2", Class=handle_class)
                            for p in self.widget.waypoints]
         def bind(i, d):
             d.bind('mousedown', lambda ev: self.mouseDownHandle(i, ev))
@@ -409,7 +411,7 @@ class RouteCenterToCenter(RoutingStragegy):
         shape.terminations = (i_a, i_b)
 
 
-class RouteSquare(RoutingStragegy):
+class RouteSquare(RoutingStrategy):
     def __init__(self):
         self.decorators = []
         self.dragged_index = None
@@ -506,7 +508,7 @@ class RouteSquare(RoutingStragegy):
             p2 = c + 10 * n + 20 * vn
             self.original_handle_pos.append((p1, p2))
             decorator = svg.line(x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, stroke_width=6, stroke="#29B6F2",
-                                 Class=self.handle_class)
+                                 Class=handle_class)
             bind(len(self.decorators), decorator)
             self.initial_pos[len(self.decorators)] = c
             canvas <= decorator

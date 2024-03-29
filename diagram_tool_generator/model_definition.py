@@ -151,8 +151,10 @@ class ModelDefinition:
     def Entity(self, styling='', parents=None):
         """ Definition of a thing rendered as a "shape": blocks, actors, objects, actions, etc, etc, etc """
         def decorate(cls):
+            nonlocal parents
             cls.categories = [ExplorableElement, RepresentableElement]
-            if parents:
+            parents = parents or []
+            if parents or 'parent' not in cls.__annotations__:
                 cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
@@ -190,13 +192,17 @@ class ModelDefinition:
     def Relationship(self, styling='', parents=None, source=None, target=None):
         """ Definition of a connection between entities. """
         def decorate(cls):
+            nonlocal parents, source, target
             cls.categories = [ConnectionElement, RepresentableElement]
-            if parents:
+            if parents or 'parent' not in cls.__annotations__:
+                parents = parents or []
                 cls.__annotations__['parent'] = XRef('children', *parents, hidden)
-            if source:
+            source = source or []
+            if source or 'source' not in cls.__annotations__:
                 cls.__annotations__['source'] = XRef('relations', *source, hidden)
-            if target:
-                cls.__annotations__['source'] = XRef('relations', *target, hidden)
+            target = target or []
+            if target or 'target' not in cls.__annotations__:
+                cls.__annotations__['target'] = XRef('relations', *target, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
             self.styling_definition[cls.__name__] = split_styling(styling)
@@ -206,8 +212,10 @@ class ModelDefinition:
     def Port(self, styling='', parents=None):
         """ Some entities can have IO "ports", or connection points. """
         def decorate(cls):
+            nonlocal parents
             cls.categories = [ExplorableElement, RepresentableElement, PortElement]
-            if parents:
+            parents = parents or []
+            if parents or 'parent' not in cls.__annotations__:
                 cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
@@ -218,9 +226,11 @@ class ModelDefinition:
     def BlockDiagram(self, *entities, styling='', parents=None):
         """ Diagram where entities can be placed anywhere on the grid, and connected freely. """
         def decorate(cls):
+            nonlocal parents
             cls.entities = entities
             cls.categories = [ExplorableElement, DiagramElement]
-            if parents:
+            parents = parents or []
+            if parents or 'parent' not in cls.__annotations__:
                 cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
@@ -232,9 +242,11 @@ class ModelDefinition:
     def LanedDiagram(self, *entities, styling='', parents=None):
         """ A diagram with "lanes", e.g. an UML sequence diagram. """
         def decorate(cls):
+            nonlocal parents
             cls.entities = entities
             cls.categories = [ExplorableElement, DiagramElement]
-            if parents:
+            parents = parents or []
+            if parents or 'parent' not in cls.__annotations__:
                 cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)
@@ -246,8 +258,10 @@ class ModelDefinition:
     def LogicalModel(self, styling='', parents=None):
         """ Part of the underlying logical model. The user can browse the data in the tool following these elements. """
         def decorate(cls):
+            nonlocal parents
             cls.categories = [ExplorableElement]
-            if parents:
+            parents = parents or []
+            if parents or 'parent' not in cls.__annotations__:
                 cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
             self.model_elements.append(cls)

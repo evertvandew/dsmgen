@@ -9,9 +9,8 @@ import enum
 from math import inf
 import json
 from point import Point
-from shapes import (Shape, CP, Relationship, getMousePos, Orientations, BlockOrientations, OwnerInterface)
+from shapes import (Shape, CP, Relationship, getMousePos, Orientations, OwnerInterface, handle_class)
 from data_store import DataStore, ExtendibleJsonEncoder, ReprCategory
-import shapes
 import svg_shapes
 
 
@@ -137,9 +136,8 @@ class ResizeFSM(BehaviourFSM):
         if self.widget and ev.target == self.widget.shape:
             self.state = ResizeStates.MOVING
             return
-        if ev.target == diagram.canvas:
-            if self.state == ResizeStates.DECORATED:
-                self.unselect()
+        if self.state == ResizeStates.DECORATED:
+            self.unselect()
         self.state = ResizeStates.NONE
         return
         # FIXME: check if this code needs to be removed.
@@ -191,7 +189,7 @@ class ResizeFSM(BehaviourFSM):
     def select(self, widget):
         self.widget = widget
 
-        self.decorators = {k: svg.circle(r=5, stroke_width=0, fill="#29B6F2") for k in Orientations}
+        self.decorators = {k: svg.circle(r=5, stroke_width=0, fill="#29B6F2", Class=handle_class) for k in Orientations}
         x, y, width, height = [getattr(widget, k) for k in ['x', 'y', 'width', 'height']]
 
         for k, d in self.decorators.items():
@@ -262,6 +260,8 @@ class RerouteStates(BehaviourFSM):
 
 
     def mouseDownConnection(self, diagram, widget, ev):
+        if self.state != self.States.NONE:
+            self.clear_decorations()
         self.widget = widget
         if not self.decorators:
             self.decorate()
@@ -275,15 +275,9 @@ class RerouteStates(BehaviourFSM):
         if diagram.selection and ev.target == diagram.selection.shape:
             self.state = self.States.MOVING
             return
-        if ev.target == diagram.canvas:
-            if self.state == self.States.DECORATED:
-                self.clear_decorations()
+        if self.state != self.States.NONE:
+            self.clear_decorations()
         self.state = self.States.NONE
-        return
-        self.dragstart = getMousePos(ev)
-        if diagram.selection:
-            self.initial_pos = diagram.selection.getPos()
-            self.initial_size = diagram.selection.getSize()
 
     def handleDragStart(self, index, ev):
         self.state = self.States.DRAGGING

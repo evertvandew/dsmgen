@@ -104,7 +104,6 @@ def make_explorer(holder, api: DataStore, allowed_children):
                 d.close()
                 if result:
                     del document[data_element.Id]
-                    msg = InfoDialog('Success', f'{data_element.name} was deleted', ok='Close')
                 else:
                     msg = InfoDialog('Failure', f'Could not delete "{data_element.name}"', ok='Close')
 

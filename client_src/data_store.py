@@ -286,7 +286,8 @@ class DataStore(EventDispatcher):
                           data=data, oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
                 self.update_data(record)
 
-    def delete(self, record: StorableElement):
+    def delete(self, record: StorableElement) -> bool:
+        """ Returns true if the deletion is successful. """
         collection = record.get_collection()
 
         # Find any dependencies and delete these first.
@@ -306,14 +307,18 @@ class DataStore(EventDispatcher):
             self.delete(d)
 
         # Now delete the actual entities.
+        result = False
         def on_complete(update: JsonResponse):
+            nonlocal result
             if update.status < 300:
                 del self.shadow_copy[collection][record.Id]
                 del self.live_instances[collection][record.Id]
+                result = True
         url = type(record).__name__ if collection not in Collection.representations() else \
             self.repr_collection_urls[collection]
         ajax.delete(f'{self.configuration.base_url}/{url}/{record.Id}', blocking=True, oncomplete=on_complete)
         self.delete_data(record)
+        return result
 
     def get(self, collection: Collection | str, Id: int) -> StorableElement:
         if isinstance(collection, str):
@@ -356,7 +361,6 @@ class DataStore(EventDispatcher):
             if response.status >= 200 and response.status < 300:
                 records = []
                 # Reconstruct the entities the diagram refers to and cache them
-                console.log(f'{repr(response.json)}')
                 for e in response.json:
                     model_details = e['_entity']
                     model_cls = self.all_classes[model_details['__classname__']]

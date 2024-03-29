@@ -3,7 +3,8 @@ from typing import Any, Self, List, Dict, Optional, Type
 from dataclasses import dataclass, field
 import json
 from browser import svg, console
-from diagrams import shapes, Shape, Relationship, CP, Point, Orientations
+from diagrams import Shape, Relationship, CP, Point, Orientations
+import shapes
 from data_store import StorableElement, Collection, ReprCategory, from_dict, ExtendibleJsonEncoder, DataStore
 from point import load_waypoints
 from copy import deepcopy, copy
@@ -112,6 +113,9 @@ class ModeledShape(Shape, ModelRepresentation):
         g = svg.g()
         _ = g <= shape_type.getShape(self)
         _ = g <= self.TextWidget.getShape(self)
+        g.attrs['data-category'] = int(ReprCategory.block)
+        g.attrs['data-rid'] = self.Id
+        g.attrs['data-mid'] = self.model_entity.Id
         return g
 
     def updateShape(self, shape=None):
@@ -159,6 +163,9 @@ class Port(CP, ModelRepresentation):
         p = self.pos
         shape = svg.rect(x=p.x-5, y=p.y-5, width=10, height=10, stroke_width=1, stroke='black', fill='lightgreen')
         shape.attrs['data-class'] = type(self).__name__
+        shape.attrs['data-category'] = int(ReprCategory.port)
+        shape.attrs['data-rid'] = self.Id
+        shape.attrs['data-mid'] = self.model_entity.Id
         return shape
     def updateShape(self, shape=None):
         shape = shape or self.shape
@@ -239,6 +246,10 @@ class ModeledShapeAndPorts(ModeledShape):
                 p.shape = s
                 port_shape_lookup[s] = p
         self.port_shape_lookup = port_shape_lookup
+
+        g.attrs['data-category'] = int(ReprCategory.block)
+        g.attrs['data-rid'] = self.Id
+        g.attrs['data-mid'] = self.model_entity.Id
 
         # Return the group of objects
         return g
@@ -336,3 +347,9 @@ class ModeledRelationship(Relationship, ModelRepresentation):
     @classmethod
     def repr_category(cls) -> ReprCategory:
         return ReprCategory.relationship
+
+    def route(self, owner, all_blocks):
+        super().route(owner, all_blocks)
+        self.path.attrs['data-category'] = int(ReprCategory.relationship)
+        self.path.attrs['data-rid'] = self.Id
+        self.path.attrs['data-mid'] = self.model_entity.Id
