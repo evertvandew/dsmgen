@@ -6,7 +6,6 @@ import re
 from copy import copy
 from dataclasses import dataclass
 from test_frame import prepare, test, run_tests
-from .events import Event
 
 
 def flatten(data):
@@ -84,10 +83,10 @@ class AttributeSelector(BaseSelector):
             def t(node):
                 if self.flag == 'i':
                     value = self.value.lower()
-                    attr = node.attrs.get(self.name, '').lower()
+                    attr = str(node.attrs.get(self.name, '')).lower()
                 else:
                     value = self.value
-                    attr = node.attrs.get(self.name, '')
+                    attr = str(node.attrs.get(self.name, ''))
                 if self.operator == AttributeOperator.equals:
                     return attr == value
                 elif self.operator == AttributeOperator.contains_word:
@@ -108,17 +107,21 @@ class Combinator(Enum):
     Child = '>'
     Column = r'\|\|'
     Descendant = ' '
+    Either = ','
 
 @dataclass
 class SelectorList:
     selectors: Selector
     def filter(self, node):
-        # Yield each element that maches a test once and only once.
-        # Collect all matches in a set to make them unique.
-        all_nodes = {n for s in self.selectors for n in s.filter(node)}
-        for item in all_nodes:
-            yield item
-
+        """ Yield only elements that match all tests """
+        # First apply each test separately to each node
+        # Then find the intersection of each set of filtered nodes.
+        sets = [set(s.filter(node)) for s in self.selectors]
+        result = sets[0]
+        if len(sets) > 1:
+            for s in sets[1:]:
+                result = result.intersection(s)
+        return result
 
 @dataclass
 class SelectorCombinator:
@@ -151,6 +154,13 @@ class SelectorCombinator:
                 for item in flatten(node):
                     if self.a.test(item):
                         yield from self.b.filter(item.children)
+            case Combinator.Either:
+                # Yield each element that matches either of the tests -- but only once if it meets multiple tests.
+                # Collect all matches in a set to make them unique.
+                all_nodes = {n for s in [self.a, self.b] for n in s.filter(node)}
+                for item in all_nodes:
+                    yield item
+
             case _:
                 RuntimeError("Combinator not (yet) supported")
 
@@ -176,10 +186,10 @@ def parse_selector(s):
             selector = UniversalSelector()
             s = s[1:]
         elif m := re.match(r'::([\w-]+)', s):
-            selector.pe = m.group(1)
+            liststack[-1].pe = m.group(1)
             s = s[m.span()[1]:]
         elif m := re.match(r':([\w-]+)', s):
-            selector.pc = m.group(1)
+            liststack[-1].pc = m.group(1)
             s = s[m.span()[1]:]
         elif m := re.match(r'([\w-]+)', s):
             selector = TypeSelector(m.group(1))
@@ -195,13 +205,10 @@ def parse_selector(s):
             s = s[m.span()[1]:]
 
         # Parse the various combinators
-        elif m := re.match(r'\s*,\s*', s):
-            liststack.append(selector)
-            selector = None
-            s = s[m.span()[1]:]
         else:
             for comb in Combinator:
                 if m := re.match(r'\s*?'+comb.value+r'\s*', s):
+                    selector = liststack.pop(-1)
                     s = s[m.span()[1]:]
                     part2 = parse_selector(s)
                     s = ''
@@ -209,10 +216,13 @@ def parse_selector(s):
                     break
         if s == start_s:
             raise RuntimeError("Unable to parse selector")
-    if liststack:
-        liststack.append(selector)
+        if selector is not None:
+            liststack.append(selector)
+        selector = None
+
+    if len(liststack) > 1:
         return SelectorList(liststack)
-    return selector
+    return liststack[0]
 
 
 class Style:
@@ -381,7 +391,7 @@ class tag:
                 handlers.remove(i)
     def events(self, event: str):
         return self.subscribers.get(event, [])
-    def dispatchEvent(self, event: Event):
+    def dispatchEvent(self, event):
         if not event.target:
             event.target = self
         for h in self.subscribers.get(event.type, []):
@@ -720,7 +730,11 @@ def selector_parsing_tests():
         assert parse_selector('[href*="pietje" i]') == AttributeSelector('href', 'pietje', AttributeOperator.contains, 'i')
     @test
     def combinations():
-        assert parse_selector('.pietje, .puk, .keteldorp') == SelectorList([ClassSelector('pietje'), ClassSelector('puk'), ClassSelector('keteldorp')])
+        assert parse_selector('.pietje, .puk, .keteldorp') == SelectorCombinator(
+            a=ClassSelector(name='pietje'),
+            b=SelectorCombinator(a=ClassSelector(name='puk'), b=ClassSelector(name='keteldorp'), t=Combinator.Either),
+            t=Combinator.Either
+        )
         assert parse_selector('.pietje || .puk  .keteldorp') == SelectorCombinator(ClassSelector('pietje'),
                                                            SelectorCombinator(ClassSelector('puk'), ClassSelector('keteldorp'), Combinator.Descendant),
                                                            Combinator.Column)
@@ -750,12 +764,13 @@ def selector_filter_tests():
                 INPUT(name="value2", Class='edit', flag='btn-primary'),
                 BUTTON(text="Click Me", onclick="onBtnClick()", Class='edit btn')
             ], id="2", Class="olivier bommel"),
+            LABEL(name="value3"),
             INPUT(name="value3", Class='outside')
         ]
     )
     @test
     def core_selectors():
-        assert len(test_set.select('*')) == 12
+        assert len(test_set.select('*')) == 13
         assert len(test_set.select('INPUT')) == 4
         assert len(test_set.select('.edit')) == 3
         assert len(test_set.select('#myvalue')) == 1
@@ -774,6 +789,7 @@ def selector_filter_tests():
         assert len(test_set.select('INPUT ~ BUTTON')) == 2
         assert len(test_set.select('DIV INPUT')) == 3
         assert len(test_set.select('DIV > INPUT')) == 2
+        assert len(test_set.select('INPUT[name="value3"]')) == 1
 
 
 if __name__ == '__main__':
