@@ -67,11 +67,6 @@ def Text(text_attr):
             shape <= renderText(getattr(details, text_attr, ''), details)
     return TextWidget
 
-# TODO:
-# class Package: -- needs to contain other blocks.
-# class Group:
-# class Cloud:
-
 
 class OwnerInterface:
     """ Define an interface through which a shape interacts with its parent.
