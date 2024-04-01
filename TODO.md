@@ -1,8 +1,6 @@
 
 
 # Bugs:
-* The property editor doesn't show the type of entity being edited.
-* Closing a tab does not activate the right one of the remaining diagrams.
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
 * When dragging an object, escape does not stop the behaviour if the mouse is not pressed down.
 * The folding / unfolding of a folder doesn't work properly: folders are first shown unfolded though the triangle
@@ -94,3 +92,5 @@
 * When adding or removing ports to a definition, its representations in Implementations aren't updated.
 * Double-click on a subprogram in a diagram doesn't open the associated diagram.
 * When editing the name of a block the explorer shows the text &mdash instead of a dash.
+* The property editor doesn't show the type of entity being edited.
+* Closing a tab does not activate the right one of the remaining diagrams.

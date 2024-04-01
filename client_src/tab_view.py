@@ -1,6 +1,6 @@
 
 from typing import Optional, Callable
-from browser import document, html, bind
+from browser import document, html, bind, window
 
 header_cls = "tabview-header"
 body_cls = "tabview-body"
@@ -31,6 +31,8 @@ class TabView:
         @bind(btn, 'click')
         def onClose(evt):
             nonlocal new_header, page
+            evt.preventDefault()
+            evt.stopPropagation()
             page.remove()
             if diagram != None:
                 diagram.close()
@@ -42,10 +44,10 @@ class TabView:
             if not current_tabs:
                 return
 
-            # Click the tab to the right (or left if none exists) the existing tab.
-            new_index = current_index if current_index < len(current_tabs) else len(current_tabs)-1
-            current_tabs[new_index]
-
+            # Click the tab to the left of the existing tab to activate it.
+            new_index = min([current_index-1, 0])
+            evt = window.MouseEvent.new("click")
+            current_tabs[new_index].dispatchEvent(evt)
 
         @bind(new_header, 'click')
         def onActivate(evt: Optional):

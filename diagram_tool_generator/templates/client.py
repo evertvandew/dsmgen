@@ -370,6 +370,7 @@ def on_diagram_selection(_e_name, _e_source, data_store, details):
     for e in properties_div.children:
         e.remove()
     properties_div.children = []
+    _ = properties_div <= html.H3(f'{type(model).__name__}: {getattr(model, "name", "")}')
     _ = properties_div <= dataClassEditor(model, model.get_editable_parameters(), data_store, repr=repr, update=update)
 
 
@@ -388,8 +389,8 @@ def on_explorer_click(_event_name, _event_source, data_store, details):
     for e in properties_div.children:
         e.remove()
     properties_div.children = []
-
-    properties_div <= dataClassEditor(data_element, data_element.get_editable_parameters(), data_store, update=update)
+    _ = properties_div <= html.H3(f'{type(data_element).__name__}: {getattr(data_element, "name", "")}')
+    _ = properties_div <= dataClassEditor(data_element, data_element.get_editable_parameters(), data_store, update=update)
 
 
 def on_explorer_dblclick(data_store, details, tabview):
