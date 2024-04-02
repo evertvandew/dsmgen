@@ -189,7 +189,8 @@ class ResizeFSM(BehaviourFSM):
     def select(self, widget):
         self.widget = widget
 
-        self.decorators = {k: svg.circle(r=5, stroke_width=0, fill="#29B6F2", Class=handle_class) for k in Orientations}
+        self.decorators = {k: svg.circle(r=5, stroke_width=0, fill="#29B6F2", data_index=int(k), Class=handle_class)
+                           for k in Orientations}
         x, y, width, height = [getattr(widget, k) for k in ['x', 'y', 'width', 'height']]
 
         for k, d in self.decorators.items():

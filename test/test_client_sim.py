@@ -384,7 +384,10 @@ class IntegrationContext:
                 shape.dispatchEvent(events.MouseUp(offsetX=cood[0], offsetY=cood[1]))
             def drag_relation_handle(self, index: int, delta: Tuple[float, float]):
                 diagram = self.current_diagram()
-                pass
+                handle = diagram.canvas.select_one(f'.{handle_class}[data-index="{index}"]')
+                handle.dispatchEvent(events.MouseDown(offsetX=0, offsetY=0))
+                handle.dispatchEvent(events.MouseMove(offsetX=delta[0], offsetY=delta[1]))
+                handle.dispatchEvent(events.MouseUp(offsetX=delta[0], offsetY=delta[1]))
 
             def delete_block(self, rid: int):
                 """ Delete a block """
@@ -1508,7 +1511,7 @@ def integration_tests():
         context.explorer.dblclick_element(mid=3)
 
         # Try to re-route the link between _Entity 6 and _Entity 10 (_Relationship 6, RelationRepresentation 6),
-        context.diagrams.click_relation(10)
+        context.diagrams.click_relation(6)
         # Take the second handle of the relationship and drag it left 100 places
         add_expected_response('/data/_RelationshipRepresentation/6', 'post', Response(200, json=data))
         context.diagrams.drag_relation_handle(1, (100,0))

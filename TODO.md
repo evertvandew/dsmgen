@@ -7,7 +7,6 @@
   is for folded; clicking the triangle acts on all children as well, not just the one clicked on.
 * Texts are rendered poorly. Long words get an empty line prepended, and they are not centered properly.
 * When drawing a new diagram, the line ends are not shown properly.
-* Re-routing a line is not always persisted in the database.
 
 # Refactoring
 * Use `get_type_hints` instead of raw `__annotations__`.
@@ -94,3 +93,4 @@
 * When editing the name of a block the explorer shows the text &mdash instead of a dash.
 * The property editor doesn't show the type of entity being edited.
 * Closing a tab does not activate the right one of the remaining diagrams.
+* Re-routing a line is not always persisted in the database.

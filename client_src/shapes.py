@@ -373,8 +373,9 @@ class RouteCenterToCenter(RoutingStrategy):
 
     def decorate(self, connection, canvas):
         self.widget = connection
-        self.decorators = [svg.circle(cx=p.x, cy=p.y, r=5, stroke_width=0, fill="#29B6F2", Class=handle_class)
-                           for p in self.widget.waypoints]
+        self.decorators = [svg.circle(cx=p.x, cy=p.y, r=5, stroke_width=0, fill="#29B6F2", Class=handle_class,
+                                      data_index=i)
+                           for i, p in enumerate(self.widget.waypoints)]
         def bind(i, d):
             d.bind('mousedown', lambda ev: self.mouseDownHandle(i, ev))
         for i, d in enumerate(self.decorators):
@@ -493,17 +494,18 @@ class RouteSquare(RoutingStrategy):
         self.handle_orientation = []
         self.handle_wp_index = self.getHandleWpIndices(self.widget.waypoints, self.widget.points)
         self.original_handle_pos = []
-        for p1, p2 in zip(self.widget.points[:-1], self.widget.points[1:]):
+        for i, (p1, p2) in enumerate(zip(self.widget.points[:-1], self.widget.points[1:])):
             v = (p2 - p1)
             vn = v / v.norm()
             c = (p1 + p2) / 2
             n = vn.transpose()
-            self.handle_orientation.append('X' if abs(n.x) > abs(n.y) else 'Y')
+            orientation = 'X' if abs(n.x) > abs(n.y) else 'Y'
+            self.handle_orientation.append(orientation)
             p1 = c + 10 * n - 20 * vn
             p2 = c + 10 * n + 20 * vn
             self.original_handle_pos.append((p1, p2))
             decorator = svg.line(x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, stroke_width=6, stroke="#29B6F2",
-                                 Class=handle_class)
+                                 data_orientation=orientation, data_index=i, Class=handle_class)
             bind(len(self.decorators), decorator)
             self.initial_pos[len(self.decorators)] = c
             canvas <= decorator

@@ -321,6 +321,8 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         result = super().copy(ignore=['start', 'finish', 'model_entity', 'id'])
         result.start = self.start
         result.finish = self.finish
+        # The waypoints need to be deep-copied
+        result.waypoints = deepcopy(self.waypoints)
         return result
 
     @staticmethod
