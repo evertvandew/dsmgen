@@ -29,11 +29,18 @@ class HAlign(enum.IntEnum):
 
 POINT_TO_PIXEL = 1.3333
 
+def getTextWidth(text, font_file='Arial.ttf', fontsize='10'):
+    font = font_sizes[font_file]['sizes']
+    normalized_width = 1 / POINT_TO_PIXEL / int(fontsize)
+    normalized_size = sum(font.get(ord(ch), font[32]) for ch in text)
+    return normalized_size / normalized_width
+
+
 def wrapText(text, width, font_file='Arial.ttf', fontsize='10'):
     # Separate into words and determine the size of each part
     font = font_sizes[font_file]['sizes']
     parts = text.split()
-    normalized_width = width / POINT_TO_PIXEL / fontsize
+    normalized_width = width / POINT_TO_PIXEL / int(fontsize)
     sizes = [sum(font.get(ord(ch), font[32]) for ch in part) for part in parts]
     if pyphen:
         dic = pyphen.Pyphen(lang='nl_NL')
@@ -66,7 +73,7 @@ def wrapText(text, width, font_file='Arial.ttf', fontsize='10'):
                 lines.append(' '.join(current_line))
                 current_line = []
                 line_length = 0
-        elif line_length + size + font[32] * (len(current_line) - 1) > normalized_width:
+        elif current_line and line_length + size + font[32] * (len(current_line) - 1) > normalized_width:
             lines.append(' '.join(current_line))
             current_line = []
             line_length = 0
@@ -86,9 +93,9 @@ def renderText(text, d):
     lineheight = font_sizes[font_file]['lineheight'] * fontsize * float(d.getStyle('linespace', '1.5'))
     # Calculate where the text must be placed.
     xpos = int({HAlign.LEFT: d.x+xmargin, HAlign.CENTER: d.x+d.width/2, HAlign.RIGHT: d.x+d.width-xmargin}[d.getStyle('halign', HAlign.LEFT)])
-    ypos = {#VAlign.TOP: y+ymargin,
-            VAlign.CENTER: d.y+(d.height-len(lines)*lineheight)/2
-            #VAlign.BOTTOM: y+height-len(lines)*lineheight*fontsize - ymargin
+    ypos = {VAlign.TOP: y+ymargin,
+            VAlign.CENTER: d.y+(d.height-(len(lines)+.5)*lineheight)/2
+            VAlign.BOTTOM: y+height-len(lines)*lineheight*fontsize - ymargin
            }[d.getStyle('valign', VAlign.CENTER)]
 
     rendered = [svg.text(line, x=xpos, y=int(ypos+lineheight*(i+1)), text_anchor=anchor, font_size=fontsize,
@@ -701,9 +708,5 @@ def pointer_icon(x, y, s, stroke='#000000', fill='#ffffff'):
     points = ', '.join(f'{i} {j}' for i, j in points)
     return svg.polygon(points=points, stroke='black')
 
-
-
-if __name__ == '__main__':
-    print(Cloud.parts)
 
 

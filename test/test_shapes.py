@@ -3,6 +3,20 @@
 from test_frame import prepare, test, run_tests, expect_exception
 
 import shapes
+from svg_shapes import wrapText, getTextWidth
+
+@prepare
+def test_text_rendering():
+    @test
+    def wrapping():
+        # Check splitting a text into parts
+        txts = ["Dit is een testtekst", 'Dit is een test-', 'Dit is een', 'Dit is een', 'Dit is', 'Dit']
+        print('Full size:', [f"{txt}: {getTextWidth(txt)}" for txt in txts])
+        widths = [110, 84, 50, 20, 10]
+        expected = ['Dit is een testtekst', 'Dit is een\ntesttekst', 'Dit is\neen\ntesttekst', 'Dit\nis\neen\ntesttekst', 'Dit\nis\neen\ntesttekst']
+        for w, e in zip(widths, expected):
+            result = wrapText(txts[0], w)
+            assert '\n'.join(result) == e, f"Not the same for width {w}: {repr(chr(10).join(result))}, {e}"
 
 @prepare
 def test_styling():
@@ -31,4 +45,4 @@ def test_styling():
         assert item.getStyle('stroke') == 'black'
 
 if __name__ == '__main__':
-    run_tests()
+    run_tests('*.wrapping')
