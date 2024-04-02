@@ -87,15 +87,16 @@ def renderText(text, d):
     font_file = d.getStyle('font', 'Arial')+'.ttf'
     fontsize = float(d.getStyle('fontsize', 12))
     xmargin = int(d.getStyle('xmargin', '5'))
+    ymargin = int(d.getStyle('ymargin', xmargin))
     lines = wrapText(text, d.width-2*xmargin, font_file, fontsize)
     # Now render these lines
     anchor = {HAlign.LEFT: 'start', HAlign.CENTER: 'middle', HAlign.RIGHT: 'end'}[d.getStyle('halign', HAlign.LEFT)]
     lineheight = font_sizes[font_file]['lineheight'] * fontsize * float(d.getStyle('linespace', '1.5'))
     # Calculate where the text must be placed.
     xpos = int({HAlign.LEFT: d.x+xmargin, HAlign.CENTER: d.x+d.width/2, HAlign.RIGHT: d.x+d.width-xmargin}[d.getStyle('halign', HAlign.LEFT)])
-    ypos = {VAlign.TOP: y+ymargin,
-            VAlign.CENTER: d.y+(d.height-(len(lines)+.5)*lineheight)/2
-            VAlign.BOTTOM: y+height-len(lines)*lineheight*fontsize - ymargin
+    ypos = {VAlign.TOP: d.y+ymargin,
+            VAlign.CENTER: d.y+(d.height-(len(lines)+.5)*lineheight)/2,
+            VAlign.BOTTOM: d.y+d.height-len(lines)*lineheight*fontsize - ymargin
            }[d.getStyle('valign', VAlign.CENTER)]
 
     rendered = [svg.text(line, x=xpos, y=int(ypos+lineheight*(i+1)), text_anchor=anchor, font_size=fontsize,

@@ -5,7 +5,6 @@
 * When dragging an object, escape does not stop the behaviour if the mouse is not pressed down.
 * The folding / unfolding of a folder doesn't work properly: folders are first shown unfolded though the triangle
   is for folded; clicking the triangle acts on all children as well, not just the one clicked on.
-* When drawing a new diagram, the line ends are not shown properly.
 
 # Refactoring
 * Use `get_type_hints` instead of raw `__annotations__`.
@@ -95,3 +94,4 @@
 * Closing a tab does not activate the right one of the remaining diagrams.
 * Re-routing a line is not always persisted in the database.
 * Texts are rendered poorly. Long words get an empty line prepended, and they are not centered properly.
+* When drawing a new diagram, the line ends are not shown properly.

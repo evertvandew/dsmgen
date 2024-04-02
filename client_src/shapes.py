@@ -1,5 +1,5 @@
 
-from browser import svg, window
+from browser import svg, window, console
 import enum
 from weakref import ref
 import math
@@ -599,8 +599,8 @@ class Relationship(Stylable):
         self.owner = owner
         # Create the line
         details = dict(d="", stroke=self.getStyle('linecolor'), stroke_width=self.getStyle('linewidth'),
-                             marker_end=f"url(#{self.getStyle('endmarker')})",
-                             marker_start=f"url(#{self.getStyle('startmarker')})", fill="none")
+                             marker_end=f"url('#{self.getStyle('endmarker')}')",
+                             marker_start=f"url('#{self.getStyle('startmarker')}')", fill="none")
         pattern = line_patterns[self.getStyle('pattern', 'solid')]
         if pattern:
             details['stroke_dasharray'] = pattern
@@ -630,8 +630,8 @@ class Relationship(Stylable):
         items = {
             'stroke': self.getStyle('linecolor'),
             'stroke-width': self.getStyle('linewidth'),
-            'marker-end': f"url(#{self.getStyle('endmarker')})",
-            'marker-start': f"url(#{self.getStyle('startmarker')})"
+            'marker-end': f"url('#{self.getStyle('endmarker')}')",
+            'marker-start': f"url('#{self.getStyle('startmarker')}')"
         }
         for k, v in items.items():
             self.path.attrs[k] = v

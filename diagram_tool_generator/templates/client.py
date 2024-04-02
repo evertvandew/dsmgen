@@ -403,10 +403,8 @@ def on_explorer_dblclick(data_store, details, tabview):
     # If a diagram is double-clicked, open it.
     if target_type in diagram_classes:
         svg_tag = html.SVG(id=target_dbid)
-        svg_tag <= getMarkerDefinitions()
         svg_tag.classList.add('diagram')
-        # container <= svg_tag
-        ## In future: subscribe to events in the diagram api.
+
         config = DiagramConfig(connections_from)
         diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], config, data_store, svg_tag)
         diagram_details = data_store.get(target_type, target_dbid)
@@ -429,6 +427,11 @@ def run(explorer: str, canvas: str, details: str) -> Tuple[DataStore, TabView]:
 
     blank = document[explorer]
     diagram_tabview = TabView(canvas)
+
+    # There can not be multiple definitions of the line-ends, so define them globally.
+    svg_tag = html.SVG(id='line_ends', height=0, width=0)
+    svg_tag <= getMarkerDefinitions()
+    document <= svg_tag
 
     def on_dblclick(_event_name, event_source, data_store, details):
         """ Called when an element was left-clicked. """
