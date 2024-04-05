@@ -37,6 +37,8 @@ class Anchor:
 class ModelEntity:
     name: str
     description: (longstr, detail)
+    block_shape: str
+    default_styling: str
     styling: str
 
 @md.Entity(styling="shape:rect", parents=['SpecificationDiagram'])
@@ -72,12 +74,16 @@ class DiagramEntity:
 class CompoundEntity:
     name: str
     description: (longstr, detail)
+    block_shape: str
+    default_styling: str
     styling: str
 
 @md.Entity(styling='shape:rect', parents=['SpecificationDiagram'])
 class InstanceEntity:
     name: str
     description: (longstr, detail)
+    block_shape: str
+    default_styling: str
     styling: str
 
 @md.Entity(styling='shape:folder', parents=['SpecificationDiagram'])
@@ -98,7 +104,7 @@ class Page:
     name: str
 
 @md.BlockDiagram(*all_entities, Attribute, SelectionArgument, SelectionOption,
-              Page, styling="icon:image", parents=[ModelCollection])
+              Page, Note, styling="icon:image", parents=[ModelCollection])
 class SpecificationDiagram:
     name: str
     description: (longstr, detail)

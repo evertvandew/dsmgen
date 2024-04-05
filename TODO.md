@@ -1,10 +1,13 @@
 
 
 # Bugs:
+* The name of a port is not printed in the explorer.
 * When "delete" is pressed while editing a property, the block is deleted. The "focus" is not taken into account.
 * When dragging an object, escape does not stop the behaviour if the mouse is not pressed down.
-* The folding / unfolding of a folder doesn't work properly: folders are first shown unfolded though the triangle
-  is for folded; clicking the triangle acts on all children as well, not just the one clicked on.
+* The folding / unfolding of a folder doesn't work properly:
+  * folders are first shown unfolded though the triangle is folded
+    is for folded
+  * clicking the triangle acts on all children as well, not just the one clicked on.
 
 # Refactoring
 * Use `get_type_hints` instead of raw `__annotations__`.
@@ -17,7 +20,9 @@
 * Get rid of mechanisms where the presence of an attribute decides actions. Replace these with (member) functions.
 
 # Future enhancements
+* When opening a diagram for the second time, open the existing diagram instead.
 * Support selecting multiple elements and moving them.
+* Implement selection by drawing a rectangle with the mouse.
 * Highlight the currently active editing mode (block mode or connection mode).
 * Honour the `pattern` style for blocks and relationships. Perhaps rename to `linepattern`.
 * Do not allow the root item to be deleted. Or alternatively, spawn a new one if necessary.
@@ -26,6 +31,7 @@
 * Make transactions of what happens in an event handler, so that if an exception occurs, the system stays in a known 
   state.
 * Allow extra details (texts) to be shown around a relationship.
+  A mechanism already exists to obtain several texts from a block.
 * When a user adds a connection that already exists, that should be reused.
 * Allow conversion of one type element to another
 * Allow conversion of one relationship to another
@@ -43,13 +49,11 @@
 * Support curved lines
 * Add support for association classes (a third association with a relationship)
 * Add support for messages along connections.
-* Allow combinations of point-2-point routed and square routed connections.
 * Implement a proper Z-order in the diagrams.
-* The explorer should handle create and rename events from entities created while editing a diagram.
 * Port to an environment where the javascript is pre-compiled. Probably pyjamas or pyjaco? Or perhaps to Kotlin? Rust wasm?
 * Automatic alignment and sizing of blocks.
 * Scrolling of the diagram viewer.
-* Resizing of the frames in the tool (explorer / diagram / details).
+* Resizing of the frames in the tool (explorer / diagram / details) by dragging the separating lines.
 * Implementation of Undo / Redo.
 * Implement the data model using Prisma (https://eash98.medium.com/why-sqlalchemy-should-no-longer-be-your-orm-of-choice-for-python-projects-b823179fd2fb)
 
@@ -85,6 +89,9 @@
   - In the client, treat ports as sub-blocks when persisting new or updated blocks
 * Replace the REST "API" stuff with simple forwarding scheme. Letting objects maintain their own dirty state is a bad idea.
   Use a more centralized approach where actions are detected and lead to centralized sequences being run to handle the change.
+* The explorer should handle create and rename events from entities created while editing a diagram.
+
+
 
 # Solved issues:
 * When adding or removing ports to a definition, its representations in Implementations aren't updated.

@@ -56,8 +56,7 @@ class ProtocolDefinition:
     definition: longstr
 
 
-@md.CompoundEntity(parents=[StructuralModel, FunctionalModel], elements=[Note, Self], styling = "shape:rect;structure:Block;blockcolor:yellow;icon:square-full;icon:image")
-@md.Entity(styling='shape:folder', parents=[Self, StructuralModel])
+@md.CompoundEntity(parents=[Self, StructuralModel, FunctionalModel], elements=[Note, Self], styling = "shape:rect;structure:Block;blockcolor:yellow;icon:square-full;icon:image")
 class Package:
     name: str
 
@@ -158,7 +157,7 @@ class Requirement:
 
 ###############################################################################
 ## Use Case diagram
-@md.Entity(styling="shape:ellipse", parents=[FunctionalModel])
+@md.Entity(styling="shape:ellipse;", parents=[FunctionalModel])
 class UseCase:
     name: str
     description: longstr
@@ -210,7 +209,7 @@ class Transition:
     target: XRef('to', State, EndState, hidden)
     name: str
 
-@md.BlockDiagram(State, Note, Constraint, styling='icon:image', parents=[FunctionalModel, Class, Block, Self, UseCase, Package])
+@md.BlockDiagram(State, Note, Constraint, Actor, styling='icon:image', parents=[FunctionalModel, Class, Block, Self, UseCase, Package])
 class UseCaseDiagram:
     name: str
 

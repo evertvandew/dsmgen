@@ -2,6 +2,25 @@
 
 It interfaces with the REST interface of the server.
 It has a buffer for all data items that are used in the application.
+
+
+Copyright© 2024 Evert van de Waal
+
+This file is part of dsmgen.
+
+Dsmgen is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 3 of the License, or
+(at your option) any later version.
+
+Dsmgen is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with Foobar; if not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
 from enum import Enum, IntEnum, auto
 import json

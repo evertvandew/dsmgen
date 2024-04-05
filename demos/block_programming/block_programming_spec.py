@@ -98,6 +98,18 @@ class AsyncChannel:
     target: XRef('target', AsyncInput)
 
 
+@md.Port(parents=[SubProgram, SubProgramDefinition, BlockDefinition])
+class ConfigInput:
+    name: str
+
+@md.Port(parents=[SubProgram, SubProgramDefinition, BlockDefinition])
+class ConfigOutput:
+    name: str
+
+@md.Relationship(source=[ConfigOutput], target=[ConfigInput])
+class ConfigChannel:
+    pass
+
 ###############################################################################
 ## Definition of the actual program
 @md.BlockDiagram(Note, BlockInstance, SubProgram, styling='icon:image')
