@@ -5,9 +5,22 @@
 
 Currently, the model specification is written using regular Python syntax.
 The model_definition module provides the `ModelDefinition` class, which contains a number of "decorators"
-that are to be used to define the model.
+that are to be used to define the model. For example, to define a simple block, the following code can be used:
 
+```python
+@md.Entity(styling = "shape:rect;structure:Block;icon:square-full", parents=[Self, StructuralModel])
+class Block:
+    name: str
+    description: longstr
+```
 
+This snippet contains a lot of different bits of information:
+
+* Information used for *rendering* the block in both diagrams and the explorer list, in the `styling` field.
+* The `parents` field specifies of which entities it can be a child. 
+  This means "Block" is available in the right-click context menu of its parents in the explorer.
+* Additional attributes `name` and `description` are defined, which can be used to either better understand the model, or for use when
+  the model is used as an Domain Specific Language. DSLs are always processed to achieve some purpose.
 
 # Elements of a specification
 
@@ -51,6 +64,62 @@ The following constraints are used:
 * Each element that is represented in the navigator can optionally have a list of elements that can be its parent.
   This is used to fill the right-click menu with which new elements can be created in the navigator.
 
+## Overview
 
-# Editing a Diagram
+In the Class diagram below an overview is given of how the different elements of the modeling language relate to each other.
+These are conceptual only, nowhere in the software will you find an implementation of these classes.
+The code generation builds separate classes that satisfy the necessary interfaces.
+Also, the `parents` and `entities` constraints are only used at code-generation time, not at run-time.
+
+@startuml
+interface Explorable
+interface Drawable
+interface Connectable
+
+Explorable <-- ModelExplorer : hierarchy
+Explorable --> Explorable : parents
+
+Drawable <-- DiagramEditor : contents
+
+LogicalModel --|> Explorable
+
+Entity --|> Explorable
+Entity --|> Drawable
+Entity --|> Connectable
+
+BlockDiagram --|> Explorable
+BlockDiagram --> Entity : entities
+
+Port --|> Entity
+
+Relationship --> Connectable : source
+Relationship --> Connectable : target
+Relationship --|> Drawable
+
+CompoundEntity --|> Entity
+CompoundEntity --|> BlockDiagram
+
+BlockInstance --|> Entity
+BlockInstance --> Entity : definition
+
+package future_enhancements {
+  Message --|> Entity
+  Message --> Relationship : connection
+  
+  SuperEntity --|> Entity
+
+  LanedDiagram --|> BlockDiagram
+  PuzzleDiagram --|> BlockDiagram
+}
+
+@enduml
+
+
+Some notable details:
+* A port is just a regular Entity. The only difference between the two is how they are rendered in a diagram.
+* Relationships are not explorable. This may change in the future. 
+  In most UML tools, relationships *are* explorable, but I find that illogical.
+  Is a relationship represented with the source? The target? Both?
+  For example, in the explorer you would want to browse from source to target etc.
+  Perhaps a specific relationship explorer should be made, or a way to navigate from block to connected blocks.
 
