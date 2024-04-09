@@ -76,7 +76,7 @@ def split_styling(styling):
     """ Split the string used to define styling into a dictionary useful for lookup"""
     if not ':' in styling:
         return {}
-    return {k:v for k, v in [l.split(':') for l in styling.split(';')]}
+    return {k:v for k, v in [l.split(':') for l in styling.strip('; ').split(';')]}
 
 
 @dataclass

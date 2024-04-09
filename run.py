@@ -15,7 +15,7 @@ os.chdir(os.path.dirname(__file__)+'/public')
 class MyHandler(http.server.SimpleHTTPRequestHandler):
     doc_dir = home + '/diagrams'
     latest_file = home + '/diagrams/latest.txt'
-    generate_script = home + '/generate_code.py'
+    generate_script = home + '/generate_code'
     if not os.path.exists(doc_dir):
         os.mkdir(doc_dir)
 
