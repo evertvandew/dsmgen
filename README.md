@@ -1,7 +1,7 @@
 
 # Welcome to the Domain Specific Model Generator (dsmgen)
 
-![Example diagram][doc/example_diagram.png]
+![Example diagram](doc/example_diagram.png)
 
 Block diagrams have proven to be the most valuable tool for gaining insight and understanding
 in complex systems. They are the ubiquitous tools of software and systems engineers.
