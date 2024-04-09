@@ -206,7 +206,7 @@ class Circle(BasicShape):
     @classmethod
     def getShape(cls, details):
         return svg.circle(cx=str(details.x+details.width//2), cy=str(details.y+details.height//2),
-                        r=str((details.width+details.height)//4),
+                        r=str(min([details.width, details.height])//2),
                         stroke_width=cls.getStyle('bordersize', details),
                         stroke=cls.getStyle('bordercolor', details),
                         fill=cls.getStyle('blockcolor', details))
@@ -217,7 +217,7 @@ class Circle(BasicShape):
         stroke_width = cls.getStyle('bordersize', details)
         stroke = cls.getStyle('bordercolor', details)
         fill = cls.getStyle('blockcolor', details)
-        shape['style'] = f"stroke_width:{stroke_width}; stroke:{stroke}; fill:{fill}"
+        shape['style'] = f"stroke_width:{stroke_width};stroke:{stroke};fill:{fill}"
 
 class Square(BasicShape):
     style_items = {}
@@ -358,16 +358,16 @@ class ClosedCircle(Circle):
         Circle.updateShape(shape, details)
         stroke_width = cls.getStyle('bordersize', details)
         stroke = cls.getStyle('bordercolor', details)
-        shape['style'] = f"stroke_width:{stroke_width}; stroke:{stroke}; fill:{stroke}"
+        shape['style'] = f"stroke_width:{stroke_width};stroke:{stroke};fill:{stroke}"
 
 class RingedClosedCircle(BasicShape):
     style_items = {'space': '25'}
     @classmethod
     def getShape(cls, details):
-        r = (details.width + details.height) // 4
+        r = min([details.width, details.height]) // 2
         space = int(cls.getStyle('space', details)) * r // 100
         ball = ClosedCircle.getShape(details)
-        ball['r'] = r - space
+        ball['r'] = int(r - space)
         ring = Circle.getShape(details)
         ring['fill'] = 'none'
         g = svg.g()
@@ -380,7 +380,8 @@ class RingedClosedCircle(BasicShape):
         space = int(cls.getStyle('space', details)) * r // 100
         ClosedCircle.updateShape(shape.children[0], details)
         Circle.updateShape(shape.children[1], details)
-        shape.children[0]['r'] = r - space
+        shape.children[0]['r'] = int(r - space)
+        shape.children[1]['fill'] = 'none'
 
 class Bar(Rect):
     style_items = {'blockcolor': 'black'}

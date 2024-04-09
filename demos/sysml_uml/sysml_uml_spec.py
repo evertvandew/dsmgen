@@ -193,7 +193,7 @@ class State:
     name: str
     description: longstr
 
-@md.Entity(styling="shape:ringedclosedcircle", parents=[Class, Block, Self, UseCase])
+@md.Entity(styling="shape:ringedclosedcircle;blockcolor:none", parents=[Class, Block, Self, UseCase])
 class EndState:
     name: str
     description: longstr
@@ -209,7 +209,7 @@ class Transition:
     target: XRef('to', State, EndState, hidden)
     name: str
 
-@md.BlockDiagram(State, Note, Constraint, Actor, styling='icon:image', parents=[FunctionalModel, Class, Block, Self, UseCase, Package])
+@md.BlockDiagram(State, StartState, EndState, Note, Constraint, styling='icon:image', parents=[FunctionalModel, Class, Block, Self, UseCase, Package])
 class UseCaseDiagram:
     name: str
 
