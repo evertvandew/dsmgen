@@ -15,7 +15,7 @@ To use it, first define a description of the model structure.
 Then, this specification will be used to generate a database for storing the model with an REST API for accessing it,
 and a web-client for editing the model.
 
-![Basic workflow][doc/usage.png]
+![Basic workflow](doc/usage.png)
 
 # Quickstart
 For the curious / impatient, a number of demos have been created with predefined model specifications ready to run.
