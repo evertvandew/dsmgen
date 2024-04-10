@@ -114,7 +114,6 @@ def make_explorer(holder, api: DataStore, allowed_children):
             ev.preventDefault()
             document[context_menu_name].close()
             d = Dialog(f'Delete {type(data_element).__name__}', ok_cancel=True)
-            _ = d.panel <= f'Delete {type(data_element).__name__} "{data_element.name}"'
 
             @bind(d.ok_button, "click")
             def ok(ev):
