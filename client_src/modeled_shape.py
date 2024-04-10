@@ -144,9 +144,9 @@ class ModeledShape(Shape, ModelRepresentation):
 
     def getDefaultStyle(self):
         style = {}
-        style.update(self.model_entity.getDefaultStyle())
         style.update(self.TextWidget.getDefaultStyle())
-        style.update(self.default_style.copy())
+        style.update(self.default_style)
+        style.update(self.model_entity.getDefaultStyle())
         return style
 
     @classmethod

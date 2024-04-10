@@ -114,7 +114,12 @@ class FlowPortConnection:
 @md.BlockInstance(parents=[Any], definitions=[SubProgramDefinition])
 class BlockInstance: pass
 
-@md.BlockDiagram(Block, Note, Constraint, BlockInstance, styling='icon:image')
+@md.Entity(styling="shape:ringedclosedcircle", parents=[Block])
+class EndState:
+    name: str
+    description: longstr
+
+@md.BlockDiagram(Block, Note, Constraint, BlockInstance, EndState, styling='icon:image')
 class BlockDefinitionDiagram:
     parent: XRef('children', Block, StructuralModel, hidden)
     name: str

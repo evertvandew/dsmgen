@@ -108,12 +108,13 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     ${key}: ${generator.get_html_type(type_)} = ${default}
     % endfor
 
-    default_styling = ${repr(generator.styling[entity.__name__])}
     % if generator.md.is_relationship(entity):
-    default_styling.update(shapes.Relationship.getDefaultStyle())
+    default_styling = shapes.Relationship.getDefaultStyle().copy()
     % else:
-    default_styling.update(shapes.BasicShape.getDescriptor("${base_shape_name}").getDefaultStyle())
+    default_styling = shapes.BasicShape.getDescriptor("${base_shape_name}").getDefaultStyle().copy()
     % endif
+    default_styling.update(${repr(generator.styling[entity.__name__])})
+
 
     def __eq__(self, other) -> bool:
         if type(self) != type(other):

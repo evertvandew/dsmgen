@@ -937,24 +937,7 @@ def simulated_diagram_tests():
 
     @test
     def load_test_diagrams():
-        resp = [{"Id": 0, "diagram": 4, "block": 7, "parent": None, "x": 110.0, "y": 393.0, "z": 0.0, "width": 64.0,
-          "height": 40.0, "order": 0, "orientation": None, "styling": "", "category": None,
-          "_entity": {"order": 0, "Id": 7, "description": "Dit is een test", "parent": 4, "__classname__": "Note"},
-          "__classname__": "_BlockRepresentation"},
-         {"Id": 1, "diagram": 4, "block": 5, "parent": None, "x": 188.0, "y": 106.0, "z": 0.0, "width": 64.0,
-          "height": 40.0, "order": None, "orientation": None, "styling": "", "category": 2,
-          "_entity": {"order": 0, "parameters": {"parameters": {}}, "Id": 5, "parent": 4, "definition": 3,
-                      "__classname__": "BlockInstance"},
-          "_definition": {"order": 0, "Id": 3, "parent": 1, "name": "test_block", "implementation": "",
-                          "parameters": "{}", "__classname__": "BlockDefinition"},
-          "__classname__": "_BlockRepresentation"},
-         {"Id": 2, "diagram": 4, "block": 6, "parent": None, "x": 309.0, "y": 104.0, "z": 0.0, "width": 64.0,
-          "height": 40.0, "order": None, "orientation": None, "styling": "", "category": 2,
-          "_entity": {"order": 0, "Id": 6, "name": "subprog", "description": "", "parameters": "", "parent": 4,
-                      "__classname__": "SubProgram"}, "__classname__": "_BlockRepresentation"}]
-
         nonlocal d
-        import public.sysml_client as client
         ds = mk_ds()
 
         add_expected_response('/data/diagram_contents/4', 'get', Response(
@@ -1517,9 +1500,29 @@ def integration_tests():
         context.diagrams.drag_relation_handle(1, (100,0))
         check_expected_response()
 
+    @test
+    def test_RingedClosedCircle():
+        """ The styling of the shape "test_RingedClosedCircle" was troublesome, thus this specific test.
+            Its fill color switched from 'none' to the default yellow when dragged.
+        """
+        context = IntegrationContext(hierarchy=[client.BlockDefinitionDiagram(Id=3).asdict()])
+        add_expected_response('/data/diagram_contents/3', 'get', Response(
+            200,
+            json=[]))
+        context.explorer.dblclick_element(mid=3)
+        context.diagrams.create_block(client.EndState)
+        block = context.diagrams.blocks()[0]
+        assert block.getStyle('blockcolor') == '#ffffff'
+        assert block.shape.children[0].children[1].attrs['fill'] == 'none'
+
+        # Now move the block, and check the details are the same.
+        context.diagrams.move_block(rid=1, cood=(100, 100))
+        assert block.getStyle('blockcolor') == '#ffffff'
+        assert block.shape.children[0].children[1].attrs['fill'] == 'none'
+
 
 if __name__ == '__main__':
     #import cProfile
-    run_tests('*.add_relationship')
+    run_tests('*.test_RingedClosedCircle')
     run_tests()
     #cProfile.run('run_tests()', sort='tottime')

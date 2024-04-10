@@ -193,7 +193,7 @@ class State:
     name: str
     description: longstr
 
-@md.Entity(styling="shape:ringedclosedcircle;blockcolor:none", parents=[Class, Block, Self, UseCase])
+@md.Entity(styling="shape:ringedclosedcircle", parents=[Class, Block, Self, UseCase])
 class EndState:
     name: str
     description: longstr

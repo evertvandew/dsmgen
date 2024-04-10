@@ -360,16 +360,28 @@ class ClosedCircle(Circle):
         stroke = cls.getStyle('bordercolor', details)
         shape['style'] = f"stroke_width:{stroke_width};stroke:{stroke};fill:{stroke}"
 
+class TransparentCircle(Circle):
+    @classmethod
+    def getShape(cls, details):
+        shape = Circle.getShape(details)
+        shape['fill'] = 'none'
+        return shape
+    @classmethod
+    def updateShape(cls, shape, details):
+        Circle.updateShape(shape, details)
+        stroke_width = cls.getStyle('bordersize', details)
+        stroke = cls.getStyle('bordercolor', details)
+        shape['style'] = f"stroke_width:{stroke_width};stroke:{stroke};fill:none"
+
 class RingedClosedCircle(BasicShape):
-    style_items = {'space': '25'}
+    style_items = {'space': '25', 'blockcolor': 'none'}
     @classmethod
     def getShape(cls, details):
         r = min([details.width, details.height]) // 2
         space = int(cls.getStyle('space', details)) * r // 100
         ball = ClosedCircle.getShape(details)
         ball['r'] = int(r - space)
-        ring = Circle.getShape(details)
-        ring['fill'] = 'none'
+        ring = TransparentCircle.getShape(details)
         g = svg.g()
         g <= ball
         g <= ring
@@ -379,9 +391,8 @@ class RingedClosedCircle(BasicShape):
         r = (details.width + details.height) // 4
         space = int(cls.getStyle('space', details)) * r // 100
         ClosedCircle.updateShape(shape.children[0], details)
-        Circle.updateShape(shape.children[1], details)
+        TransparentCircle.updateShape(shape.children[1], details)
         shape.children[0]['r'] = int(r - space)
-        shape.children[1]['fill'] = 'none'
 
 class Bar(Rect):
     style_items = {'blockcolor': 'black'}
