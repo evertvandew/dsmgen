@@ -26,15 +26,13 @@ import json
 
 from property_editor import dataClassEditorForm, getFormValues
 from modeled_shape import ModelEntity, ModelRepresentation
+from context_menu import context_menu_name, mk_context_menu
 
 line_cls = 'eline'
 name_cls = 'ename'
 
 
 class Element: pass
-
-
-context_menu_name = 'ContextMenu'
 
 def toggle_caret(ev):
     ev.stopPropagation()
@@ -110,11 +108,7 @@ def make_explorer(holder, api: DataStore, allowed_children):
                 api.get_hierarchy(start)
 
         def on_delete(ev):
-            ev.stopPropagation()
-            ev.preventDefault()
-            document[context_menu_name].close()
             d = Dialog(f'Delete {type(data_element).__name__}', ok_cancel=True)
-
             @bind(d.ok_button, "click")
             def ok(ev):
                 result = api.delete(data_element)
@@ -125,9 +119,6 @@ def make_explorer(holder, api: DataStore, allowed_children):
                     msg = InfoDialog('Failure', f'Could not delete "{data_element.name}"', ok='Close')
 
         def on_rename(ev):
-            ev.stopPropagation()
-            ev.preventDefault()
-            document[context_menu_name].close()
             d = EntryDialog(f'Rename {type(data_element).__name__}', 'new name:')
 
             @bind(d, "entry")
@@ -140,9 +131,6 @@ def make_explorer(holder, api: DataStore, allowed_children):
                 d.close()
 
         def on_add(ev, etype: Type[ModelEntity], parent):
-            ev.stopPropagation()
-            ev.preventDefault()
-            document[context_menu_name].close()
             default_obj = etype()
             d = Dialog(f'Add {etype.__name__}', ok_cancel=True)
             parameters = default_obj.get_editable_parameters()
@@ -155,32 +143,21 @@ def make_explorer(holder, api: DataStore, allowed_children):
                 api.add(new_object)
                 d.close()
 
-        def mk_menu_item(text, action):
-            item = html.LI(text)
-            item.bind('click', action)
-            return item
-
         def bind_add_action(item):
-            return mk_menu_item(item.__name__, lambda ev: on_add(ev, item, data_element.Id))
+            return item.__name__, lambda ev: on_add(ev, item, data_element.Id)
 
         @bind(html_element, 'contextmenu')
         def contextfunc(ev):
-            create = allowed_children[type(data_element)]
             ev.stopPropagation()
             ev.preventDefault()
-            createmenu = html.LI('Create')
-            _ =createmenu <= html.UL([bind_add_action(t) for t in create])
-            menu = html.UL(Class='contextmenu')
-            _ = menu <= createmenu
-            _ = menu <= html.HR()
-            _ = menu <= mk_menu_item('Rename', on_rename)
-            _ = menu <= html.HR()
-            _ = menu <= mk_menu_item('Remove', on_delete)
-            #d = Dialog("", ok_cancel=True)
-            if context_menu_name in document:
-                del document[context_menu_name]
-            d = html.DIALOG(id=context_menu_name)
-            _ = d <= menu
+
+            create = allowed_children[type(data_element)]
+
+            d = mk_context_menu(
+                create=dict(bind_add_action(c) for c in create),
+                rename=on_rename,
+                remove=on_delete
+            )
             _ = html_element <= d
             d.showModal()
 
