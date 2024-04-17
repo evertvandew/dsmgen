@@ -22,14 +22,12 @@ from browser.widgets.dialog import Dialog, EntryDialog, InfoDialog
 import enum
 import diagrams
 from dataclasses import fields, MISSING, dataclass, Field
-from typing import Hashable, Dict, Any, List, Optional
+from typing import Hashable, Dict, Any, List, Optional, Type, Callable
 import json
 from svg_shapes import HAlign, VAlign
-from shapes import HIDDEN
+from model_interface import ModelEntity, EditableParameterDetails
+from shapes import HIDDEN, Stylable
 from data_store import DataStore, ExtendibleJsonEncoder, parameter_spec, parameter_values
-from modeled_shape import ModeledShape, ModeledShapeAndPorts, ModelEntity, EditableParameterDetails, ModelRepresentation
-
-#diagrams.createDiagram("canvas");
 
 
 class longstr(str): pass
@@ -305,7 +303,7 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
     return div
 
 
-def dataClassEditorForm(o: ModelEntity, editable_fields: List[EditableParameterDetails], data_store: DataStore):
+def dataClassEditorForm(o: ModelEntity, editable_fields: List[EditableParameterDetails], data_store: DataStore=None):
     """ Return a form for editing the values in a data object, without buttons. """
     # Use the annotations to create the properties editor
     form = html.FORM()
@@ -318,12 +316,12 @@ def dataClassEditorForm(o: ModelEntity, editable_fields: List[EditableParameterD
         _ = form <= html.BR()
 
     port_types = o.get_allowed_ports() if o else []
-    if port_types:
+    if port_types and data_store:
         f = [f for f in fields(o) if f.name == 'ports'][0]
         _ = form <= createPortEditor(o, f, port_types, data_store)
     return form
 
-def stylingEditorForm(o: ModeledShape):
+def stylingEditorForm(o: Stylable):
     # Add an editor for style elements
     form = html.FORM()
     if isStylable(o):
@@ -338,7 +336,7 @@ def stylingEditorForm(o: ModeledShape):
     return form
 
 def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[EditableParameterDetails],
-                  repr: Optional[ModeledShape]=None):
+                  repr: Optional[Stylable]=None):
     """ Returns a dictionary with the current values in the form edits. """
     update_data = {}
     for field in editable_fields:
@@ -357,7 +355,7 @@ def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[Editable
 # Add the logic to edit parameters
 # When a block is selected, the canvas throws an event with the details
 def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameterDetails], data_store: DataStore,
-                    repr: Optional[ModeledShape]=None, update=None):
+                    repr: Optional[Stylable]=None, update=None):
     """ Create a detail-editor, with a save button for the user to click..
         o: Optional object with the current values of the fields.
         parameters: List of descriptors of all the fields.
@@ -379,3 +377,15 @@ def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameter
     b.className = "btn btn-primary"
     b.bind("click", onSave)
     return form, b
+
+
+def getDetailsPopup(cls: Type[ModelEntity], cb: Callable):
+    default_obj = cls()
+    d = Dialog(f'Add {cls.__name__}', ok_cancel=True)
+    parameters = default_obj.get_editable_parameters()
+    _ = d.panel <= dataClassEditorForm(None, parameters)
+
+    @bind(d.ok_button, 'click')
+    def on_ok(ev):
+        cb(getFormValues(d.panel, cls, parameters))
+        d.close()

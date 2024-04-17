@@ -43,7 +43,7 @@ class RepresentableElement: pass
 class DiagramElement: pass
 class PortElement: pass
 class InstanceOf: pass
-
+class MessageElement: pass
 
 class LaneDirection(IntEnum):
     Up    =auto(),
@@ -142,6 +142,8 @@ class ModelDefinition:
         return InstanceOf in cls.categories
     def is_explorable(self, cls):
         return ExplorableElement in cls.categories
+    def is_message(self, cls):
+        return MessageElement in cls.categories
 
 
     def get_conversions(self, cls: Any) -> Optional[TypeConversion]:
@@ -239,6 +241,20 @@ class ModelDefinition:
             if parents or 'parent' not in cls.__annotations__:
                 cls.__annotations__['parent'] = XRef('children', *parents, hidden)
             cls = dataclass(cls)
+            self.model_elements.append(cls)
+            self.styling_definition[cls.__name__] = split_styling(styling)
+            return cls
+        return decorate
+
+    def Message(self, targets=None, parents=None, styling=''):
+        def decorate(cls):
+            nonlocal parents
+            cls.categories = [RepresentableElement, MessageElement, ExplorableElement]
+            parents = parents or []
+            if parents or 'parent' not in cls.__annotations__:
+                cls.__annotations__['parent'] = XRef('children', *parents, hidden)
+            cls = dataclass(cls)
+            cls.targets = targets
             self.model_elements.append(cls)
             self.styling_definition[cls.__name__] = split_styling(styling)
             return cls

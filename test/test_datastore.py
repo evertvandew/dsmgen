@@ -360,5 +360,5 @@ def data_store_tests():
         check_expected_response()
 
 if __name__ == '__main__':
-    run_tests('*.add_repr_new_repr')
+    run_tests('*.test_get_diagram')
     run_tests()

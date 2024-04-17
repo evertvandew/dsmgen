@@ -19,9 +19,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
 
 import enum
+from typing import List, Tuple
+from collections.abc import Generator
+import math
+from itertools import chain
+from copy import copy
 from browser import svg, console
 from fontsizes import font_sizes
-from itertools import chain
 from square_routing import Point, routeSquare
 
 try:
@@ -568,62 +572,113 @@ class Label(Note):
             (0, details.height),
             (0,0)]]
 
+def path_parser(d:str) -> Generator[(str, List[float])]:
+    """ Split a path into its mnemonics + arguments """
+    parts = [p if ',' not in p else [float(f) for f in p.split(',')] for p in d.split()]
+
+    it = iter(parts)
+    last_mnemonic = None
+    try:
+        while True:
+            arguments = []
+            # Get the mnemonic
+            p = next(it)
+            if isinstance(p, str):
+                last_mnemonic = p
+            elif isinstance(p, list):
+                arguments.extend(p)
+            else:
+                arguments.append(p)
+            required_arguments = {'m': 2, 'l': 2, 'h': 1, 'v': 1, 'c': 6, 'q': 4, 'z': 0}[last_mnemonic.lower()]
+            while len(arguments) < required_arguments:
+                a = next(it)
+                if isinstance(a, list):
+                    arguments.extend(a)
+                else:
+                    arguments.append(float(a))
+            yield (last_mnemonic, arguments)
+    except StopIteration:
+        return
+
+def absposes(d: str) -> Generator[Point]:
+    """ Generate a list of all point & control points for a path, in absolute positions. """
+    position = None
+    for command, coods in path_parser(d):
+        match command:
+            case 'M' | 'L' | 'C' | 'Q':
+                results = [Point(*c) for c in zip(coods[0:2:], coods[1:2:])]
+                yield from results
+                position = results[-1]
+            case 'm' | 'l' | 'c' | 'q':
+                assert position
+                results = [position+Point(*c) for c in zip(coods[0:2:], coods[1:2:])]
+                yield from results
+                position = results[-1]
+            case 'V':
+                position = Point(position.x, coods[0])
+                yield position
+            case 'v':
+                position = Point(position.x, position.y+coods[0])
+                yield position
+            case 'H':
+                position = Point(coods[0], position.y)
+                yield position
+            case 'h':
+                position = Point(coods[0] + position.x, position.y)
+                yield position
+
+
+def path_origin(d: str) -> Tuple[Point, float]:
+    """ Determine the first point of a path and the direction it takes from there, in radians. """
+    it = absposes(d)
+    first = next(it)
+    second = next(it)
+    direction = math.atan2(second.y - first.y, second.x - first.x)
+    return first, direction
+
+def path_ending(d: str) -> Tuple[Point, float]:
+    """ Determine the first point of a path and the direction it takes from there, in radians. """
+    all_poses = absposes(d)
+    first = all_poses[-1]
+    second = all_poses[-2]
+    direction = math.atan2(second.y - first.y, second.x - first.x)
+    return first, direction
 
 def normalize_path(d: str):
-    parts = [p if ',' not in p else [float(f) for f in p.split(',')] for p in d.split()]
-    # Make the path relative
+    # Make the path relative, except the first bit, which should be an M mnemonic.
+    it = path_parser(d)
     relative_parts = []
-    assert parts[0] == 'M'
-    position = parts[1]
+    initial = next(it)
+    assert initial[0] == 'M'
+    position = initial[1]
     count = 0
     command = None
-    relative_parts.extend(parts[:2])
-    min_pos = parts[1]
-    max_pos = parts[1]
-    for p in parts[2:]:
-        if isinstance(p, str):
-            command = p
-            relative_parts.append(p.lower())
-            count = 0
-            continue
+    relative_parts.extend(['M', copy(position)])
+    min_pos = copy(position)
+    max_pos = copy(position)
+    for p in it:
+        command, coods = p
+        relative_parts.append(command.lower())
         if command == 'C':
-            match count:
-                case 0: # First control point
-                    relative_parts.append([p[0] - position[0], p[1] - position[1]])
-                    count = 1
-                case 1: # Second control point
-                    relative_parts.append([p[0] - position[0], p[1] - position[1]])
-                    count = 2
-                case 2: # Endpoint
-                    relative_parts.append([p[0] - position[0], p[1] - position[1]])
-                    position = p
-                    count = 0   # In case we have a poly-bezier path here.
+            relative_parts.extend([[c[0] - position[0], c[1] - position[1]] for c in zip(coods[0::2], coods[1::2])])
+            position = [coods[4], coods[5]]
         if command == 'c':
-            match count:
-                case 0: # First control point
-                    relative_parts.append(p)
-                    count = 1
-                case 1: # Second control point
-                    relative_parts.append(p)
-                    count = 2
-                case 2: # Endpoint
-                    relative_parts.append(p)
-                    position = [p[0] + position[0], p[1] + position[1]]
-                    count = 0   # In case we have a multi-bezier path here.
+            relative_parts.extend(list(zip(coods[0::2], coods[1::2])))
+            position = [coods[4] + position[0], coods[5] + position[1]]
         if command in 'ML':
-            relative_parts.append([p[0] - position[0], p[1] - position[1]])
-            position = p
+            relative_parts.append([coods[0] - position[0], coods[1] - position[1]])
+            position = coods
         if command == 'ml':
-            relative_parts.append(p)
-            position = [p[0] + position[0], p[1] + position[1]]
+            relative_parts.append(coods)
+            position = [coods[0] + position[0], coods[1] + position[1]]
         if command in 'HV':
             hv = 0 if command.lower() == 'h' else 1
-            relative_parts.append(float(p) - position[hv])
-            position = [p if i==hv else f for i,f in enumerate(position)]
+            relative_parts.append(float(coods[0]) - position[hv])
+            position = [coods[0] if i==hv else f for i,f in enumerate(position)]
         if command == 'hv':
             hv = 0 if command.lower() == 'h' else 1
-            relative_parts.append(float(p))
-            position = [p+f if i==hv else f for i,f in enumerate(position)]
+            relative_parts.append(float(coods[0]))
+            position = [coods[0]+f if i==hv else f for i,f in enumerate(position)]
         min_pos = [a if a < b else b for a, b in zip(position, min_pos)]
         max_pos = [a if a > b else b for a, b in zip(position, max_pos)]
 
@@ -738,6 +793,3 @@ def pointer_icon(x, y, s, stroke='#000000', fill='#ffffff'):
     points = [(s*(i+5)/15+x, s*j/15+y+s/2) for i, j in points]
     points = ', '.join(f'{i} {j}' for i, j in points)
     return svg.polygon(points=points, stroke='black')
-
-
-

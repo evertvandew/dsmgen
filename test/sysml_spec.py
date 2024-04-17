@@ -119,10 +119,18 @@ class EndState:
     name: str
     description: longstr
 
+@md.Message(targets=[BlockReference], parents=[Block])
+class ClassMessage:
+    name: str
+    kind: selection('function event message create destroy')
+    arguments: str
+    description: longstr
+
 @md.BlockDiagram(Block, Note, Constraint, BlockInstance, EndState, styling='icon:image')
 class BlockDefinitionDiagram:
     parent: XRef('children', Block, StructuralModel, hidden)
     name: str
+
 
 ###############################################################################
 ## Entities for requirements

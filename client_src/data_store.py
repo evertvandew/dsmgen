@@ -26,84 +26,12 @@ from enum import Enum, IntEnum, auto
 import json
 from copy import deepcopy, copy
 from dataclasses import dataclass, is_dataclass, asdict, fields, field, Field
-from typing import Dict, Callable, List, Any, Iterable, Tuple, Optional, Self
+from typing import Dict, Callable, List, Any, Iterable, Tuple, Optional, Type
 from dispatcher import EventDispatcher
 from math import inf         # Used when evaluating waypoint strings
 from contextlib import contextmanager
-
+from storable_element import StorableElement, Collection, ReprCategory
 from browser import ajax, console, alert
-
-class Collection(Enum):
-    hierarchy = 'hierarchy'
-    block = 'block'
-    relation = 'relation'
-    block_repr = 'block_repr'
-    relation_repr = 'relation_repr'
-    not_storable = ''
-
-    @classmethod
-    def representations(cls):
-        return [cls.block_repr, cls.relation_repr]
-
-    @classmethod
-    def oppose(cls, c):
-        """ Find the representation collection for a model collection, and the reverse. """
-        return {
-            cls.block: cls.block_repr,
-            cls.block_repr: cls.block,
-            cls.relation: cls.relation_repr,
-            cls.relation_repr: cls.relation,
-        }[c]
-
-class ReprCategory(IntEnum):
-    no_repr = auto()
-    block = auto()
-    port = auto()
-    relationship = auto()
-    message = auto()
-
-
-def from_dict(cls, **details) -> Self:
-    """ Construct an instance of this class from a dictionary of key:value pairs. """
-    # Use only elements accepted by this dataclass.
-    keys = [f.name for f in fields(cls)]
-    kwargs = {k:v for k, v in details.items() if k in keys}
-    return cls(**kwargs)
-
-@dataclass
-class StorableElement:
-    Id: int = 0
-    @classmethod
-    def get_collection(cls) -> Collection:
-        raise NotImplementedError()
-    @classmethod
-    def from_dict(cls, data_store: "DataStore", **details) -> Self:
-        """ Construct an instance of this class from a dictionary of key:value pairs. """
-        return from_dict(cls, **details)
-    @classmethod
-    def fields(cls) -> Tuple[Field, ...]:
-        """ Return the dataclasses.Field instances for each element that needs to be stored in the DB """
-        # The default implementation uses dataclasses.fields
-        return fields(cls)
-    def asdict(self, ignore: List[str]=None) -> Dict[str, Any]:
-        ignore = ignore or []   # Use a safe default value for the ignore argument
-        keys = [f.name for f in fields(self) if f.name not in ignore]
-        result = {k: self.__dict__[k] for k in keys}
-        result['__classname__'] = type(self).__name__
-        return result
-
-    @classmethod
-    def repr_category(cls) -> ReprCategory:
-        return ReprCategory.no_repr
-
-    @classmethod
-    def is_instance_of(cls) -> bool:
-        return False
-
-    def copy(self) -> Self:
-        # Create a deep copy from the persistent fields for this data structure.
-        return from_dict(type(self), **deepcopy(self.asdict()))
-
 
 class parameter_spec(str):
     """ A parameter spec is represented in the REST api as a string with this structure:
@@ -182,10 +110,6 @@ class DataStore(EventDispatcher):
         self.shadow_copy: Dict[Collection, Dict[int: StorableElement]] = {k: {} for k in Collection}
         self.live_instances: Dict[Collection, Dict[int: StorableElement]] = {k: {} for k in Collection}
         self.all_classes: Dict[str, Type[StorableElement]] = configuration.all_classes
-        self.repr_collection_urls = {
-            Collection.relation_repr: '_RelationshipRepresentation',
-            Collection.block_repr: '_BlockRepresentation',
-        }
 
     @contextmanager
     def transaction(self):
@@ -211,11 +135,8 @@ class DataStore(EventDispatcher):
     def add(self, record: StorableElement) -> StorableElement:
         """ Persist a new element """
         collection = record.get_collection()
-        if collection in Collection.representations():
-            # Representations are to be broken up into two objects:
-            # Pure representation details, and the underlying model item
-            assert record.diagram
-            repr, model = self.split_representation_item(collection, record)
+        # Representations also have a record with model details that may or may not already exist.
+        if model := record.get_model_details():
             # Check if this is a new model item (they can be created inside a diagram)
             if not model.Id:
                 # Insert this model item as a child of the diagram (diagrams are also folders in the explorer).
@@ -223,14 +144,6 @@ class DataStore(EventDispatcher):
                     model.parent = record.diagram
                 # Add the model item
                 self.add(model)
-                # Take out the new Id of the model item
-                if collection == Collection.block_repr:
-                    record.block = model.Id
-                    repr['block'] = model.Id
-                else:
-                    record.relationship = model.Id
-                    repr['relationship'] = model.Id
-            collection_url = self.repr_collection_urls[collection]
 
             def on_complete(update: JsonResponse):
                 if update.status > 299:
@@ -240,8 +153,8 @@ class DataStore(EventDispatcher):
                     record.Id = update.json['Id']
                     assert self.update_cache(record) is record
 
-            data = json.dumps(repr, cls=ExtendibleJsonEncoder)
-            ajax.post(f'{self.configuration.base_url}/{collection_url}', blocking=True, data=data,
+            data = json.dumps(record, cls=ExtendibleJsonEncoder)
+            ajax.post(f'{self.configuration.base_url}/{record.get_db_table()}', blocking=True, data=data,
                       oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
             self.add_data(record)
             # For ports, also update the ports collections in the parent block.
@@ -258,7 +171,7 @@ class DataStore(EventDispatcher):
                 if update.status < 300:
                     record.Id = update.json['Id']
                     assert self.update_cache(record) is record
-            ajax.post(f'/data/{type(record).__name__}', blocking=True, data=data, oncomplete=on_complete,
+            ajax.post(f'/data/{record.get_db_table()}', blocking=True, data=data, oncomplete=on_complete,
                       mode='json', headers={"Content-Type": "application/json"})
             if record.Id < 1:
                 raise RuntimeError("Could not add record")
@@ -279,20 +192,19 @@ class DataStore(EventDispatcher):
             if update.status < 300:
                 assert self.update_cache(record) is record
 
-        if collection in Collection.representations():
+        if model := record.get_model_details():
             # A representation is a merging of two separate entities. Treat them separately.
-            repr, model = self.split_representation_item(collection, record)
             org_repr = self.shadow_copy[collection][record.Id]
             org_model = self.shadow_copy[Collection.oppose(collection)][model.Id]
             if model != org_model:
                 self.update(model)
+            repr = record.asdict()
             changed = any(getattr(org_repr, k) != v for k, v in repr.items() if hasattr(org_repr, k) and k not in ['ports', 'model_entity'])
             if collection == Collection.relation_repr:
                 changed = changed or org_repr.waypoints != record.waypoints
             if changed:
-                url = self.repr_collection_urls[collection]
                 data = json.dumps(repr, cls=ExtendibleJsonEncoder)
-                ajax.post(f'{self.configuration.base_url}/{url}/{record.Id}', blocking=True, data=data,
+                ajax.post(f'{self.configuration.base_url}/{record.get_db_table()}/{record.Id}', blocking=True, data=data,
                           oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
                 self.update_data(repr)
 
@@ -301,7 +213,7 @@ class DataStore(EventDispatcher):
             original = self.shadow_copy[collection][record.Id]
             if record != original:
                 data = json.dumps(record, cls=ExtendibleJsonEncoder)
-                ajax.post(f'{self.configuration.base_url}/{type(record).__name__}/{record.Id}', blocking=True,
+                ajax.post(f'{self.configuration.base_url}/{record.get_db_table()}/{record.Id}', blocking=True,
                           data=data, oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
                 self.update_data(record)
 
@@ -333,9 +245,7 @@ class DataStore(EventDispatcher):
                 del self.shadow_copy[collection][record.Id]
                 del self.live_instances[collection][record.Id]
                 result = True
-        url = type(record).__name__ if collection not in Collection.representations() else \
-            self.repr_collection_urls[collection]
-        ajax.delete(f'{self.configuration.base_url}/{url}/{record.Id}', blocking=True, oncomplete=on_complete)
+        ajax.delete(f'{self.configuration.base_url}/{record.get_db_table()}/{record.Id}', blocking=True, oncomplete=on_complete)
         self.delete_data(record)
         return result
 

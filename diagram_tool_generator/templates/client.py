@@ -51,7 +51,8 @@ import modeled_shape as ms
 import diagrams
 import shapes
 from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, parameter_values, stylingEditorForm, parameter_types
-from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder, Collection, StorableElement, from_dict
+from storable_element import Collection, StorableElement, from_dict
+from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder
 from svg_shapes import getMarkerDefinitions
 from tab_view import TabView
 from point import load_waypoints
@@ -161,6 +162,8 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     def get_collection(cls) -> Collection:
     %if generator.md.is_relationship(entity):
         return Collection.relation
+    %elif generator.md.is_message(entity):
+        return Collection.message
     %elif generator.md.is_representable(entity):
         return Collection.block
     %elif generator.md.is_explorable(entity):
@@ -171,7 +174,7 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
     %if generator.md.is_representable(entity):
     @classmethod
-    def get_representation_cls(cls, category: ms.ReprCategory) -> Optional[Union[ms.ModeledShape, ms.ModeledShapeAndPorts, ms.Port, ms.ModeledRelationship]]:
+    def get_representation_cls(cls, category: ms.ReprCategory) -> Optional[Union[ms.ModeledShape, ms.ModeledShapeAndPorts, ms.Port, ms.ModeledRelationship, ms.Message]]:
     %if generator.md.is_relationship(entity):
         if category == ms.ReprCategory.relationship:
             return ms.ModeledRelationship
@@ -183,6 +186,9 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     %elif generator.get_allowed_ports().get(entity.__name__, []) or generator.md.is_instance_of(entity):
         if category == ms.ReprCategory.block:
             return ms.ModeledShapeAndPorts
+    %elif generator.md.is_message(entity):
+        if category == ms.ReprCategory.message:
+            return ms.Message
     %else:
         if category == ms.ReprCategory.block:
             return ms.ModeledShape
@@ -250,6 +256,10 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         details['definition'] = self.definition.Id
     % endif
         return details
+
+    @staticmethod
+    def get_messages():
+        return ${generator.get_messages(entity)}
 
     % if generator.md.is_relationship(entity):
     @classmethod

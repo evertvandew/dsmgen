@@ -24,7 +24,7 @@ from typing import Type
 from data_store import DataStore, ExtendibleJsonEncoder, StorableElement
 import json
 
-from property_editor import dataClassEditorForm, getFormValues
+from property_editor import getDetailsPopup
 from modeled_shape import ModelEntity, ModelRepresentation
 from context_menu import context_menu_name, mk_context_menu
 
@@ -130,19 +130,11 @@ def make_explorer(holder, api: DataStore, allowed_children):
                     span.html = format_name(data)
                 d.close()
 
-        def on_add(ev, etype: Type[ModelEntity], parent):
-            default_obj = etype()
-            d = Dialog(f'Add {etype.__name__}', ok_cancel=True)
-            parameters = default_obj.get_editable_parameters()
-            _ = d.panel <= dataClassEditorForm(None, parameters, api)
-
-            @bind(d.ok_button, 'click')
-            def on_ok(ev):
-                data = getFormValues(d.panel, etype, parameters)
-                new_object = etype(parent=parent, **data)
+        def on_add(ev, cls: Type[ModelEntity], parent):
+            def callback(data):
+                new_object = cls(parent=parent, **data)
                 api.add(new_object)
-                d.close()
-
+            getDetailsPopup(cls, callback)
         def bind_add_action(item):
             return item.__name__, lambda ev: on_add(ev, item, data_element.Id)
 
@@ -199,7 +191,7 @@ def make_explorer(holder, api: DataStore, allowed_children):
         """ Add new elements to the explorer as the user creates them in diagrams or the property editor.
         """
         # Exclude representation records and records without a `parent` field.
-        if isinstance(source, ModelRepresentation) or not hasattr(source, 'parent'):
+        if isinstance(source, ModelRepresentation) or not hasattr(source, 'parent') or not source.parent:
             return
         assert source.Id
         # Exclude records that are already in the hierarchy
@@ -207,7 +199,10 @@ def make_explorer(holder, api: DataStore, allowed_children):
             return
         # Find the insertion point for the new record
         if source.parent:
-            parent = holder.select_one(f'[data-modelid="{source.parent}"]').parent.parent
+            model_parent_tag = holder.select_one(f'[data-modelid="{source.parent}"]')
+            if not model_parent_tag:
+                return
+            parent = model_parent_tag.parent.parent
         else:
             parent = holder
         # Add the new element

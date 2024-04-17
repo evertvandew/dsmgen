@@ -230,6 +230,11 @@ package inner_diagram {
 
 @enduml
 
+## Messages
+
+Messages are modeled as normal blocks. Their representations are connected to relationships in "Communication Diagrams"
+or between instances in "Sequence Diagrams".
+
 # Design choices
 * For now, CompoundEntities only have BlockDiagram inner diagrams, not laned diagrams.
 

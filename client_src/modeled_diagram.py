@@ -48,7 +48,7 @@ class ModeledDiagram(Diagram):
                     #    r.model_entity.ports.append(source)
                     # Check it is represented in each representation
                     if not any(source.Id == p.model_entity.Id for p in r.ports):
-                        p = repr_cls(block=source.Id, parent=r.Id, model_entity=source, diagram=self.diagram_id)
+                        p = repr_cls(parent=r.Id, model_entity=source, diagram=self.diagram_id)
                         self.datastore.add(p)
                         # Redraw the shape
                         r.updateShape(r.shape)
@@ -101,6 +101,15 @@ class ModeledDiagram(Diagram):
         datastore.subscribe('add/*', self, addAction)
         datastore.subscribe('delete/*', self, deleteAction)
         datastore.subscribe('update/*', self, updateAction)
+
+    def child_update(self, action: shapes.UpdateType, child: StorableElement):
+        match action:
+            case shapes.UpdateType.add:
+                self.datastore.add(child)
+            case shapes.UpdateType.update:
+                self.datastore.update(child)
+            case shapes.UpdateType.delete:
+                self.datastore.delete(child)
 
     @classmethod
     def get_allowed_blocks(cls, block_cls_name: str, for_drop=False) -> Dict[str, Type[ModelEntity]]:

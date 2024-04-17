@@ -20,72 +20,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from typing import Any, Self, List, Dict, Optional, Type
 from dataclasses import dataclass, field
 import json
-from browser import svg, console
+from browser import svg, console, document
 from diagrams import Shape, Relationship, CP, Point, Orientations
 import shapes
-from data_store import StorableElement, Collection, ReprCategory, from_dict, ExtendibleJsonEncoder, DataStore
+from context_menu import mk_context_menu
+from storable_element import StorableElement, Collection, ReprCategory, from_dict
+from data_store import ExtendibleJsonEncoder, DataStore
 from point import load_waypoints
 from copy import deepcopy, copy
-
-
-
-class DataConvertor:
-    """ A dataconvertor converts strings to a specific type, and vice-versa.
-        The interface corresponds to the built-in API of most built-in types.
-    """
-    def __init__(self, str):
-        raise RuntimeError()
-    def __str__(self) -> str:
-        raise RuntimeError()
-
-@dataclass
-class EditableParameterDetails:
-    """ Description for a parameter that can be edited for an element in a model item. """
-    name: str
-    type: type   # Key: value pairs used by the property_editor to create input fields.
-    current_value: Any
-    convertor: DataConvertor
-
-
-class ModelEntity:
-    """ An interface class describing the behaviour of an item represented in a diagram. """
-    default_styling = {}
-    def get_text(self, index: int) -> str:
-        """ Retrieve a specific string associated with the item that is needed in the diagram. """
-        return self.name
-    def get_nr_texts(self) -> int:
-        """ Ask how many texts this item wants to display """
-        return 1
-
-    def get_editable_parameters(self) -> List[EditableParameterDetails]:
-        return []
-    @classmethod
-    def supports_ports(cls) -> bool:
-        return False
-
-    @classmethod
-    def get_representation_cls(cls, context: ReprCategory) -> Optional[Self]:
-        """ Create a shape representing this model item.
-            context: how this entity is represented: as a block, as a port, as a relation, etc.
-        """
-        return None
-
-    @classmethod
-    def get_allowed_ports(cls) -> List[Self]:
-        """ Determine which ports are allowed to be attached to a model entity """
-        return []
-
-    def get_instance_parameters(self) -> List[EditableParameterDetails]:
-        return []
-
-    def update(self, data: Dict[str, Any]):
-        for k, v in data.items():
-            setattr(self, k, v)
-
-    @classmethod
-    def getDefaultStyle(cls):
-        return cls.default_styling.copy()
-
+from property_editor import getDetailsPopup
+from model_interface import ModelEntity, EditableParameterDetails
 
 ###############################################################################
 @dataclass
@@ -106,6 +50,9 @@ class ModelRepresentation(StorableElement):
         result.model_entity = self.model_entity
         return result
 
+    def get_model_details(self) -> Optional[Self]:
+        return self.model_entity
+
 @dataclass
 class ModeledShape(Shape, ModelRepresentation):
     parent: Optional[int] = None        # For hierarchical shapes (inner block & ports): the owner of this repr.
@@ -117,6 +64,10 @@ class ModeledShape(Shape, ModelRepresentation):
     @property
     def text(self):
         return self.model_entity.get_text(0)
+
+    @property
+    def block(self):
+        return self.model_entity.Id
 
     def asdict(self) -> Dict[str, Any]:
         details = StorableElement.asdict(self, ignore=['model_entity', 'ports'])
@@ -168,14 +119,21 @@ class ModeledShape(Shape, ModelRepresentation):
     def get_editable_parameters(self):
         return self.model_entity.get_editable_parameters()
 
+    def get_db_table(cls):
+        return '_BlockRepresentation'
+
+
 
 @dataclass
 class Port(CP, ModelRepresentation):
     # These two items have slightly illogical names. That is because they are stored in the database in
     # the same table as regular blocks, so that connections can be made to them.
-    block: int = 0                  # The ID of the model_entity for this port.
     parent: Optional[int] = None    # The block this port belongs to.
     category: ReprCategory = ReprCategory.block
+
+    @property
+    def block(self):
+        return self.model_entity.Id
 
     def getShape(self):
         p = self.pos
@@ -210,6 +168,8 @@ class Port(CP, ModelRepresentation):
         details = StorableElement.asdict(self, ignore=['model_entity', 'id'])
         return details
 
+    def get_db_table(cls):
+        return '_BlockRepresentation'
 
 @dataclass
 class ModeledShapeAndPorts(ModeledShape):
@@ -335,6 +295,34 @@ class ModeledRelationship(Relationship, ModelRepresentation):
     finish: ModeledShape = None
     category: ReprCategory = ReprCategory.relationship
 
+    @property
+    def relationship(self):
+        return self.model_entity.Id
+
+    def onContextMenu(self, ev):
+        ev.stopPropagation()
+        ev.preventDefault()
+        msgs = self.model_entity.get_messages()
+        def bind_add_msg_action(cls):
+            def do_add(ev):
+                def callback(data):
+                    new_object = cls(parent=self.model_entity.Id, **data)
+                    new_shape = Message(model_entity=new_object)
+                    self.add_message(new_shape)
+                    self.owner.child_update(shapes.UpdateType.add, new_shape)
+                getDetailsPopup(cls, callback)
+            return cls.__name__, do_add
+
+        d = mk_context_menu(
+            create=dict(bind_add_msg_action(c) for c in msgs),
+        )
+        _ = document <= d
+        d.showModal()
+
+    def add_message(self, new_shape):
+        super().add_message(new_shape)
+
+
     def copy(self) -> Self:
         result = super().copy(ignore=['start', 'finish', 'model_entity', 'id'])
         result.start = self.start
@@ -373,3 +361,33 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         self.path.attrs['data-category'] = int(ReprCategory.relationship)
         self.path.attrs['data-rid'] = self.Id
         self.path.attrs['data-mid'] = self.model_entity.Id
+
+    def get_db_table(cls):
+        return '_RelationshipRepresentation'
+
+@dataclass
+class Message(shapes.MessageShape, ModelRepresentation):
+    Id: int = 0
+    message: int = 0
+    parent: int = 0
+
+    @staticmethod
+    def from_dict(data_store: DataStore, **details) -> Self:
+        self = from_dict(ModeledRelationship, **details)
+        self.category = ReprCategory.message
+        return self
+    def asdict(self) -> Dict[str, Any]:
+        details = StorableElement.asdict(self, ignore=['model_entity', 'id', 'category', 'width', 'height'])
+        details['message'] = self.model_entity.Id
+        return details
+
+    @classmethod
+    def repr_category(cls) -> ReprCategory:
+        return ReprCategory.message
+
+    @classmethod
+    def get_collection(cls) -> Collection:
+        return Collection.message_repr
+
+    def get_db_table(cls):
+        return '_MessageRepresentation'

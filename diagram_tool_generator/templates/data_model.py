@@ -227,8 +227,12 @@ class _MessageRepresentation(Base):
     diagram: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
     message: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
     parent: int = Column(Integer, ForeignKey("_relationshiprepresentation.Id", ondelete='CASCADE'))
+    x: float = Column(Float)
+    y: float = Column(Float)
+    z: float = Column(Float)  # For placing blocks etc on top of each other
     order: int = Column(Integer)
     orientation: int = Column(Integer)
+    direction: int = Column(Integer)
     styling: str = Column(String)
 
     def post_init(self):

@@ -359,6 +359,28 @@ class IntegrationContext:
                 # Check the AJAX requests were consumed.
                 check_expected_response()
 
+            def create_message(self, rid: int, cls: Type):
+                """ Create a new message linked to a relationship: rid """
+                # Get hold of the path to click it and get the context menu.
+                paths = self.parent.select(f'path[data-category="4"][data-rid="{rid}"]')
+                assert paths
+                path = paths[0]
+                path.dispatchEvent(events.ContextMenu())
+                # Find the item to click to create the right message class.
+                items = d.select(f'dialog li[data-text="{cls.__name__}"]')
+                assert items
+                items[0].dispatchEvent(events.Click())
+                # Prepare for the correct requests
+                mid = integration_context.get_new_id(cls)
+                repr_cls = cls.get_representation_cls(modeled_shape.ReprCategory.message)
+                rid = integration_context.get_new_id(repr_cls)
+                self.expect_request(f'/data/ClassMessage', 'post', response_code=201, response_json={'Id': mid})
+                self.expect_request(f'/data/_MessageRepresentation', 'post', response_code=201, response_json={'Id': rid})
+                # Click OK on the details pop-up
+                btn = [b for b in d.select('.brython-dialog-button') if b.text == 'OK'][0]
+                btn.dispatchEvent(events.Click())
+                check_expected_response()
+
             def click_block(self, rid: int):
                 shape = self.resolve(rid).shape
                 shape.dispatchEvent(events.MouseDown())
@@ -1520,9 +1542,38 @@ def integration_tests():
         assert block.getStyle('blockcolor') == '#ffffff'
         assert block.shape.children[0].children[1].attrs['fill'] == 'none'
 
+    @test
+    def add_message():
+        """ Test for adding a message to a relationship, as in a communication diagram. """
+        context = IntegrationContext(hierarchy=[client.BlockDefinitionDiagram(Id=3).asdict()])
+        # Two blocks connected with a block reference
+        s = client.Block(Id=4)
+        t = client.Block(Id=5)
+        add_expected_response('/data/diagram_contents/3', 'get', Response(
+            200,
+            json=[
+                {'Id': 2, 'diagram': 3, 'block': 4, 'parent': None, 'x': 383.0, 'y': 137.0, 'width': 64.0, 'height': 40.0, 'category': 2, '__classname__': '_BlockRepresentation',
+                '_entity': s.asdict()},
+                {'Id': 3, 'diagram': 3, 'block': 5, 'parent': None, 'x': 383.0, 'y': 137.0, 'width': 64.0,
+                 'height': 40.0, 'category': 2, '__classname__': '_BlockRepresentation',
+                 '_entity': t.asdict()},
+                {'Id': 1, 'diagram': 3, 'relationship': 1, 'source_repr_id': 2, 'target_repr_id': 3, 'routing': '[]',
+                    '__classname__': '_RelationshipRepresentation',
+                    '_entity': client.BlockReference(Id=1, source=s, target=t).asdict()}
+            ]))
+        context.explorer.dblclick_element(mid=3)
+        context.diagrams.create_message(rid=1, cls=client.ClassMessage)
+        msgs = context.data_store.live_instances[Collection.message]
+        assert len(msgs) == 1
+        msg_reprs = context.data_store.live_instances[Collection.message_repr]
+        assert len(msg_reprs) == 1
+        assert msgs[1].parent == 1
+
+
+
 
 if __name__ == '__main__':
     #import cProfile
-    run_tests('*.test_RingedClosedCircle')
+    run_tests('*.edit_ports')
     run_tests()
     #cProfile.run('run_tests()', sort='tottime')

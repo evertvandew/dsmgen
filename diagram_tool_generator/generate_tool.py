@@ -90,7 +90,7 @@ class Generator:
                         children[cls.__name__].add(cls.__name__)
         # Also look at the allowed "entities" in diagrams.
         for cls in md.diagrams:
-            children[cls.__name__] = {c.__name__ for c in self.get_inner_types(cls, cls.entities)}
+            children[cls.__name__] |= {c.__name__ for c in self.get_inner_types(cls, cls.entities)}
         self.children = children
 
         self.ordered_items = self.order_dependencies()
@@ -339,6 +339,12 @@ class Generator:
         spec.loader.exec_module(new_mod)
         generator = Generator(config, module_name)
         return generator, module_name
+
+    def get_messages(self, target):
+        msgs = [m for m in self.md.model_elements
+                if mdef.MessageElement in m.categories and (target in m.targets or target.__name__ in m.targets)]
+        return f"[{', '.join([c.__name__ for c in msgs])}]"
+
 
 
 def generate_tool(config: Configuration):

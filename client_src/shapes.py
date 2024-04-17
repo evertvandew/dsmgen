@@ -17,7 +17,8 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
-from browser import svg, window, console
+from browser import svg, window, console, html
+from context_menu import mk_context_menu
 import enum
 from weakref import ref
 import math
@@ -27,7 +28,8 @@ import json
 from typing import List, Dict
 from square_routing import routeSquare
 from point import Point
-from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns)
+from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns, path_ending, path_origin)
+from storable_element import StorableElement
 
 # CSS class given to all handles shapes are decorated with.
 handle_class = 'line_handle'
@@ -85,6 +87,10 @@ def Text(text_attr):
             shape <= renderText(getattr(details, text_attr, ''), details)
     return TextWidget
 
+class UpdateType(enum.IntEnum):
+    add = enum.auto()
+    update = enum.auto()
+    delete = enum.auto()
 
 class OwnerInterface:
     """ Define an interface through which a shape interacts with its parent.
@@ -93,17 +99,21 @@ class OwnerInterface:
         Python doesn't need interfaces, this is added for documentation purposes.
     """
     def clickChild(self, widget, ev):
-        raise NotImplementedError
+        raise NotImplementedError()
     def dblclickChild(self, widget, ev):
-        raise NotImplementedError
+        raise NotImplementedError()
     def mouseDownChild(self, widget, ev):
-        raise NotImplementedError
+        raise NotImplementedError()
     def mouseDownConnection(self, connection, ev):
-        raise NotImplementedError
+        raise NotImplementedError()
     def getCanvas(self):
-        raise NotImplementedError
+        raise NotImplementedError()
+    def child_update(self, action: UpdateType, child: StorableElement):
+        """ Call this function when a child is updated in a way that needs to be persisted. """
+        # The default action is to do nothing. Diagrams with persistent storage should overload this.
+        pass
     def __le__(self, svg_widget):
-        raise NotImplementedError
+        raise NotImplementedError()
     def evaluateOwnership(self, widget, pos, ex_owner):
         # Check this widget is dropped on me
         if hasattr(self, 'owner'):
@@ -252,8 +262,15 @@ class Shape(Stylable):
             owner.dblclickChild(self, ev)
 
     def onMouseDown(self, ev):
-        if owner := self.owner():
-            owner.mouseDownChild(self, ev)
+        match ev.button:
+            case 0:
+                if owner := self.owner():
+                    owner.mouseDownChild(self, ev)
+            case 2:
+                self.onContextMenu(ev)
+
+    def onContextMenu(self, ev):
+        pass
 
     #################################
     ## Low level handlers
@@ -564,8 +581,9 @@ class Relationship(Stylable):
         return id(self)
 
     def __post_init__(self):
-        # Also set the routing_method strategy object.
+        # Also set the routing_method strategy object and message container.
         self.routing_method = router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)
+        self.messages = []
 
     @property
     def canvas(self):
@@ -581,7 +599,11 @@ class Relationship(Stylable):
         pass
 
     def onMouseDown(self, ev):
-        self.owner.mouseDownConnection(self, ev)
+        if ev.button == 0:
+            self.owner.mouseDownConnection(self, ev)
+
+    def onContextMenu(self, ev):
+        pass
 
     def insertWaypoint(self, pos):
         # Find the spot to insert the waypoint.
@@ -628,7 +650,9 @@ class Relationship(Stylable):
         self.selector = svg.path(d="", stroke="gray", stroke_width="10", fill="none", opacity="0.0")
         self.reroute(all_blocks)
         self.path.bind('mousedown', self.onMouseDown)
+        self.path.bind('contextmenu', self.onContextMenu)
         self.selector.bind('mousedown', self.onMouseDown)
+        self.selector.bind('contextmenu', self.onContextMenu)
         self.owner.canvas <= self.selector
         self.owner.canvas <= self.path
 
@@ -662,6 +686,43 @@ class Relationship(Stylable):
 
     def getLogicalClass(self):
         return getattr(self, 'logical_class', None)
+
+    def add_message(self, msg):
+        # Calculate initial orientation and orientation.
+        if msg.direction == MsgDirection.source_2_target:
+            # Use the first point of the path as reference
+            origin, direction = path_origin(self.path.attrs['d'])
+        else:
+            origin, direction = path_ending(self.path.attrs['d'])
+        # Place the message and render it.
+        msg.x = origin.x
+        msg.y = origin.y
+        msg.orientation = int(180*direction/math.pi)
+        self.messages.append(msg)
+
+class MsgDirection(enum.IntEnum):
+    source_2_target = enum.auto()
+    target_2_source = enum.auto()
+
+@dataclass
+class MessageShape(Shape):
+    order: int = 0
+    orientation: int = 0
+    direction: MsgDirection = MsgDirection.source_2_target
+
+    def getShape(self):
+        x1, y1 = self.getPos()
+        x2, y2 = x1+20 * math.cos(self.orientation/180*math.pi), y1+20 * math.sin(self.orientation/180*math.pi)
+        return svg.line(x1=x1, x2=x2, y1=y1, y2=y2, style={'endmarker': 'arrow'})
+
+    def updateShape(self, shape=None):
+        shape = shape or self.shape
+        x1, y1 = self.getPos()
+        x2, y2 = x1+20 * math.cos(self.orientation/180*math.pi), y1+20 * math.sin(self.orientation/180*math.pi)
+        shape.x1 = x1
+        shape.x2 = x2
+        shape.y1 = y1
+        shape.y2 = y2
 
 
 @dataclass

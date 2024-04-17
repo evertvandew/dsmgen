@@ -94,15 +94,15 @@ class FlowPort:
 @md.Relationship(styling="endmarker:hat;pattern:dashed")
 class Dependency:
     stereotype: str
-    source: XRef('associations', Block, Actor, hidden)
-    target: XRef('associations', Block, Actor, hidden)
+    source: XRef('associations', Class, Block, Actor, hidden)
+    target: XRef('associations', Class, Block, Actor, hidden)
     
 
 @md.Relationship(styling = "endmarker:funccall(end)")
-class BlockReference:
+class ClassReference:
     stereotype: selection("None Association Aggregation Composition")
-    source: XRef('associations', Block, hidden)
-    target: XRef('associations', Block, hidden)
+    source: XRef('associations', Class, Block, hidden)
+    target: XRef('associations', Class, Block, hidden)
     source_multiplicity: selection("0-1 1 + *")
     target_multiplicity: selection("0-1 1 + *")
 
@@ -115,9 +115,9 @@ class BlockReference:
         }[self.stereotype]
 
 @md.Relationship(styling = "endmarker:opentriangle")
-class BlockGeneralization:
-    source: XRef('parent', Block, hidden)
-    target: XRef('children', Block, hidden)
+class ClassGeneralization:
+    source: XRef('parent', Class, Block, hidden)
+    target: XRef('children', Class, Block, hidden)
 
 @md.Relationship(styling = "endmarker:hat")
 class FullPortConnection:
@@ -131,19 +131,39 @@ class FlowPortConnection:
     target: XRef('producers', FlowPort, hidden)
     name: str
 
+@md.BlockDiagram(Block, Actor, Note, Constraint, styling='icon:image', parents=[Block, StructuralModel])
+class BlockDefinitionDiagram:
+    name: str
+
+@md.BlockDiagram(Class, Actor, Note, Constraint, styling='icon:image', parents=[Block, Class, StructuralModel])
+class ClassDiagram:
+    name: str
+
+###############################################################################
+## Behavioural Diagrams
+@md.Relationship(styling="endmarker:none", source=[Actor, ObjectInstance, Block], target=[Actor, ObjectInstance, Block])
+class CommunicationLink: pass
+
+
+@md.BlockDiagram(ObjectInstance, Actor, Note, Constraint, styling='icon:image', parents=[Block, Class, FunctionalModel, ClassDiagram])
+class CommunicationDiagram:
+    name: str
+
+@md.Message(targets=[CommunicationLink, ObjectInstance], parents=[Class, Block, CommunicationDiagram])
+class ClassMessage:
+    name: str
+    kind: selection('function event message create destroy')
+    arguments: str
+    description: longstr
+
 @md.Relationship(styling = "")
 class LifeLine:
     source: XRef('a', Actor, ObjectInstance, hidden)
     target: XRef('b', Actor, ObjectInstance, hidden)
     name: str
 
-@md.BlockDiagram(Block, Actor, Note, Constraint, styling='icon:image', parents=[Block, StructuralModel])
-class BlockDefinitionDiagram:
-    name: str
 
-@md.BlockDiagram(ObjectInstance, Actor, Note, Constraint, styling='icon:image', parents=[Block, FunctionalModel])
-class CommunicationDiagram:
-    name: str
+
 
 ###############################################################################
 ## Entities for requirements
