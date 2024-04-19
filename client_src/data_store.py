@@ -309,8 +309,11 @@ class DataStore(EventDispatcher):
                     block = auto()
                     port = auto()
                     rel = auto()
+                    mesg = auto()
 
                 def classify_representation(data: Dict[str, Any]) -> repr_class:
+                    if data['__classname__'] == '_MessageRepresentation':
+                        return repr_class.mesg
                     if 'category' in data:
                         r = {
                             ReprCategory.block: repr_class.block,
@@ -329,7 +332,7 @@ class DataStore(EventDispatcher):
                         if classify_representation(r) == c:
                             yield r
 
-                for filter in [repr_class.block, repr_class.port, repr_class.rel]:
+                for filter in [repr_class.block, repr_class.port, repr_class.rel, repr_class.mesg]:
                     for d in filter_reprs(response.json, filter):
                         entity = self.decode_representation(d)
                         representations.append(entity)
@@ -347,6 +350,12 @@ class DataStore(EventDispatcher):
                 # Then handle the relationships
                 for d in [r for r in representations if r.repr_category() == ReprCategory.relationship]:
                     records.append(d)
+
+                # Like the ports, messages are yielded through representations.
+                for p in [r for r in representations if r.repr_category() == ReprCategory.message]:
+                    relation = self.get(Collection.relation_repr, p.parent)
+                    relation.messages.append(p)
+                    self.update_cache(relation)
 
                 cb(records)
 

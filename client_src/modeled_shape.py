@@ -23,6 +23,7 @@ import json
 from browser import svg, console, document
 from diagrams import Shape, Relationship, CP, Point, Orientations
 import shapes
+from svg_shapes import MsgShape
 from context_menu import mk_context_menu
 from storable_element import StorableElement, Collection, ReprCategory, from_dict
 from data_store import ExtendibleJsonEncoder, DataStore
@@ -34,6 +35,7 @@ from model_interface import ModelEntity, EditableParameterDetails
 ###############################################################################
 @dataclass
 class ModelRepresentation(StorableElement):
+    Id: int = 0
     model_entity: ModelEntity = None
     diagram: int = 0                    # Diagram in which this representation is displayed.
 
@@ -82,7 +84,7 @@ class ModeledShape(Shape, ModelRepresentation):
         g = svg.g()
         _ = g <= shape_type.getShape(self)
         _ = g <= self.TextWidget.getShape(self)
-        g.attrs['data-category'] = int(ReprCategory.block)
+        g.attrs['data-category'] = int(self.repr_category())
         g.attrs['data-rid'] = self.Id
         g.attrs['data-mid'] = self.model_entity.Id
         return g
@@ -306,10 +308,10 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         def bind_add_msg_action(cls):
             def do_add(ev):
                 def callback(data):
-                    new_object = cls(parent=self.model_entity.Id, **data)
-                    new_shape = Message(model_entity=new_object)
+                    new_object = cls(parent=self.diagram, association=self.model_entity.Id, **data)
+                    new_shape = Message(model_entity=new_object, parent=self.Id, diagram=self.diagram)
                     self.add_message(new_shape)
-                    self.owner.child_update(shapes.UpdateType.add, new_shape)
+
                 getDetailsPopup(cls, callback)
             return cls.__name__, do_add
 
@@ -321,7 +323,8 @@ class ModeledRelationship(Relationship, ModelRepresentation):
 
     def add_message(self, new_shape):
         super().add_message(new_shape)
-
+        self.owner.child_update(shapes.UpdateType.add, new_shape)
+        new_shape.create(self.owner)
 
     def copy(self) -> Self:
         result = super().copy(ignore=['start', 'finish', 'model_entity', 'id'])
@@ -356,8 +359,8 @@ class ModeledRelationship(Relationship, ModelRepresentation):
     def repr_category(cls) -> ReprCategory:
         return ReprCategory.relationship
 
-    def route(self, owner, all_blocks):
-        super().route(owner, all_blocks)
+    def route(self, all_blocks):
+        super().route(all_blocks)
         self.path.attrs['data-category'] = int(ReprCategory.relationship)
         self.path.attrs['data-rid'] = self.Id
         self.path.attrs['data-mid'] = self.model_entity.Id
@@ -366,16 +369,20 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         return '_RelationshipRepresentation'
 
 @dataclass
-class Message(shapes.MessageShape, ModelRepresentation):
-    Id: int = 0
-    message: int = 0
-    parent: int = 0
+class Message(ModeledShape):
+    message: int = None
+    orientation: float = 0
+    direction: shapes.MsgDirection = shapes.MsgDirection.source_2_target
+
+    def isResizable(self) -> bool:
+        return False
 
     @staticmethod
     def from_dict(data_store: DataStore, **details) -> Self:
-        self = from_dict(ModeledRelationship, **details)
+        self = from_dict(Message, **details)
         self.category = ReprCategory.message
         return self
+
     def asdict(self) -> Dict[str, Any]:
         details = StorableElement.asdict(self, ignore=['model_entity', 'id', 'category', 'width', 'height'])
         details['message'] = self.model_entity.Id
@@ -391,3 +398,12 @@ class Message(shapes.MessageShape, ModelRepresentation):
 
     def get_db_table(cls):
         return '_MessageRepresentation'
+
+    def getShapeDescriptor(self):
+        return MsgShape
+
+    def updateShape(self, shape=None):
+        shape = shape or self.shape
+        shape_type = self.getShapeDescriptor()
+        shape_type.updateShape(shape.children[0], self)
+        self.TextWidget.updateShape(shape.children[1], self)

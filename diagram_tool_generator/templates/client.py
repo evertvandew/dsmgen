@@ -98,6 +98,10 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
             internal_fields['children'] = ('shapes.HIDDEN', 'field(default_factory=list)')
 
+        if generator.md.is_message(entity):
+            internal_fields['association'] = ('shapes.HIDDEN', 'None')
+            persistent_fields['association'] = 'int'
+
         text_fields = [f.name for f in fields(entity)
                        if generator.field_is_type(f.type, str) or generator.field_is_type(f.type, mdef.longstr)]
 
@@ -219,7 +223,7 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
     def get_editable_parameters(self) -> List[ms.EditableParameterDetails]:
         regular_parameters = [
-        %for name, type_ in {k:v for k, v in persistent_fields.items() if k not in ['parent', 'Id', 'ports', 'children', 'source', 'target', 'definition']}.items():
+        %for name, type_ in {k:v for k, v in persistent_fields.items() if k not in ['parent', 'Id', 'ports', 'children', 'source', 'target', 'definition', 'association']}.items():
             ms.EditableParameterDetails("${name}", ${generator.get_html_type(type_)}, self.${name}, ${generator.get_html_type(type_)}),
         %endfor
         ]

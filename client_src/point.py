@@ -48,6 +48,11 @@ class Point:
         return (float(self.x), float(self.y))
     def transpose(self):
         return Point(x=self.y, y=-self.x)
+    def rot(self, angle: float):
+        """ Rotate the vector by a specific angle (in radians). """
+        c = math.cos(angle)
+        s = math.sin(angle)
+        return Point(x=c*self.x-s*self.y, y=s*self.x+c*self.y)
     def __json__(self):
         return self.astuple()
 

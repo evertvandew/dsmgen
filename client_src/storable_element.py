@@ -26,6 +26,8 @@ class Collection(Enum):
             cls.block_repr: cls.block,
             cls.relation: cls.relation_repr,
             cls.relation_repr: cls.relation,
+            cls.message: cls.message_repr,
+            cls.message_repr: cls.message
         }[c]
 
 class ReprCategory(IntEnum):

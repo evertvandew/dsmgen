@@ -183,6 +183,7 @@ class _Entity(Base):
     subtype: str = Column(String)
     parent: str = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'), nullable=True)  # For subblocks and ports
     definition: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'), nullable=True)  # For instances
+    association: int = Column(Integer, ForeignKey("_relationship.Id", ondelete='CASCADE'), nullable=True)  # For messages & association class.
     order: str = Column(Integer)
     details: str = Column("details", LargeBinary)
 
@@ -231,7 +232,7 @@ class _MessageRepresentation(Base):
     y: float = Column(Float)
     z: float = Column(Float)  # For placing blocks etc on top of each other
     order: int = Column(Integer)
-    orientation: int = Column(Integer)
+    orientation: float = Column(Float)
     direction: int = Column(Integer)
     styling: str = Column(String)
 
@@ -417,6 +418,7 @@ class ABlock(AWrapper):
             'type': self.get_entity_type(),
             'subtype': self.__class__.__name__,
             'parent': self.parent if hasattr(self, 'parent') else None,
+            'association': self.association if hasattr(self, 'association') else None,
             'definition': None,
             'order': self.order
         }
@@ -488,6 +490,9 @@ class ${entity.__name__}(${stereotype}):
     ## All elements must have a default value so they can be created from scratch
     ${f.name}: ${get_type(f.type)} = ${generator.get_default(f.type)}
     % endfor
+    %if generator.md.is_message(entity):
+    association: int = None
+    %endif
 
 % endfor
 

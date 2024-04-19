@@ -717,6 +717,37 @@ class Cloud(Drum):
         # Return the results as a string.
         return ' '.join([','.join(str(f) for f in p) if isinstance(p, list) else p for p in parts])
 
+
+class MsgShape:
+    style_items = {'marker': 'arrow', 'linecolor': 'black', 'linewidth': '1'}
+    @classmethod
+    def getShape(cls, details):
+        x1, y1 = details.getPos().astuple()
+        x2, y2 = (details.getPos()+Point(20, 0)).rot(details.orientation).astuple()
+        shape = svg.line(x1=int(x1), x2=int(x2), y1=int(y1), y2=int(y2),
+            marker_end="url('#%s')"%details.getStyle('marker', 'arrow'),
+            style={
+                'stroke': details.getStyle('linecolor', 'black'),
+                'stroke-width': details.getStyle('linewidth', 1)
+            })
+        return shape
+
+    @classmethod
+    def updateShape(cls, shape, details):
+        x1, y1 = details.getPos().astuple()
+        x2, y2 = x1+20 * math.cos(details.orientation/180*math.pi), y1+20 * math.sin(details.orientation/180*math.pi)
+        shape.attrs['x1'] = int(x1)
+        shape.attrs['x2'] = int(x2)
+        shape.attrs['y1'] = int(y1)
+        shape.attrs['y2'] = int(y2)
+        shape.attrs['marker_end'] = "url('#%s')" % details.getStyle('marker', 'arrow'),
+        shape.style = {
+            'stroke': details.getStyle('linecolor', 'black'),
+            'stroke-width': details.getStyle('linewidth', 1)
+        }
+
+
+
 ###################################################################################################
 # Define possible line endings. 
 # Also open and closed variants are generated. Open ones are named "<name>open"

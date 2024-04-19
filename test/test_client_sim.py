@@ -381,6 +381,25 @@ class IntegrationContext:
                 btn.dispatchEvent(events.Click())
                 check_expected_response()
 
+            def move_message(self, rid: int, delta: Tuple[float,float] | Point):
+                if isinstance(delta, Point):
+                    delta = delta.astuple()
+                msg_repr = self.parent.select_one(f'g[data-category="5"][data-rid="{rid}"]')
+                add_expected_response(f'/data/_MessageRepresentation/{rid}', 'post', Response(200, json=None))
+                msg_repr.dispatchEvent(events.MouseDown(offsetX=0, offsetY=0))
+                msg_repr.dispatchEvent(events.MouseMove(offsetX=delta[0], offsetY=delta[1]))
+                msg_repr.dispatchEvent(events.MouseUp(offsetX=delta[0], offsetY=delta[1]))
+                check_expected_response()
+
+            def delete_message(self, rid:int):
+                msg_repr = self.parent.select_one(f'g[data-category="5"][data-rid="{rid}"]')
+                msg_repr.dispatchEvent(events.Click())
+                add_expected_response(f'/data/_MessageRepresentation/{rid}', 'delete', Response(204, json=None))
+                ev = events.KeyDown(key='Delete')
+                self.parent.parent.dispatchEvent(ev)
+                self.press_ok()
+                check_expected_response()
+
             def click_block(self, rid: int):
                 shape = self.resolve(rid).shape
                 shape.dispatchEvent(events.MouseDown())
@@ -396,6 +415,8 @@ class IntegrationContext:
             def move_block(self, rid: int, cood: Tuple[float,float] | Point):
                 """ Move the block by manipulating it through mouse events
                 """
+                if isinstance(cood, Point):
+                    cood = cood.astuple()
                 # Expect an update of the representation to be sent to the server.
                 add_expected_response(f'/data/_BlockRepresentation/{rid}', 'post', Response(200, json=None))
                 # Find the shape involved.
@@ -404,6 +425,7 @@ class IntegrationContext:
                 shape.dispatchEvent(events.MouseDown(offsetX=0, offsetY=0))
                 shape.dispatchEvent(events.MouseMove(offsetX=cood[0], offsetY=cood[1]))
                 shape.dispatchEvent(events.MouseUp(offsetX=cood[0], offsetY=cood[1]))
+                check_expected_response()
             def drag_relation_handle(self, index: int, delta: Tuple[float, float]):
                 diagram = self.current_diagram()
                 handle = diagram.canvas.select_one(f'.{handle_class}[data-index="{index}"]')
@@ -1543,7 +1565,7 @@ def integration_tests():
         assert block.shape.children[0].children[1].attrs['fill'] == 'none'
 
     @test
-    def add_message():
+    def add_move_delete_message():
         """ Test for adding a message to a relationship, as in a communication diagram. """
         context = IntegrationContext(hierarchy=[client.BlockDefinitionDiagram(Id=3).asdict()])
         # Two blocks connected with a block reference
@@ -1567,13 +1589,51 @@ def integration_tests():
         assert len(msgs) == 1
         msg_reprs = context.data_store.live_instances[Collection.message_repr]
         assert len(msg_reprs) == 1
-        assert msgs[1].parent == 1
+        assert msgs[1].association == 1
 
+        # Try moving it
+        pos = msg_reprs[1].getPos()
+        context.diagrams.move_message(rid=1, delta=(100, 100))
+        assert msg_reprs[1].getPos() - pos == Point(100,100)
 
+        # Try deleting it
+        context.diagrams.delete_message(rid=1)
+
+    @test
+    def display_message():
+        context = IntegrationContext(hierarchy=[client.BlockDefinitionDiagram(Id=13).asdict()])
+        data = [{
+            "Id": 6, "diagram": 13, "block": 14, "parent": None, "x": 171.0, "y": 293.0, "z": 0.0, "width": 64.0, "height": 40.0, "order": None, "orientation": None, "styling": "", "category": 2,
+            "_entity": {"order": 0, "parameters": {}, "Id": 14, "name": "", "parent": 13, "definition": 11, "__classname__": "Block"},
+            "_definition": None,
+            "__classname__": "_BlockRepresentation"
+        }, {
+            "Id": 7, "diagram": 13, "block": 15, "parent": None, "x": 370.0, "y": 294.0, "z": 0.0, "width": 64.0, "height": 40.0, "order": None, "orientation": None, "styling": "", "category": 2,
+            "_entity": {"order": 0, "parameters": {}, "Id": 15, "name": "", "parent": 13, "definition": 12, "__classname__": "Block"},
+            "_definition": None,
+            "__classname__": "_BlockRepresentation"
+        }, {
+            "Id": 3, "diagram": 13, "relationship": 3, "source_repr_id": 6, "target_repr_id": 7, "routing": "[]", "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation",
+            "_entity": {"Id": 3, "parent": 13, "source": 14, "target": 15, "__classname__": "BlockReference"}
+        }, {
+            "Id": 1, "diagram": 13, "message": 17, "parent": 3, "x": 235.0, "y": 313.5, "z": 0.0, "order": 0, "orientation": 0.0, "direction": 1, "styling": {},
+            "__classname__": "_MessageRepresentation",
+            "_entity": {"order": 0, "Id": 17, "name": "test", "kind": 1, "arguments": "", "description": "", "parent": 13, "association": 3, "__classname__": "ClassMessage"}
+        }]
+        add_expected_response('/data/diagram_contents/13', 'get', Response(200, json=data))
+        context.explorer.dblclick_element(mid=13)
+
+        # Check the message is rendered.
+        canvas = context.diagrams.parent
+        msgs = canvas.select(f'g[data-category="5"]')
+        assert len(msgs) == 1
+        msg = msgs[0]
+        assert msg.attrs['data-rid'] == 1
+        assert msg.attrs['data-mid'] == 17
 
 
 if __name__ == '__main__':
     #import cProfile
-    run_tests('*.edit_ports')
+    run_tests('*.add_move_delete_message')
     run_tests()
     #cProfile.run('run_tests()', sort='tottime')

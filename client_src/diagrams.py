@@ -200,37 +200,39 @@ class ResizeFSM(BehaviourFSM):
         self.initial_size = widget.getSize()
 
     def unselect(self):
-        for dec in self.decorators.values():
-            dec.remove()
-        self.decorators = {}
-        if self.widget:
-            self.widget.unsubscribe(resize_role)
+        if self.widget.isResizable():
+            for dec in self.decorators.values():
+                dec.remove()
+            self.decorators = {}
+            if self.widget:
+                self.widget.unsubscribe(resize_role)
         self.widget = None
         self.state = ResizeStates.NONE
 
     def select(self, widget):
         self.widget = widget
 
-        self.decorators = {k: svg.circle(r=5, stroke_width=0, fill="#29B6F2", data_index=int(k), Class=handle_class)
-                           for k in Orientations}
-        x, y, width, height = [getattr(widget, k) for k in ['x', 'y', 'width', 'height']]
+        if widget.isResizable():
+            self.decorators = {k: svg.circle(r=5, stroke_width=0, fill="#29B6F2", data_index=int(k), Class=handle_class)
+                               for k in Orientations}
+            x, y, width, height = [getattr(widget, k) for k in ['x', 'y', 'width', 'height']]
 
-        for k, d in self.decorators.items():
-            d['cx'], d['cy'] = [int(i) for i in locations[k](x, y, width, height)]
+            for k, d in self.decorators.items():
+                d['cx'], d['cy'] = [int(i) for i in locations[k](x, y, width, height)]
 
-        def bind_decorator(d, orientation):
-            def dragStart(ev):
-                self.dragged_handle = orientation
-                self.startResize(widget, orientation, ev)
-                ev.stopPropagation()
+            def bind_decorator(d, orientation):
+                def dragStart(ev):
+                    self.dragged_handle = orientation
+                    self.startResize(widget, orientation, ev)
+                    ev.stopPropagation()
 
-            d.bind('mousedown', dragStart)
+                d.bind('mousedown', dragStart)
 
-        for orientation, d in self.decorators.items():
-            self.diagram.canvas <= d
-            bind_decorator(d, orientation)
+            for orientation, d in self.decorators.items():
+                self.diagram.canvas <= d
+                bind_decorator(d, orientation)
 
-        widget.subscribe(resize_role, lambda w: moveAll(w, self.decorators))
+            widget.subscribe(resize_role, lambda w: moveAll(w, self.decorators))
 
     def onDrag(self, origin, original_size, delta):
         dx, dy, sx, sy, mx, my = orientation_details[self.dragged_handle]
@@ -463,17 +465,24 @@ class Diagram(OwnerInterface):
     def addConnection(self, connection):
         """ Handle a completed connection and add it to the diagram. """
         self.connections.append(connection)
-        connection.route(self, self.children)
+        connection.create(self, self.children)
 
     def deleteConnection(self, connection):
         if connection in self.connections:
             connection.delete()
             self.connections.remove(connection)
 
-    def deleteBlock(self, block):
+    def deleteBlock(self, block: Shape):
         block.delete()
-        if owner := block.owner():
-            owner.children.remove(block)
+        if block.repr_category() == ReprCategory.block:
+            # Remove the block from the diagram's list of children
+            if owner := block.owner():
+                owner.children.remove(block)
+        elif block.repr_category() == ReprCategory.message:
+            # Remove the message from the relationship's list of messages
+            for c in self.connections:
+                if c.Id == block.parent:
+                    c.messages.remove(block)
 
         # Also delete all connections with this block or its ports
         to_remove = []

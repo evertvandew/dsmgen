@@ -309,11 +309,14 @@ def dataClassEditorForm(o: ModelEntity, editable_fields: List[EditableParameterD
     form = html.FORM()
 
     for field in editable_fields:
-        label = html.LABEL(field.name)
-        label.className ="col-sm-3 col-form-label"
-        _ = form <= label
-        _ = form <= getInputForField(field)
-        _ = form <= html.BR()
+        console.log(f'Placing field: {field}')
+        iff = getInputForField(field)
+        if iff:
+            label = html.LABEL(field.name)
+            label.className ="col-sm-3 col-form-label"
+            _ = form <= label
+            _ = form <= iff
+            _ = form <= html.BR()
 
     port_types = o.get_allowed_ports() if o else []
     if port_types and data_store:

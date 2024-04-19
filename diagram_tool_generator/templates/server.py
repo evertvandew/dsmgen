@@ -421,6 +421,13 @@ def diagram_contents(index):
             r['_entity'] = json.loads(relat_rep[1].details)
             data.append(r)
 
+        # Same for the messages
+        for message_rep in session.query(dm._MessageRepresentation, dm._Entity).filter(dm._MessageRepresentation.diagram==index).\
+                join(dm._Entity, dm._MessageRepresentation.message == dm._Entity.Id).all():
+            m = message_rep[0].asdict()
+            m['_entity'] = json.loads(message_rep[1].details)
+            data.append(m)
+
     response = flask.make_response(
         json.dumps(data, cls=dm.ExtendibleJsonEncoder).encode('utf8'),
         200

@@ -29,7 +29,7 @@ from typing import List, Dict
 from square_routing import routeSquare
 from point import Point
 from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns, path_ending, path_origin)
-from storable_element import StorableElement
+from storable_element import StorableElement, ReprCategory
 
 # CSS class given to all handles shapes are decorated with.
 handle_class = 'line_handle'
@@ -196,7 +196,7 @@ class Stylable:
             self.updateShape()
 
 @dataclass
-class Shape(Stylable):
+class Shape(Stylable, StorableElement):
     x: float = 0.0
     y: float = 0.0
     height: float = 0.0
@@ -584,6 +584,7 @@ class Relationship(Stylable):
         # Also set the routing_method strategy object and message container.
         self.routing_method = router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)
         self.messages = []
+        self.owner = None
 
     @property
     def canvas(self):
@@ -629,14 +630,24 @@ class Relationship(Stylable):
         self.waypoints.insert(index, pos)
         return index
 
+    def create(self, owner, all_blocks):
+        self.owner = owner
+        self.route(all_blocks)
+        # Also render the messages
+        for m in self.messages:
+            m.create(owner)
+
+        self.reroute(all_blocks)
+
     def reroute(self, all_blocks):
         router = getattr(self, 'router', None) or router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)()
         router.route(self, all_blocks)
         self.router = router
+        for m in self.messages:
+            m.updateShape()
 
-    def route(self, owner, all_blocks):
+    def route(self, all_blocks):
         """ The default routing is center-to-center. """
-        self.owner = owner
         # Create the line
         details = dict(d="", stroke=self.getStyle('linecolor'), stroke_width=self.getStyle('linewidth'),
                              marker_end=f"url('#{self.getStyle('endmarker')}')",
@@ -648,7 +659,6 @@ class Relationship(Stylable):
         self.path.attrs['data-class'] = type(self).__name__
         # Above the visible path, there is an invisible one used to give a wider selection region.
         self.selector = svg.path(d="", stroke="gray", stroke_width="10", fill="none", opacity="0.0")
-        self.reroute(all_blocks)
         self.path.bind('mousedown', self.onMouseDown)
         self.path.bind('contextmenu', self.onContextMenu)
         self.selector.bind('mousedown', self.onMouseDown)
@@ -691,39 +701,19 @@ class Relationship(Stylable):
         # Calculate initial orientation and orientation.
         if msg.direction == MsgDirection.source_2_target:
             # Use the first point of the path as reference
-            origin, direction = path_origin(self.path.attrs['d'])
+            origin, orientation = path_origin(self.path.attrs['d'])
         else:
-            origin, direction = path_ending(self.path.attrs['d'])
+            origin, orientation = path_ending(self.path.attrs['d'])
         # Place the message and render it.
-        msg.x = origin.x
-        msg.y = origin.y
-        msg.orientation = int(180*direction/math.pi)
+        offset = Point(5, -15).rot(orientation)
+        msg.x = origin.x + offset.x
+        msg.y = origin.y + offset.y
+        msg.orientation = orientation
         self.messages.append(msg)
 
 class MsgDirection(enum.IntEnum):
     source_2_target = enum.auto()
     target_2_source = enum.auto()
-
-@dataclass
-class MessageShape(Shape):
-    order: int = 0
-    orientation: int = 0
-    direction: MsgDirection = MsgDirection.source_2_target
-
-    def getShape(self):
-        x1, y1 = self.getPos()
-        x2, y2 = x1+20 * math.cos(self.orientation/180*math.pi), y1+20 * math.sin(self.orientation/180*math.pi)
-        return svg.line(x1=x1, x2=x2, y1=y1, y2=y2, style={'endmarker': 'arrow'})
-
-    def updateShape(self, shape=None):
-        shape = shape or self.shape
-        x1, y1 = self.getPos()
-        x2, y2 = x1+20 * math.cos(self.orientation/180*math.pi), y1+20 * math.sin(self.orientation/180*math.pi)
-        shape.x1 = x1
-        shape.x2 = x2
-        shape.y1 = y1
-        shape.y2 = y2
-
 
 @dataclass
 class Container(Shape, OwnerInterface):
