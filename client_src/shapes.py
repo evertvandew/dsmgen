@@ -30,6 +30,7 @@ from square_routing import routeSquare
 from point import Point
 from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns, path_ending, path_origin)
 from storable_element import StorableElement, ReprCategory
+from copy import copy
 
 # CSS class given to all handles shapes are decorated with.
 handle_class = 'line_handle'
@@ -584,6 +585,7 @@ class Relationship(Stylable):
         # Also set the routing_method strategy object and message container.
         self.routing_method = router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)
         self.messages = []
+        self.points = None
         self.owner = None
 
     @property
@@ -640,10 +642,30 @@ class Relationship(Stylable):
         self.reroute(all_blocks)
 
     def reroute(self, all_blocks):
+        if self.points:
+            first_point = copy(self.points[0])
+            last_point = copy(self.points[-1])
+        else:
+            first_point = None
+            last_point = None
+
         router = getattr(self, 'router', None) or router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)()
         router.route(self, all_blocks)
         self.router = router
+        if first_point is not None:
+            first_delta = self.points[0] - first_point
+            last_delta = self.points[-1] - last_point
+        else:
+            first_delta = Point(0,0)
+            last_delta = Point(0,0)
         for m in self.messages:
+            # Move the shape with the point it is linked to
+            if m.direction == MsgDirection.source_2_target:
+                # Linked to the first point
+                m.setPos(m.getPos() + first_delta)
+            else:
+                # Linked to the last point
+                m.setPos(m.getPos() + last_delta)
             m.updateShape()
 
     def route(self, all_blocks):
