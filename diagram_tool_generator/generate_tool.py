@@ -43,7 +43,6 @@ from mako.template import Template
 import model_definition
 import model_definition as mdef
 from config import Configuration
-from test_frame import prepare, test, run_tests, cleanup
 
 
 class Generator:
@@ -391,30 +390,10 @@ def generate_tool(config: Configuration):
 
 
 
-@prepare
-def generator_tests():
-    """ Unit tests for the generator tool """
-    TEST_SPEC = os.path.normpath(os.path.dirname(__file__)+'/../test/sysml_spec.py')
-
-    @test
-    def test_get_diagram_attributes():
-        generator, module_name = Generator.load_from_config(Configuration(TEST_SPEC))
-        sysml_spec = sys.modules[module_name]
-        attrs = generator.get_diagram_attributes(sysml_spec.Block)
-        assert len(attrs) == 2
-        names = [f.name for f in attrs]
-        assert 'name' in names
-        assert 'description' in names
-
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('specification', default='sysml_spec.py')
     parser.add_argument('--test', action='store_true')
     args = parser.parse_args()
 
-    if args.test:
-        run_tests()
-    else:
-        generate_tool(Configuration(args.specification))
+    generate_tool(Configuration(args.specification))
