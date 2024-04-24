@@ -34,7 +34,7 @@ For example, the sysml_uml demo reports as the final line:
 WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:5103
- * Running on http://192.168.178.107:5103
+ * Running on http://<your IP address>:5103
 Press CTRL+C to quit
 ```
 

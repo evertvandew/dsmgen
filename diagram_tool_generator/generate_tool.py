@@ -396,4 +396,7 @@ if __name__ == '__main__':
     parser.add_argument('--test', action='store_true')
     args = parser.parse_args()
 
-    generate_tool(Configuration(args.specification))
+    public_dir = os.path.normpath(os.path.dirname(__file__)+'/../public/')
+
+
+    generate_tool(Configuration(args.specification, pub_dir=public_dir))

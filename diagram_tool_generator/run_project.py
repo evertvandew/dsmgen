@@ -45,10 +45,6 @@ def create_environment(project):
         if not os.path.exists(d):
             os.mkdir(d)
 
-    copy(home_dir('public/stylesheet.css'), 'build/public/stylesheet.css')
-    copy_tree(home_dir('public/assets'), 'build/public/assets')
-    copy_tree(home_dir('public/src'), 'build/public/src')
-
     Path('build/__init__.py').touch()
 
 
@@ -56,7 +52,8 @@ def run(specs, project, port):
     # Generate all the components of the tool.
     create_environment(project)
     config = generate_tool.Configuration(
-        specs, client_dir='build/public', dbase_url='sqlite:///build/data/diagrams.sqlite3'
+        specs, client_dir='build/public', dbase_url='sqlite:///build/data/diagrams.sqlite3',
+        pub_dir = os.path.normpath(os.path.dirname(__file__) + '/../public/')
     )
     generate_tool.generate_tool(config)
 

@@ -473,6 +473,24 @@ def diagram_contents(index):
 
 # #############################################################################
 # # Serve the static data (HTML, JS and other resources)
+assets_dir = "${config.pub_dir}"
+
+@app.route('/stylesheet.css')
+def send_css():
+    return flask.send_from_directory(assets_dir, 'stylesheet.css', mimetype='text/css')
+
+@app.route('/src/<path:path>')
+def external_src(path):
+    fname = f'{assets_dir}/src/{path}'
+    mime_type = my_get_mime(fname)
+    return flask.send_from_directory(f'{assets_dir}/src', path, mimetype=mime_type)
+
+@app.route('/assets/<path:path>')
+def external_assets(path):
+    fname = f'{assets_dir}/assets/{path}'
+    mime_type = my_get_mime(fname)
+    return flask.send_from_directory(f'{assets_dir}/assets', path, mimetype=mime_type)
+
 @app.route('/<path:chapter>/<path:path>')
 def send_static_2(chapter, path):
     fname = f'${config.client_dir}/{chapter}/{path}'

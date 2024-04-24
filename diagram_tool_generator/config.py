@@ -13,3 +13,4 @@ class Configuration:
     dbase_uname: str  = ''
     dbase_pwd: str    = ''
     homedir: str      = os.getcwd()
+    pub_dir: str      = ''
