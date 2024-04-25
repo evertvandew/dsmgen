@@ -73,9 +73,9 @@ def wrapText(text, width, font_file='Arial.ttf', fontsize='10'):
     current_line = []
     for size, part in zip(sizes, parts):
         if pyphen:
-            while line_length + size + font[32]*(len(current_line)-1) > normalized_width:
+            while (not line_length) or (line_length + size + font[32]*(1 if line_length else 0) > normalized_width):
                 # Only hyphenate if the remaining space is more than 4 characters
-                if normalized_width - line_length > 4*size/len(part):
+                if (not line_length) or (normalized_width - line_length > 4*size/len(part)):
                     # Find the largest part that fits
                     for a, b in dic.iterate(part):
                         a = a + '-'
