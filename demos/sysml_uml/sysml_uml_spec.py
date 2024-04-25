@@ -206,6 +206,11 @@ class Association:
     target: XRef('usecase', UseCase, hidden)
     name: str
 
+@md.BlockDiagram(Actor, UseCase, Note, styling='icon:image', parents=[FunctionalModel, Package])
+class UseCaseDiagram:
+    name: str
+
+
 ###############################################################################
 ## State diagram
 @md.Entity(styling="shape:ellipse", parents=[Class, Self, Block, UseCase])
@@ -230,7 +235,7 @@ class Transition:
     name: str
 
 @md.BlockDiagram(State, StartState, EndState, Note, Constraint, styling='icon:image', parents=[FunctionalModel, Class, Block, Self, UseCase, Package])
-class UseCaseDiagram:
+class StateDiagram:
     name: str
 
 ###############################################################################
