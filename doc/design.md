@@ -1,9 +1,3 @@
-
-
-
-
-
-
 # Hierarchical Model
 
 Entities in the hierarchical model can have a parent. This determines the position of the entity in the model.
@@ -63,31 +57,7 @@ There can be an infinte number of representations of a modeled entity.
 Each representation has a pointer to the model entity it represents, and it has a pointer to the diagram it is in.
 
 
-@startuml
-
-package model {
-  object Relation
-  object BlockA
-  object BlockB
-  Relation --> BlockA : source
-  Relation --> BlockB : target
-}
-package diagram {
-  object RelationRepr
-  object BlockARepr
-  object BlockBRepr
-  object Diagram
-  RelationRepr --> BlockARepr : source
-  RelationRepr --> BlockBRepr : target
-  BlockARepr --> Diagram : diagram
-  
-}
-
-BlockARepr ..> BlockA : block
-BlockBRepr ..> BlockB : block
-RelationRepr ..> Relation : relationship
-
-@enduml
+![Blocks and Relationships](design_block_relationships.png)
 
 ## Ports
 
@@ -99,29 +69,7 @@ Ports refer to their block using the `parent` fields. In regular blocks, the `pa
 Because Ports are treated as Blocks logically, so relationships can be made with it, the link from a Port Representation
 to the underlying Port model entity is still called `block`.
 
-@startuml
-
-package model {
-  object Port1
-  object Port2
-  object Block
-  Port1 --> Block : parent
-  Port2 --> Block : parent
-}
-
-package diagram {
-  object PortRepr1
-  object PortRepr2
-  object BlockRepr
-  PortRepr1 ..> Port1 : block
-  PortRepr1 ..> Port2 : block
-  PortRepr1 --> BlockRepr : parent
-  PortRepr2 --> BlockRepr : parent
-  BlockRepr ..> Block : block
-  
-}
-
-@enduml
+![Ports](design_ports.png)
 
 ## Instances
 
@@ -148,29 +96,7 @@ definition side, not on the instance side. An instance can not have different po
 Perhaps we will let the model structure determine is the ports can be determined by the instance, for
 example to achieve blocks with a configurable number of inputs.
 
-@startuml
-
-package model {
-  object Library
-  object BlockProgram
-  object Port
-  object BlockRepr
-  object PortRepr
-  Library <-- Definition : parent
-  BlockProgram <-- Instance : parent
-  Definition <-- Port : parent
-  object Definition {
-    parameter_definition
-  }
-  object Instance {
-    parameter_values
-  }
-  Definition <-- Instance : definition
-  Port <.. PortRepr : block
-  Instance <.. BlockRepr : block
-  BlockRepr <-- PortRepr : parent
-}
-@enduml
+![Instances](design_instances.png)
 
 ## Recursive blocks
 
@@ -187,48 +113,9 @@ With outside recursion, there is the question how to represent connections to th
 In some diagrams, communication goes through ports. The ports of the diagram-block must be represented as blocks in the
 inner diagram. This is done using the PortLabel block, a hard-coded type for this purpose.
 
-@startuml
+![Using a Recursive Block](design_recursion_outside.png)
 
-object DiagramBlock
-object OuterBlock
-object InnerBlock1
-object InnerBlock2
-object Relation
-
-OuterBlock <-- InnerBlock1 : parent
-OuterBlock <-- InnerBlock2 : parent
-Relation --> InnerBlock1 : source
-Relation --> InnerBlock2 : target
-
-@enduml
-
-@startuml
-
-package model {
-  object DiagramBlock
-  object Port
-  object InnerBlock
-  Port --> DiagramBlock : parent
-  DiagramBlock <-- InnerBlock : parent
-}
-package outer_diagram {
-  object DiagramBlockRepr
-  object PortRepr
-  Port <.. PortRepr : block
-  DiagramBlock <.. DiagramBlockRepr : block
-  DiagramBlockRepr <-- PortRepr : parent
-}
-package inner_diagram {
-  object PortLabel
-  object InnerBlockRepr
-  object RelationRepr
-  Port <.. PortLabel : block
-  PortLabel --> RelationRepr : source
-  RelationRepr --> InnerBlockRepr : target
-  InnerBlock <.. InnerBlockRepr : block
-}
-
-@enduml
+![Inside a Recursive Block](design_recursion_inside.png)
 
 ## Messages
 

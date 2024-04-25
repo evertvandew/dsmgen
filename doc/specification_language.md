@@ -71,48 +71,7 @@ These are conceptual only, nowhere in the software will you find an implementati
 The code generation builds separate classes that satisfy the necessary interfaces.
 Also, the `parents` and `entities` constraints are only used at code-generation time, not at run-time.
 
-@startuml
-interface Explorable
-interface Drawable
-interface Connectable
-
-Explorable <-- ModelExplorer : hierarchy
-Explorable --> Explorable : parents
-
-Drawable <-- DiagramEditor : contents
-
-LogicalModel --|> Explorable
-
-Entity --|> Explorable
-Entity --|> Drawable
-Entity --|> Connectable
-
-BlockDiagram --|> Explorable
-BlockDiagram --> Entity : entities
-
-Port --|> Entity
-
-Relationship --> Connectable : source
-Relationship --> Connectable : target
-Relationship --|> Drawable
-
-CompoundEntity --|> Entity
-CompoundEntity --|> BlockDiagram
-
-BlockInstance --|> Entity
-BlockInstance --> Entity : definition
-
-package future_enhancements {
-  Message --|> Entity
-  Message --> Relationship : connection
-  
-  SuperEntity --|> Entity
-
-  LanedDiagram --|> BlockDiagram
-  PuzzleDiagram --|> BlockDiagram
-}
-
-@enduml
+![Overview of the specification elements](specification_design.png)
 
 
 Some notable details:

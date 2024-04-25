@@ -1,0 +1,174 @@
+To render the diagrams in this document, simply run:
+
+    plantuml diagrams.plantuml -tpng
+
+
+Please don't forget to the rendered form of new diagrams to the GIT repo,
+so that they can be viewed in github.
+    
+@startuml design_block_relationships
+package model {
+  object Relation
+  object BlockA
+  object BlockB
+  Relation --> BlockA : source
+  Relation --> BlockB : target
+}
+package diagram {
+  object RelationRepr
+  object BlockARepr
+  object BlockBRepr
+  object Diagram
+  RelationRepr --> BlockARepr : source
+  RelationRepr --> BlockBRepr : target
+  BlockARepr --> Diagram : diagram
+  
+}
+
+BlockARepr ..> BlockA : block
+BlockBRepr ..> BlockB : block
+RelationRepr ..> Relation : relationship
+@enduml
+
+
+
+
+@startuml design_ports
+package model {
+  object Port1
+  object Port2
+  object Block
+  Port1 --> Block : parent
+  Port2 --> Block : parent
+}
+
+package diagram {
+  object PortRepr1
+  object PortRepr2
+  object BlockRepr
+  PortRepr1 ..> Port1 : block
+  PortRepr1 ..> Port2 : block
+  PortRepr1 --> BlockRepr : parent
+  PortRepr2 --> BlockRepr : parent
+  BlockRepr ..> Block : block
+  
+}
+@enduml
+
+
+
+
+@startuml design_instances
+package model {
+  object Library
+  object BlockProgram
+  object Port
+  object BlockRepr
+  object PortRepr
+  Library <-- Definition : parent
+  BlockProgram <-- Instance : parent
+  Definition <-- Port : parent
+  object Definition {
+    parameter_definition
+  }
+  object Instance {
+    parameter_values
+  }
+  Definition <-- Instance : definition
+  Port <.. PortRepr : block
+  Instance <.. BlockRepr : block
+  BlockRepr <-- PortRepr : parent
+}
+@enduml
+
+
+
+
+@startuml design_recursion_outside
+object DiagramBlock
+object OuterBlock
+object InnerBlock1
+object InnerBlock2
+object Relation
+
+OuterBlock <-- InnerBlock1 : parent
+OuterBlock <-- InnerBlock2 : parent
+Relation --> InnerBlock1 : source
+Relation --> InnerBlock2 : target
+@enduml
+
+
+
+
+@startuml design_recursion_inside
+package model {
+  object DiagramBlock
+  object Port
+  object InnerBlock
+  Port --> DiagramBlock : parent
+  DiagramBlock <-- InnerBlock : parent
+}
+package outer_diagram {
+  object DiagramBlockRepr
+  object PortRepr
+  Port <.. PortRepr : block
+  DiagramBlock <.. DiagramBlockRepr : block
+  DiagramBlockRepr <-- PortRepr : parent
+}
+package inner_diagram {
+  object PortLabel
+  object InnerBlockRepr
+  object RelationRepr
+  Port <.. PortLabel : block
+  PortLabel --> RelationRepr : source
+  RelationRepr --> InnerBlockRepr : target
+  InnerBlock <.. InnerBlockRepr : block
+}
+@enduml
+
+
+
+
+
+
+@startuml specification_design
+interface Explorable
+interface Drawable
+interface Connectable
+
+Explorable <-- ModelExplorer : hierarchy
+Explorable --> Explorable : parents
+
+Drawable <-- DiagramEditor : contents
+
+LogicalModel --|> Explorable
+
+Entity --|> Explorable
+Entity --|> Drawable
+Entity --|> Connectable
+
+BlockDiagram --|> Explorable
+BlockDiagram --> Entity : entities
+
+Port --|> Entity
+
+Relationship --> Connectable : source
+Relationship --> Connectable : target
+Relationship --|> Drawable
+
+CompoundEntity --|> Entity
+CompoundEntity --|> BlockDiagram
+
+BlockInstance --|> Entity
+BlockInstance --> Entity : definition
+
+package future_enhancements {
+  Message --|> Entity
+  Message --> Relationship : connection
+  
+  SuperEntity --|> Entity
+
+  LanedDiagram --|> BlockDiagram
+  PuzzleDiagram --|> BlockDiagram
+}
+@enduml
