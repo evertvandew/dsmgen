@@ -17,19 +17,18 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
-from browser import svg, window, console, html
-from context_menu import mk_context_menu
+from browser import svg, window
 import enum
 from weakref import ref
 import math
 from math import inf
 from dataclasses import dataclass, field
 import json
-from typing import List, Dict, Self, Optional
+from typing import List, Dict, Self, Optional, Type
 from square_routing import routeSquare
 from point import Point
 from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns, path_ending, path_origin)
-from storable_element import StorableElement, ReprCategory
+from storable_element import StorableElement
 from copy import copy
 
 # CSS class given to all handles shapes are decorated with.
@@ -57,6 +56,9 @@ class BlockOrientations(enum.IntEnum):
     BOTTOM = Orientations.BOTTOM
     LEFT = Orientations.LEFT
 
+class MsgDirection(enum.IntEnum):
+    source_2_target = enum.auto()
+    target_2_source = enum.auto()
 
 id_counter = 0
 def getId():
@@ -79,13 +81,13 @@ def Text(text_attr):
         def getShape(cls, details):
             # The text lines are wrapped in a group.
             g = svg.g()
-            g <= renderText(getattr(details, text_attr, ''), details)
+            _ = g <= renderText(getattr(details, text_attr, ''), details)
             return g
         @classmethod
         def updateShape(cls, shape, details):
             # Simply delete the previous text and write anew.
             shape.clear()
-            shape <= renderText(getattr(details, text_attr, ''), details)
+            _ = shape <= renderText(getattr(details, text_attr, ''), details)
     return TextWidget
 
 class UpdateType(enum.IntEnum):
@@ -96,9 +98,15 @@ class UpdateType(enum.IntEnum):
 class OwnerInterface:
     """ Define an interface through which a shape interacts with its parent.
         A parent can either be another shape, or the SVG canvas itself.
-
-        Python doesn't need interfaces, this is added for documentation purposes.
     """
+    def getPos(self) -> Point:
+        raise NotImplementedError()
+    def getSize(self) -> Point:
+        raise NotImplementedError()
+    def get_canvas(self):
+        return getattr(self, 'canvas', None)
+    def get_children(self) -> Optional[List[Type[Self]]]:
+        raise NotImplementedError()
     def clickChild(self, widget, ev):
         raise NotImplementedError()
     def dblclickChild(self, widget, ev):
@@ -115,19 +123,23 @@ class OwnerInterface:
         pass
     def __le__(self, svg_widget):
         raise NotImplementedError()
-    def evaluateOwnership(self, widget, pos, ex_owner):
+    def evaluateOwnership(self, widget: Type[Self], pos: Point, ex_owner: Type[Self]):
         # Check this widget is dropped on me
         if hasattr(self, 'owner'):
-            if pos.x < self.x or pos.x > self.x+self.width or pos.y < self.y or pos.y > self.y+self.height:
+            my_pos = self.getPos()
+            my_size = self.getSize()
+            if pos.x < my_pos.x or pos.x > my_pos.x+my_size.x or pos.y < my_pos.y or pos.y > my_pos.y+my_size.y:
                 owner = self.owner()
                 return owner.evaluateOwnership(widget, pos, ex_owner)
         # Check if this widget is actually dropped on a child container.
-        containers: List[OwnerInterface] = [c for c in self.children if isinstance(c, OwnerInterface)]
+        containers: List[OwnerInterface] = [c for c in self.get_children() if isinstance(c, OwnerInterface)]
         for c in containers:
             # A container can not contain itself
-            if c == widget:
+            if c is widget:
                 continue
-            if pos.x < c.x or pos.x > c.x+c.width or pos.y < c.y or pos.y > c.y+c.height:
+            c_pos = c.getPos()
+            c_size = c.getSize()
+            if pos.x < c_pos.x or pos.x > c_pos.x+c_size.x or pos.y < c_pos.y or pos.y > c_pos.y+c_size.y:
                 continue
             # The release point is inside this container. Make it the owner.
             return c.evaluateOwnership(widget, pos, self)
@@ -139,7 +151,7 @@ class OwnerInterface:
                 return
             owner.children.remove(widget)
             widget.delete()
-        self.children.append(widget)
+        self.get_children().append(widget)
         widget.create(self)
 
 
@@ -187,7 +199,7 @@ class Stylable:
     def updateShape(self):
         raise NotImplementedError()
 
-    def updateStyle(self, **updates) -> bool:
+    def updateStyle(self, **updates) -> None:
         """ Returns True if the style was actually changed. """
         current_style = self.getDefaultStyle()
         current_style.update(self.styling)
@@ -291,7 +303,7 @@ class Shape(Stylable, StorableElement):
 
         self.shape = self.getShape()
         self.shape.attrs['data-class'] = type(self).__name__
-        canvas <=  self.shape
+        _ = canvas <=  self.shape
 
         self.shape.bind('click', self.onClick)
         self.shape.bind('mousedown', self.onMouseDown)
@@ -390,7 +402,7 @@ class RouteCenterToCenter(RoutingStrategy):
     def dragHandle(self, pos):
         delta = pos - self.drag_start
         new_pos = self.initial_pos + delta
-        handle = self.decorators[self.dragged_index]
+        handle: Dict[str, int] = self.decorators[self.dragged_index]
         handle['cx'], handle['cy'] = new_pos.x, new_pos.y
         self.widget.waypoints[self.dragged_index] = new_pos
 
@@ -417,7 +429,7 @@ class RouteCenterToCenter(RoutingStrategy):
         def bind(i, d):
             d.bind('mousedown', lambda ev: self.mouseDownHandle(i, ev))
         for i, d in enumerate(self.decorators):
-            canvas <= d
+            _ = canvas <= d
             # Python shares variables inside a for loop by reference
             # So to avoid binding to the same handle x times, we need to call a function to make permanent copies.
             bind(i, d)
@@ -474,7 +486,7 @@ class RouteSquare(RoutingStrategy):
         # Now we can start moving the waypoint.
         delta = pos - self.drag_start
         new_pos = self.initial_pos[self.dragged_index] + delta
-        h = self.decorators[self.dragged_index]
+        h: Dict[str, int] = self.decorators[self.dragged_index]
         if self.widget.waypoints[wp_index].x == inf:
             self.widget.waypoints[wp_index].y = new_pos.y
             h['y1'] = int(self.original_handle_pos[self.dragged_index][0].y + delta.y)
@@ -546,7 +558,7 @@ class RouteSquare(RoutingStrategy):
                                  data_orientation=orientation, data_index=i, Class=handle_class)
             bind(len(self.decorators), decorator)
             self.initial_pos[len(self.decorators)] = c
-            canvas <= decorator
+            _ = canvas <= decorator
             self.decorators.append(decorator)
 
     def clear_decorations(self):
@@ -585,14 +597,15 @@ class Relationship(Stylable):
 
     def __post_init__(self):
         # Also set the routing_method strategy object and message container.
-        self.routing_method = router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)
-        self.messages = []
-        self.points = None
-        self.owner = None
+        self.routing_method: RoutingMethod = router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)
+        self.messages: List[Shape] = []
+        self.points: Optional[List[Point]] = None
+        self.owner: Optional[OwnerInterface] = None
+        self.terminations: List[Point] = []
 
     @property
     def canvas(self):
-        return self.owner.canvas
+        return self.owner.get_canvas()
 
     def onHover(self):
         pass
@@ -648,7 +661,7 @@ class Relationship(Stylable):
             first_point = None
             last_point = None
 
-        router = getattr(self, 'router', None) or router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)()
+        router: RoutingStrategy = getattr(self, 'router', None) or router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)()
         router.route(self, all_blocks)
         self.router = router
         if first_point is not None:
@@ -684,8 +697,8 @@ class Relationship(Stylable):
         self.path.bind('contextmenu', self.onContextMenu)
         self.selector.bind('mousedown', self.onMouseDown)
         self.selector.bind('contextmenu', self.onContextMenu)
-        self.owner.canvas <= self.selector
-        self.owner.canvas <= self.path
+        _ = self.owner.get_canvas() <= self.selector
+        _ = self.owner.get_canvas() <= self.path
 
     def delete(self):
         self.selector.remove()
@@ -732,10 +745,6 @@ class Relationship(Stylable):
         msg.orientation = orientation
         self.messages.append(msg)
 
-class MsgDirection(enum.IntEnum):
-    source_2_target = enum.auto()
-    target_2_source = enum.auto()
-
 @dataclass
 class Container(Shape, OwnerInterface):
     """
@@ -770,11 +779,11 @@ class Container(Shape, OwnerInterface):
         delta = Point(new.x - self.x, new.y - self.y)
 
         # Also update the positions for all the children
-        for child in self.children:
+        for child in self.get_children():
             child.setPos(child.getPos() + delta)
 
         # Find all connections affected by this move.
-        connections = set(c for s in self.children for c in self.getConnectionsToShape(s))
+        connections = set(c for s in self.get_children() for c in self.getConnectionsToShape(s))
         connections = list(connections)
         internal_connections = [c for c in connections if c.start in self.children and c.finish in self.children]
 
@@ -800,8 +809,8 @@ class Container(Shape, OwnerInterface):
     def setSize(self, new):
         # Keep the rect large enough to fit all children.
         if self.children:
-            min_width = max([c.x+c.width-self.x for c in self.children]) + 5
-            min_height = max([c.y+c.height-self.y for c in self.children]) + 5
+            min_width = max([c.x+c.width-self.x for c in self.get_children()]) + 5
+            min_height = max([c.y+c.height-self.y for c in self.get_children()]) + 5
             if new.x < min_width:
                 new.x = min_width
             if new.y < min_height:
