@@ -26,7 +26,7 @@ import json
 
 from property_editor import getDetailsPopup
 from modeled_shape import ModelEntity, ModelRepresentation
-from context_menu import context_menu_name, mk_context_menu
+from context_menu import mk_context_menu
 
 line_cls = 'eline'
 name_cls = 'ename'
@@ -191,15 +191,15 @@ def make_explorer(holder, api: DataStore, allowed_children):
         """ Add new elements to the explorer as the user creates them in diagrams or the property editor.
         """
         # Exclude representation records and records without a `parent` field.
-        if isinstance(source, ModelRepresentation) or not hasattr(source, 'parent') or not source.parent:
+        if isinstance(source, ModelRepresentation) or not hasattr(source, 'parent') or not source.get_parent():
             return
         assert source.Id
         # Exclude records that are already in the hierarchy
         if holder.select(f'[data-modelid="{source.Id}"]'):
             return
         # Find the insertion point for the new record
-        if source.parent:
-            model_parent_tag = holder.select_one(f'[data-modelid="{source.parent}"]')
+        if source.get_parent():
+            model_parent_tag = holder.select_one(f'[data-modelid="{source.get_parent()}"]')
             if not model_parent_tag:
                 return
             parent = model_parent_tag.parent.parent

@@ -18,16 +18,16 @@ along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
 from browser import document, console, html, bind
-from browser.widgets.dialog import Dialog, EntryDialog, InfoDialog
+from browser.widgets.dialog import Dialog
 import enum
 import diagrams
-from dataclasses import fields, MISSING, dataclass, Field
+from dataclasses import fields, MISSING
 from typing import Hashable, Dict, Any, List, Optional, Type, Callable
 import json
 from svg_shapes import HAlign, VAlign
 from model_interface import ModelEntity, EditableParameterDetails
 from shapes import HIDDEN, Stylable
-from data_store import DataStore, ExtendibleJsonEncoder, parameter_spec, parameter_values
+from data_store import DataStore, ExtendibleJsonEncoder, parameter_spec
 
 
 class longstr(str): pass

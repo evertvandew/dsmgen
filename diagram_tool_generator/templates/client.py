@@ -39,7 +39,8 @@ from model_definition import fields, is_dataclass, parameter_spec
 
 from browser import document, console, html, svg, bind, ajax
 import json
-from explorer import Element, make_explorer, context_menu_name
+from context_menu import context_menu_name
+from explorer import Element, make_explorer
 from dataclasses import dataclass, field, is_dataclass, asdict, fields
 from typing import Self, List, Dict, Any, Callable, Type, Optional, Union, Tuple
 from collections.abc import Iterable
@@ -50,9 +51,10 @@ from modeled_diagram import ModeledDiagram
 import modeled_shape as ms
 import diagrams
 import shapes
-from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, parameter_values, stylingEditorForm, parameter_types
+from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, stylingEditorForm, parameter_types
 from storable_element import Collection, StorableElement, from_dict
-from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder
+from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder, parameter_values
+from model_interface import EditableParameterDetails
 from svg_shapes import getMarkerDefinitions
 from tab_view import TabView
 from point import load_waypoints
@@ -221,10 +223,10 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         keys_types = {k.strip(): parameter_types[t.strip()] for k, t in field_specs.items()}
         return keys_types
 
-    def get_editable_parameters(self) -> List[ms.EditableParameterDetails]:
+    def get_editable_parameters(self) -> List[EditableParameterDetails]:
         regular_parameters = [
         %for name, type_ in {k:v for k, v in persistent_fields.items() if k not in ['parent', 'Id', 'ports', 'children', 'source', 'target', 'definition', 'association']}.items():
-            ms.EditableParameterDetails("${name}", ${generator.get_html_type(type_)}, self.${name}, ${generator.get_html_type(type_)}),
+            EditableParameterDetails("${name}", ${generator.get_html_type(type_)}, self.${name}, ${generator.get_html_type(type_)}),
         %endfor
         ]
         %if generator.md.is_instance_of(entity):
@@ -236,7 +238,7 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         keys_types = self.definition.get_parameter_specs()
         if keys_types:
             regular_parameters += [
-                ms.EditableParameterDetails(key, type_, self.parameters.get(key, ''), type_)
+                EditableParameterDetails(key, type_, self.parameters.get(key, ''), type_)
                 for key, type_ in keys_types.items()
             ]
         # Filter out the parameter collection field

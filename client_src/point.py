@@ -19,7 +19,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
 from dataclasses import dataclass
 import math
-from math import inf
+from math import inf        # Do not delete: used when loading the waypoints.
 from typing import List, Tuple, Self
 
 @dataclass
@@ -56,10 +56,10 @@ class Point:
         c = math.cos(angle)
         s = math.sin(angle)
         return Point(x=c*self.x-s*self.y, y=s*self.x+c*self.y)
-    def __json__(self) -> str:
+    def __json__(self) -> Tuple[float, float]:
         return self.astuple()
 
-def load_waypoints(s: str) -> List[Tuple[float, float]]:
+def load_waypoints(s: str) -> List[Point]:
     """ The Brython JSON decoder doesn't handle infinity, so we need a workaround. """
     if not s:
         return []

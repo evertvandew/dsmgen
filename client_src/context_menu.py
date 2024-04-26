@@ -1,7 +1,5 @@
 
-from typing import Dict, Callable, Union
-
-from browser import html, console, bind, document
+from browser import html, document
 
 context_menu_name = 'ContextMenu'
 

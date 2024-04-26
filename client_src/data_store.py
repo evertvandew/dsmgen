@@ -24,14 +24,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
 from enum import Enum, IntEnum, auto
 import json
-from copy import deepcopy, copy
-from dataclasses import dataclass, is_dataclass, asdict, fields, field, Field
+from dataclasses import dataclass, is_dataclass, fields, field
 from typing import Dict, Callable, List, Any, Iterable, Tuple, Optional, Type
 from dispatcher import EventDispatcher
-from math import inf         # Used when evaluating waypoint strings
+from math import inf         # Do not delete: used when evaluating waypoint strings
 from contextlib import contextmanager
 from storable_element import StorableElement, Collection, ReprCategory
-from browser import ajax, console, alert
+from browser import ajax, alert
 
 class parameter_spec(str):
     """ A parameter spec is represented in the REST api as a string with this structure:
@@ -54,7 +53,7 @@ class DataConfiguration:
     relation_entities: Dict[str, StorableElement]
     port_entities: Dict[str, StorableElement]
     base_url: str
-    all_classes: Dict[str, StorableElement] = field(default_factory=dict)
+    all_classes: Dict[str, Type[StorableElement]] = field(default_factory=dict)
 
     def __post_init__(self):
         result = {}
@@ -83,7 +82,7 @@ class ExtendibleJsonEncoder(json.JSONEncoder):
             result['__classname__'] = type(o).__name__
             return result
         elif isinstance(o, Enum):
-            return int(o)
+            return o.value
         elif isinstance(o, bytes):
             return o.decode('utf8')
         return str(o)
@@ -141,7 +140,7 @@ class DataStore(EventDispatcher):
             if not model.Id:
                 # Insert this model item as a child of the diagram (diagrams are also folders in the explorer).
                 if not getattr(model, 'parent', True):
-                    model.parent = record.diagram
+                    model.parent = record.get_diagram()
                 # Add the model item
                 self.add(model)
 
@@ -159,7 +158,7 @@ class DataStore(EventDispatcher):
             self.add_data(record)
             # For ports, also update the ports collections in the parent block.
             if record.repr_category() == ReprCategory.port:
-                repr_parent = self.live_instances[Collection.block_repr][record.parent]
+                repr_parent = self.live_instances[Collection.block_repr][record.get_parent()]
                 if record not in repr_parent.ports:
                     repr_parent.ports.append(record)
                     self.update_cache(repr_parent)
@@ -178,7 +177,7 @@ class DataStore(EventDispatcher):
             self.add_data(record)
             # For ports, also update the ports collections in the parent block.
             if type(record).__name__ in self.configuration.port_entities:
-                parent_block = self.live_instances[Collection.block][record.parent]
+                parent_block = self.live_instances[Collection.block][record.get_parent()]
                 if record not in parent_block.ports:
                     parent_block.ports.append(record)
                     self.update_cache(parent_block)
@@ -201,7 +200,7 @@ class DataStore(EventDispatcher):
             repr = record.asdict()
             changed = any(getattr(org_repr, k) != v for k, v in repr.items() if hasattr(org_repr, k) and k not in ['ports', 'model_entity'])
             if collection == Collection.relation_repr:
-                changed = changed or org_repr.waypoints != record.waypoints
+                changed = changed or org_repr.waypoints != record.get_waypoints()
             if changed:
                 data = json.dumps(repr, cls=ExtendibleJsonEncoder)
                 ajax.post(f'{self.configuration.base_url}/{record.get_db_table()}/{record.Id}', blocking=True, data=data,
@@ -272,8 +271,8 @@ class DataStore(EventDispatcher):
                 lu[r.Id] = r
             roots = []
             for r in records:
-                if r.parent:
-                    lu[r.parent].children.append(r)
+                if r.get_parent():
+                    lu[r.get_parent()].get_children().append(r)
                 else:
                     roots.append(r)
             cb(roots)
@@ -343,9 +342,9 @@ class DataStore(EventDispatcher):
                 # Ports are not yielded directly to the diagram, they are added to the block that owns them.
                 for p in [r for r in representations if r.repr_category() == ReprCategory.port]:
                     block = self.get(Collection.block_repr, p.parent)
-                    block.ports.append(p)
-                    block.model_entity.ports.append(p.model_entity)
-                    self.update_cache([block, block.model_entity])
+                    block.get_ports().append(p)
+                    block.get_model_details().get_ports().append(p.model_entity)
+                    self.update_cache([block, block.get_model_details()])
 
                 # Then handle the relationships
                 for d in [r for r in representations if r.repr_category() == ReprCategory.relationship]:
@@ -354,7 +353,7 @@ class DataStore(EventDispatcher):
                 # Like the ports, messages are yielded through representations.
                 for p in [r for r in representations if r.repr_category() == ReprCategory.message]:
                     relation = self.get(Collection.relation_repr, p.parent)
-                    relation.messages.append(p)
+                    relation.get_messages().append(p)
                     self.update_cache(relation)
 
                 cb(records)
@@ -449,7 +448,7 @@ class DataStore(EventDispatcher):
         repr = record.asdict()
         return repr, record.model_entity
 
-    def get_instance_parameters(self, instance_representation: Any) -> Optional[Tuple[str, type, Any]]:
+    def get_instance_parameters(self, instance_representation: Any) -> Optional[Tuple[List[str], List[type], List[Any]]]:
         """ Inspect the definition object being instantiated by the argument, to determine the parameters it needs.
             Returns either None (if the object isn't an Instance),
             or a tuple of argument names, argument types and current argument values.

@@ -17,10 +17,10 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
-from typing import Any, Self, List, Dict, Optional, Type
+from typing import Any, Self, List, Dict, Optional, cast
 from dataclasses import dataclass, field
 import json
-from browser import svg, console, document
+from browser import svg, document
 from diagrams import Shape, Relationship, CP, Point, Orientations
 import shapes
 from svg_shapes import MsgShape
@@ -30,7 +30,7 @@ from data_store import ExtendibleJsonEncoder, DataStore
 from point import load_waypoints
 from copy import deepcopy, copy
 from property_editor import getDetailsPopup
-from model_interface import ModelEntity, EditableParameterDetails
+from model_interface import ModelEntity
 
 ###############################################################################
 @dataclass
@@ -67,11 +67,14 @@ class ModeledShape(Shape, ModelRepresentation):
 
     @property
     def block(self):
-        return self.model_entity.Id
+        storable_entity = cast(StorableElement, self.model_entity)
+        return storable_entity.Id
 
-    def asdict(self) -> Dict[str, Any]:
-        details = StorableElement.asdict(self, ignore=['model_entity', 'ports'])
-        details['block'] = self.model_entity.Id
+    def asdict(self, ignore: List[str]=None) -> Dict[str, Any]:
+        ignore = (ignore or []) + ['model_entity', 'ports']
+        details = StorableElement.asdict(self, ignore=ignore)
+        storable_entity = cast(StorableElement, self.model_entity)
+        details['block'] = storable_entity.Id
         if 'children' in details:
             del details['children']
         return details
@@ -84,7 +87,8 @@ class ModeledShape(Shape, ModelRepresentation):
         _ = g <= self.TextWidget.getShape(self)
         g.attrs['data-category'] = int(self.repr_category())
         g.attrs['data-rid'] = self.Id
-        g.attrs['data-mid'] = self.model_entity.Id
+        storable_entity = cast(StorableElement, self.model_entity)
+        g.attrs['data-mid'] = storable_entity.Id
         return g
 
     def updateShape(self, shape=None):
@@ -131,9 +135,14 @@ class Port(CP, ModelRepresentation):
     parent: Optional[int] = None    # The block this port belongs to.
     category: ReprCategory = ReprCategory.block
 
+    def __post_init__(self):
+        self.shape = None
+        self.pos: Point = Point(0, 0)
+
     @property
     def block(self):
-        return self.model_entity.Id
+        storable_entity = cast(StorableElement, self.model_entity)
+        return storable_entity.Id
 
     def getShape(self):
         p = self.pos
@@ -141,7 +150,8 @@ class Port(CP, ModelRepresentation):
         shape.attrs['data-class'] = type(self).__name__
         shape.attrs['data-category'] = int(ReprCategory.port)
         shape.attrs['data-rid'] = self.Id
-        shape.attrs['data-mid'] = self.model_entity.Id
+        storable_entity = cast(StorableElement, self.model_entity)
+        shape.attrs['data-mid'] = storable_entity.Id
         return shape
     def updateShape(self, shape=None):
         shape = shape or self.shape
@@ -164,8 +174,9 @@ class Port(CP, ModelRepresentation):
     def repr_category(cls) -> ReprCategory:
         return ReprCategory.port
 
-    def asdict(self) -> Dict[str, Any]:
-        details = StorableElement.asdict(self, ignore=['model_entity', 'id'])
+    def asdict(self, ignore: List[str]=None) -> Dict[str, Any]:
+        ignore = (ignore or []) + ['model_entity', 'id']
+        details = StorableElement.asdict(self, ignore=ignore)
         return details
 
     def get_db_table(cls):
@@ -176,12 +187,13 @@ class ModeledShapeAndPorts(ModeledShape):
     ports: List[Port] = field(default_factory=list)
     children: [Self] = field(default_factory=list)
 
-    def asdict(self) -> Dict[str, Any]:
-        details = super().asdict()
+    def asdict(self, ignore: List[str]=None) -> Dict[str, Any]:
+        details = super().asdict(ignore)
         return details
 
-    def copy(self) -> Self:
-        result = super().copy(ignore=['ports', 'children', 'model_entity', 'id'])
+    def copy(self, ignore=None) -> Self:
+        ignore = (ignore or []) + ['ports', 'children', 'model_entity', 'id']
+        result = super().copy(ignore=ignore)
         result.ports = self.ports
         result.children = self.children
         return result
@@ -227,7 +239,8 @@ class ModeledShapeAndPorts(ModeledShape):
 
         g.attrs['data-category'] = int(ReprCategory.block)
         g.attrs['data-rid'] = self.Id
-        g.attrs['data-mid'] = self.model_entity.Id
+        storable_entity = cast(StorableElement, self.model_entity)
+        g.attrs['data-mid'] = storable_entity.Id
 
         # Return the group of objects
         return g
@@ -297,16 +310,18 @@ class ModeledRelationship(Relationship, ModelRepresentation):
 
     @property
     def relationship(self):
-        return self.model_entity.Id
+        storable_entity = cast(StorableElement, self.model_entity)
+        return storable_entity.Id
 
     def onContextMenu(self, ev):
         ev.stopPropagation()
         ev.preventDefault()
-        msgs = self.model_entity.get_messages()
+        storable_entity = cast(StorableElement, self.model_entity)
+        msgs = storable_entity.get_messages()
         def bind_add_msg_action(cls):
             def do_add(ev):
                 def callback(data):
-                    new_object = cls(parent=self.diagram, association=self.model_entity.Id, **data)
+                    new_object = cls(parent=self.diagram, association=storable_entity.Id, **data)
                     new_shape = Message(model_entity=new_object, parent=self.Id, diagram=self.diagram)
                     self.add_message(new_shape)
 
@@ -324,8 +339,9 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         self.owner.child_update(shapes.UpdateType.add, new_shape)
         new_shape.create(self.owner)
 
-    def copy(self) -> Self:
-        result = super().copy(ignore=['start', 'finish', 'model_entity', 'id'])
+    def copy(self, ignore:Optional[List[str]]=None) -> Self:
+        ignore = (ignore or []) + ['start', 'finish', 'model_entity', 'id']
+        result = super().copy(ignore=ignore)
         result.start = self.start
         result.finish = self.finish
         # The waypoints need to be deep-copied
@@ -333,7 +349,7 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         return result
 
     @staticmethod
-    def from_dict(data_store: DataStore, **details) -> Self:
+    def from_dict(data_store: DataStore, **details) -> ModelRepresentation:
         self = from_dict(ModeledRelationship, **details)
         self.start = data_store.get(Collection.block_repr, details['source_repr_id'])
         self.finish = data_store.get(Collection.block_repr, details['target_repr_id'])
@@ -341,9 +357,11 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         self.category = ReprCategory.relationship
         return self
 
-    def asdict(self) -> Dict[str, Any]:
-        details = StorableElement.asdict(self, ignore=['model_entity', 'start', 'finish', 'waypoints', 'id', 'category'])
-        details['relationship'] = self.model_entity.Id
+    def asdict(self, ignore:Optional[List[str]]=None) -> Dict[str, Any]:
+        ignore = (ignore or []) + ['model_entity', 'start', 'finish', 'waypoints', 'id', 'category']
+        storable_entity = cast(StorableElement, self.model_entity)
+        details = StorableElement.asdict(self, ignore=ignore)
+        details['relationship'] = storable_entity.Id
         details['source_repr_id'] = self.start.Id
         details['target_repr_id'] = self.finish.Id
         details['routing'] = json.dumps(self.waypoints, cls=ExtendibleJsonEncoder)
@@ -361,7 +379,8 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         super().route(all_blocks)
         self.path.attrs['data-category'] = int(ReprCategory.relationship)
         self.path.attrs['data-rid'] = self.Id
-        self.path.attrs['data-mid'] = self.model_entity.Id
+        storable_entity = cast(StorableElement, self.model_entity)
+        self.path.attrs['data-mid'] = storable_entity.Id
 
     def get_db_table(cls):
         return '_RelationshipRepresentation'
@@ -376,14 +395,16 @@ class Message(ModeledShape):
         return False
 
     @staticmethod
-    def from_dict(data_store: DataStore, **details) -> Self:
+    def from_dict(data_store: DataStore, **details) -> ModeledShape:
         self = from_dict(Message, **details)
         self.category = ReprCategory.message
         return self
 
-    def asdict(self) -> Dict[str, Any]:
-        details = StorableElement.asdict(self, ignore=['model_entity', 'id', 'category', 'width', 'height'])
-        details['message'] = self.model_entity.Id
+    def asdict(self, ignore:Optional[List[str]]=None) -> Dict[str, Any]:
+        ignore = (ignore or []) + ['model_entity', 'id', 'category', 'width', 'height']
+        storable_entity = cast(StorableElement, self.model_entity)
+        details = StorableElement.asdict(self, ignore=ignore)
+        details['message'] = storable_entity.Id
         return details
 
     @classmethod

@@ -27,7 +27,7 @@ class ModelEntity:
     default_styling = {}
     def get_text(self, index: int) -> str:
         """ Retrieve a specific string associated with the item that is needed in the diagram. """
-        return self.name
+        return getattr(self, 'name', '')
     def get_nr_texts(self) -> int:
         """ Ask how many texts this item wants to display """
         return 1

@@ -27,7 +27,7 @@ from browser.widgets.dialog import InfoDialog
 from diagrams import Diagram, getMousePos, DiagramConfiguration
 import shapes
 from data_store import DataStore, ReprCategory, StorableElement, Collection, ReprCategory
-from modeled_shape import ModeledRelationship, ModelEntity
+from modeled_shape import ModeledRelationship, ModelEntity, ModeledShape
 
 class ModeledDiagram(Diagram):
     def __init__(self, config: DiagramConfiguration, widgets, datastore: DataStore, diagram_id: int):
@@ -196,7 +196,7 @@ class ModeledDiagram(Diagram):
         else:
             self.connect_specific(a, b, clss[0])
 
-    def mouseDownChild(self, widget: shapes.Shape, ev):
+    def mouseDownChild(self, widget: ModeledShape, ev, update_func=None):
         def uf(new_data: str):
             # Store the existing values to see if anything actually changed.
             new_values = json.loads(new_data)
@@ -212,7 +212,7 @@ class ModeledDiagram(Diagram):
 
         super().mouseDownChild(widget, ev, uf)
 
-    def mouseDownConnection(self, connection: shapes.Relationship, ev):
+    def mouseDownConnection(self, connection: ModeledRelationship, ev, update_function=None) -> None:
         def uf(new_data):
             # Store the existing values to see if anything actually changed.
             data = json.loads(new_data)
