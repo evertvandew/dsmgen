@@ -75,7 +75,8 @@ Also, the `parents` and `entities` constraints are only used at code-generation 
 
 
 Some notable details:
-* A port is just a regular Entity. The only difference between the two is how they are rendered in a diagram.
+* A Port is just a regular Entity. The only difference between the two is how they are rendered in a diagram.
+  Same for a Message.
 * Relationships are not explorable. This may change in the future. 
   In most UML tools, relationships *are* explorable, but I find that illogical.
   Is a relationship represented with the source? The target? Both?

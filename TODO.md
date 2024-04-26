@@ -20,6 +20,7 @@
 * Get rid of mechanisms where the presence of an attribute decides actions. Replace these with (member) functions.
 
 # Future enhancements
+* Place texts with an offset, and allow that offset to be edited. Perhaps also the bounding box of the text.
 * When opening a diagram for the second time, open the existing diagram instead.
 * Support selecting multiple elements and moving them.
 * Implement selection by drawing a rectangle with the mouse.

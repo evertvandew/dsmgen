@@ -162,9 +162,10 @@ CompoundEntity --|> BlockDiagram
 BlockInstance --|> Entity
 BlockInstance --> Entity : definition
 
+Message --|> Entity
+Message --> Relationship : connection
+
 package future_enhancements {
-  Message --|> Entity
-  Message --> Relationship : connection
   
   SuperEntity --|> Entity
 
