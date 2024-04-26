@@ -1,8 +1,9 @@
 
 from enum import Enum, IntEnum, auto
-from typing import Self, Tuple, List, Dict, Any, Optional
+from typing import Self, Tuple, List, Dict, Any, Optional, Type
 from dataclasses import dataclass, fields, Field
 from copy import deepcopy
+from point import Point
 
 class Collection(Enum):
     hierarchy = 'hierarchy'
@@ -83,5 +84,23 @@ class StorableElement:
     def get_db_table(cls):
         return cls.__name__
 
-    def get_model_details(self) -> Optional[Self]:
+    def get_model_details(self) -> Optional[Type[Self]]:
         return None
+
+    def get_diagram(self) -> Optional[int]:
+        return getattr(self, 'diagram', None)
+
+    def get_parent(self) -> Optional[int]:
+        return getattr(self, 'parent', None)
+
+    def get_waypoints(self) -> Optional[List[Point]]:
+        return getattr(self, 'waypoints', None)
+
+    def get_ports(self) -> Optional[List[Type[Self]]]:
+        return getattr(self, 'ports', None)
+
+    def get_children(self) -> Optional[List[Type[Self]]]:
+        return getattr(self, 'children', None)
+
+    def get_messages(self) -> Optional[List[Type[Self]]]:
+        return getattr(self, 'messages', None)
