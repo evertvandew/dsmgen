@@ -134,10 +134,10 @@ diagram_w_instance = [
      "category": int(data_store.ReprCategory.block),
      "_entity": {"order": 0, "parameters": {"parameters": {"factor": 41, "gain": 3.1415}}, "Id": 7, "parent": 3, "definition": 4, "__classname__": "BlockInstance"},
      "_definition": {"order": 0, "Id": 4, "parent": 1, "name": "test block", "implementation": "", "parameters": {"factor": "int", "gain": "float"}, "__classname__": "SubProgramDefinition"}},
-    {"Id": 2, "diagram": 3, "block": 5, "parent": 1, "x": 0.0, "y": 0.0, "z": 0.0, "width": 0.0, "height": 0.0, "styling": {}, "block_cls": "FlowPortRepresentation", "__classname__": "_BlockRepresentation",
+    {"Id": 2, "diagram": 3, "block": 5, "parent": 1, "x": 0.0, "y": 0.0, "z": 0.0, "width": 64.0, "height": 40.0, "styling": {}, "block_cls": "FlowPortRepresentation", "__classname__": "_BlockRepresentation",
      "category": int(data_store.ReprCategory.block),
      "_entity": {"order": 0, "orientation": 8, "Id": 5, "name": "in", "parent": 4, "__classname__": "FlowPort"}},
-    {"Id": 3, "diagram": 3, "block": 6, "parent": 1, "x": 0.0, "y": 0.0, "z": 0.0, "width": 0.0, "height": 0.0, "styling": {}, "block_cls": "FlowPortRepresentation", "__classname__": "_BlockRepresentation",
+    {"Id": 3, "diagram": 3, "block": 6, "parent": 1, "x": 0.0, "y": 0.0, "z": 0.0, "width": 64.0, "height": 40.0, "styling": {}, "block_cls": "FlowPortRepresentation", "__classname__": "_BlockRepresentation",
      "category": int(data_store.ReprCategory.port),
      "_entity": {"order": 0, "orientation": 4, "Id": 6, "name": "out", "parent": 4, "__classname__": "FlowPort"}}
 ]
@@ -512,6 +512,9 @@ class IntegrationContext:
                 self.enter_connection_mode()
                 source.shape.dispatchEvent(events.MouseDown())
                 source.shape.dispatchEvent(events.MouseUp())
+                # Move the mouse over the canvas
+                delta = (target.getPos() - source.getPos()).astuple()
+                self.parent.dispatchEvent(events.MouseMove(offsetX=delta[0]/2, offsetY=delta[1]/2))
                 target.shape.dispatchEvent(events.MouseDown())
                 target.shape.dispatchEvent(events.MouseUp())
 
@@ -1421,7 +1424,7 @@ def integration_tests():
                 }
             },
             {
-                "Id": 2, "diagram": 5, "block": 7, "parent": None, "x": 347.0, "y": 188.0, "z": 0.0, "width": 64.0,
+                "Id": 2, "diagram": 5, "block": 7, "parent": None, "x": 647.0, "y": 188.0, "z": 0.0, "width": 64.0,
                 "height": 40.0, "order": 0, "styling": "", "category": 2,
                 "__classname__": "_BlockRepresentation",
                 "_entity": {
@@ -1634,6 +1637,6 @@ def integration_tests():
 
 if __name__ == '__main__':
     #import cProfile
-    run_tests('*.add_move_delete_message')
+    run_tests('*.block_properties_editor_instance')
     run_tests()
     #cProfile.run('run_tests()', sort='tottime')

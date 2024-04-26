@@ -38,10 +38,11 @@ class Point:
         return Point(self.x*scalar, self.y*scalar)
     def __rmul__(self, scalar):
         return Point(self.x * scalar, self.y * scalar)
-    def __len__(self):
-        return math.sqrt(self.x*self.x + self.y*self.y)
     def norm(self):
-        return self.__len__()
+        return math.sqrt(self.x*self.x + self.y*self.y)
+    def normalize(self):
+        l = self.norm()
+        return self / l
     def dot(self, other):
         return self.x*other.x + self.y*other.y
     def astuple(self):

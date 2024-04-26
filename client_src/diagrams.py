@@ -335,7 +335,7 @@ class RerouteStates(BehaviourFSM):
         pos = getMousePos(ev)
         if self.state == self.States.POTENTIAL_DRAG:
             delta = pos - self.dragstart
-            if len(delta) > 10:
+            if delta.norm() > 10:
                 self.widget.router.createWaypointByDrag(pos, self.widget, self.diagram.canvas)
                 self.state = self.States.DRAGGING
         if self.state == self.States.DRAGGING:
@@ -403,7 +403,7 @@ class ConnectionEditor(BehaviourFSM):
         # Let the temporary line follow the mouse.
         # But ensure it doesn't hide the B-shape
         v = pos - self.a_party.getPos()
-        delta = (v/len(v)) * 2
+        delta = (v.normalize()) * 2
         self.path['x2'], self.path['y2'] = [int(i) for i in (pos - delta).astuple()]
     def delete(self, diagram):
         if self.state != self.States.NONE:
