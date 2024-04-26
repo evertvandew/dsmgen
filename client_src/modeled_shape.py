@@ -57,8 +57,6 @@ class ModelRepresentation(StorableElement):
 
 @dataclass
 class ModeledShape(Shape, ModelRepresentation):
-    parent: Optional[int] = None        # For hierarchical shapes (inner block & ports): the owner of this repr.
-
     default_style = dict(blockcolor='#FFFBD6')
     TextWidget = shapes.Text('text')
     category: ReprCategory = ReprCategory.block

@@ -25,7 +25,7 @@ import math
 from math import inf
 from dataclasses import dataclass, field
 import json
-from typing import List, Dict
+from typing import List, Dict, Self, Optional
 from square_routing import routeSquare
 from point import Point
 from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns, path_ending, path_origin)
@@ -205,6 +205,8 @@ class Shape(Stylable, StorableElement):
     z: float = 0.0
     order: int = 0
     styling: Dict[str, str] = field(default_factory=dict)
+    parent: Optional[Self] = None
+    Id: int = 0
 
     default_style = dict()
     owner = None
@@ -596,9 +598,6 @@ class Relationship(Stylable):
         pass
 
     def onDrag(self):
-        pass
-
-    def getMenu(self):
         pass
 
     def onMouseDown(self, ev):

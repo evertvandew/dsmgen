@@ -20,41 +20,43 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from dataclasses import dataclass
 import math
 from math import inf
-from typing import List, Tuple
+from typing import List, Tuple, Self
 
 @dataclass
 class Point:
     x: float
     y: float
-    def __str__(self):
+    def __str__(self) -> str:
         return f"({self.x}, {self.y})"
-    def __add__(self, other):
+    def __add__(self, other) -> Self:
         return Point(self.x + other.x, self.y + other.y)
-    def __sub__(self, other):
+    def __sub__(self, other) -> Self:
         return Point(self.x - other.x, self.y - other.y)
-    def __truediv__(self, scalar):
+    def __truediv__(self, scalar) -> Self:
         return Point(self.x/scalar, self.y/scalar)
-    def __mul__(self, scalar):
+    def __mul__(self, scalar) -> Self:
         return Point(self.x*scalar, self.y*scalar)
-    def __rmul__(self, scalar):
+    def __rmul__(self, scalar) -> Self:
         return Point(self.x * scalar, self.y * scalar)
-    def norm(self):
+    def norm(self) -> float:
         return math.sqrt(self.x*self.x + self.y*self.y)
-    def normalize(self):
+    def normalize(self) -> Self:
         l = self.norm()
-        return self / l
-    def dot(self, other):
+        if l > 1e-10:
+            return self / l
+        return self
+    def dot(self, other) -> float:
         return self.x*other.x + self.y*other.y
-    def astuple(self):
+    def astuple(self) -> Tuple[float, float]:
         return (float(self.x), float(self.y))
-    def transpose(self):
+    def transpose(self) -> Self:
         return Point(x=self.y, y=-self.x)
-    def rot(self, angle: float):
+    def rot(self, angle: float) -> Self:
         """ Rotate the vector by a specific angle (in radians). """
         c = math.cos(angle)
         s = math.sin(angle)
         return Point(x=c*self.x-s*self.y, y=s*self.x+c*self.y)
-    def __json__(self):
+    def __json__(self) -> str:
         return self.astuple()
 
 def load_waypoints(s: str) -> List[Tuple[float, float]]:

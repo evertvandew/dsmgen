@@ -71,24 +71,24 @@ orientation_details = {
                 Orientations.LEFT: (1, 0, -1, 0, 1, 0)
             }
 
-def moveSingleHandle(decorators, widget, orientation):
+def moveSingleHandle(decorators, widget, orientation) -> None:
     d = decorators[orientation]
     x, y, width, height = [getattr(widget, k) for k in ['x', 'y', 'width', 'height']]
     d['cx'], d['cy'] = [int(i) for i in locations[orientation](x, y, width, height)]
 
-def moveHandles(decorators, widget, orientation):
+def moveHandles(decorators, widget, orientation) -> None:
     # Determine which markers to move
     for o in to_update[orientation]:
         moveSingleHandle(decorators, widget, o)
 
-def moveAll(widget, decorators):
+def moveAll(widget, decorators) -> None:
     for o in Orientations:
         moveSingleHandle(decorators, widget, o)
 
 
 class FSMEnvironment:
     """ The FSM needs to talk back to its "environment", the Diagram object. """
-    def updateElement(self, element):
+    def updateElement(self, element) -> None:
         """ Called whenever an element has been updated without informing the Environment
             in another way.
         """
@@ -96,26 +96,26 @@ class FSMEnvironment:
 
 class BehaviourFSM:
     # FIXME: Remove the diagrams from all these functions.
-    def mouseDownShape(self, diagram, widget, ev):
+    def mouseDownShape(self, diagram, widget, ev) -> None:
         pass
-    def mouseDownConnection(self, diagram, widget, ev):
+    def mouseDownConnection(self, diagram, widget, ev) -> None:
         pass
-    def mouseDownPort(self, diagram, widget, ev):
+    def mouseDownPort(self, diagram, widget, ev) -> None:
         pass
-    def mouseDownBackground(self, diagram, ev):
+    def mouseDownBackground(self, diagram, ev) -> None:
         pass
-    def onMouseUp(self, diagram, ev):
+    def onMouseUp(self, diagram, ev) -> None:
         pass
-    def onMouseMove(self, diagram, ev):
+    def onMouseMove(self, diagram, ev) -> None:
         pass
-    def onKeyDown(self, diagram, ev):
+    def onKeyDown(self, diagram, ev) -> None:
         pass
-    def delete(self, diagram):
+    def delete(self, diagram) -> None:
         """ Called when the FSM is about to be deleted"""
         pass
-    def is_at_rest(self):
+    def is_at_rest(self) -> bool:
         """ Returns True if the state machine is not in the middle of something. """
-        return True
+        raise NotImplementedError()
 
 
 class ResizeStates(enum.IntEnum):
@@ -129,13 +129,13 @@ class ResizeFSM(BehaviourFSM):
         super().__init__()
         self.state: ResizeStates = ResizeStates.NONE
         self.diagram = diagram
-        self.widget: Shape | List[Shape] = None
+        self.widget: Optional[Shape | List[Shape]] = None
         self.decorators = {}
 
-    def is_at_rest(self):
+    def is_at_rest(self) -> bool:
         return self.state == ResizeStates.NONE
 
-    def mouseDownShape(self, diagram, widget, ev):
+    def mouseDownShape(self, diagram, widget, ev) -> None:
         if self.state != ResizeStates.NONE and self.widget != widget:
             self.unselect()
         if self.state == ResizeStates.NONE:
@@ -146,7 +146,7 @@ class ResizeFSM(BehaviourFSM):
         ev.stopPropagation()
         ev.preventDefault()
 
-    def mouseDownConnection(self, diagram, widget, ev):
+    def mouseDownConnection(self, diagram, widget, ev) -> None:
         # We need to change the state machine
         if self.state != ResizeStates.NONE:
             self.unselect()
@@ -154,7 +154,7 @@ class ResizeFSM(BehaviourFSM):
         self.diagram.changeFSM(fsm)
         fsm.mouseDownConnection(diagram, widget, ev)
 
-    def mouseDownBackground(self, diagram, ev):
+    def mouseDownBackground(self, diagram, ev) -> None:
         if self.widget and ev.target == self.widget.shape:
             self.state = ResizeStates.MOVING
             return
@@ -169,7 +169,7 @@ class ResizeFSM(BehaviourFSM):
             self.initial_size = diagram.selection.getSize()
 
 
-    def onMouseUp(self, diagram, ev):
+    def onMouseUp(self, diagram, ev) -> None:
         # If an object was being moved, evaluate if it changed owner
         if self.state == ResizeStates.MOVING:
             pos = getMousePos(ev)
@@ -178,7 +178,7 @@ class ResizeFSM(BehaviourFSM):
             self.diagram.updateElement(self.widget)
             self.state = ResizeStates.DECORATED
 
-    def onMouseMove(self, diagram, ev):
+    def onMouseMove(self, diagram, ev) -> None:
         if self.state in [ResizeStates.NONE, ResizeStates.DECORATED]:
             return
         delta = getMousePos(ev) - self.dragstart
@@ -188,18 +188,18 @@ class ResizeFSM(BehaviourFSM):
             self.widget.setPos(self.initial_pos + delta)
             diagram.rerouteConnections(self.widget)
 
-    def delete(self, diagram):
+    def delete(self, diagram) -> None:
         """ Called when the FSM is about to be deleted"""
         if self.state != ResizeStates.NONE:
             self.unselect()
 
-    def startResize(self, widget, orientation, ev):
+    def startResize(self, widget, orientation, ev) -> None:
         self.dragstart = getMousePos(ev)
         self.state = ResizeStates.RESIZING
         self.initial_pos = widget.getPos()
         self.initial_size = widget.getSize()
 
-    def unselect(self):
+    def unselect(self) -> None:
         if self.widget.isResizable():
             for dec in self.decorators.values():
                 dec.remove()
@@ -209,7 +209,7 @@ class ResizeFSM(BehaviourFSM):
         self.widget = None
         self.state = ResizeStates.NONE
 
-    def select(self, widget):
+    def select(self, widget) -> None:
         self.widget = widget
 
         if widget.isResizable():
@@ -229,12 +229,12 @@ class ResizeFSM(BehaviourFSM):
                 d.bind('mousedown', dragStart)
 
             for orientation, d in self.decorators.items():
-                self.diagram.canvas <= d
+                _ = self.diagram.canvas <= d
                 bind_decorator(d, orientation)
 
             widget.subscribe(resize_role, lambda w: moveAll(w, self.decorators))
 
-    def onDrag(self, origin, original_size, delta):
+    def onDrag(self, origin, original_size, delta) -> None:
         dx, dy, sx, sy, mx, my = orientation_details[self.dragged_handle]
         d = self.decorators[self.dragged_handle]
         shape = self.widget
@@ -247,7 +247,7 @@ class ResizeFSM(BehaviourFSM):
         moveHandles(self.decorators, shape, self.dragged_handle)
         self.diagram.rerouteConnections(shape)
 
-    def onKeyDown(self, diagram, ev):
+    def onKeyDown(self, diagram, ev) -> None:
         if ev.key == 'Delete':
             if self.state != ResizeStates.NONE:
                 widget = self.widget
@@ -262,20 +262,28 @@ class ResizeFSM(BehaviourFSM):
                     self.unselect()
                     diagram.deleteBlock(widget)
 
+class ReroutingState(enum.IntEnum):
+    NONE = enum.auto()
+    DECORATED = enum.auto()
+    HANDLE_SELECTED = enum.auto()
+    POTENTIAL_DRAG = enum.auto()
+    DRAGGING = enum.auto()
 
 class RerouteStates(BehaviourFSM):
-    States = enum.IntEnum('States', 'NONE DECORATED HANDLE_SELECTED POTENTIAL_DRAG DRAGGING')
+    States = ReroutingState
     def __init__(self, diagram):
         super().__init__()
         self.state = self.States.NONE
         self.diagram = diagram
         self.decorators = []
         self.dragged_index = None
+        self.drag_start = Point(0, 0)
+        self.initial_pos = Point(0, 0)
 
-    def is_at_rest(self):
+    def is_at_rest(self) -> bool:
         return self.state == self.States.NONE
 
-    def mouseDownShape(self, diagram, widget, ev):
+    def mouseDownShape(self, diagram, widget, ev) -> None:
         # We need to change the state machine
         if self.state != self.States.NONE:
             self.clear_decorations()
@@ -284,7 +292,7 @@ class RerouteStates(BehaviourFSM):
         fsm.mouseDownShape(diagram, widget, ev)
 
 
-    def mouseDownConnection(self, diagram, widget, ev):
+    def mouseDownConnection(self, diagram, widget, ev) -> None:
         if self.state != self.States.NONE:
             self.clear_decorations()
         self.widget = widget
@@ -296,20 +304,20 @@ class RerouteStates(BehaviourFSM):
         ev.stopPropagation()
         ev.preventDefault()
 
-    def mouseDownBackground(self, diagram, ev):
+    def mouseDownBackground(self, diagram, ev) -> None:
         if diagram.selection and ev.target == diagram.selection.shape:
-            self.state = self.States.MOVING
+            self.state = self.States.DRAGGING
             return
         if self.state != self.States.NONE:
             self.clear_decorations()
         self.state = self.States.NONE
 
-    def handleDragStart(self, index, ev):
+    def handleDragStart(self, index, ev) -> None:
         self.state = self.States.DRAGGING
         ev.stopPropagation()
         ev.preventDefault()
 
-    def dragHandle(self, ev):
+    def dragHandle(self, ev) -> None:
         delta = getMousePos(ev) - self.drag_start
         new_pos = self.initial_pos + delta
         handle = self.decorators[self.dragged_index]
@@ -320,7 +328,7 @@ class RerouteStates(BehaviourFSM):
             handle['y1'] = handle['y2'] = new_pos.y
             self.widget.waypoints[self.dragged_index] = Point(x=inf, y=new_pos.y)
 
-    def onMouseUp(self, diagram, ev):
+    def onMouseUp(self, diagram, ev) -> None:
         if self.state in [self.States.POTENTIAL_DRAG, self.States.DRAGGING]:
             self.widget.router.dragEnd(self.diagram.canvas)
             if self.state == self.States.DRAGGING:
@@ -329,7 +337,7 @@ class RerouteStates(BehaviourFSM):
                 self.state = self.States.DECORATED
             diagram.updateElement(self.widget)
 
-    def onMouseMove(self, diagram, ev):
+    def onMouseMove(self, diagram, ev) -> None:
         if self.state in [self.States.NONE, self.States.DECORATED, self.States.HANDLE_SELECTED]:
             return
         pos = getMousePos(ev)
@@ -342,7 +350,7 @@ class RerouteStates(BehaviourFSM):
             self.widget.router.dragHandle(pos)
             diagram.rerouteConnections(self.widget)
 
-    def onKeyDown(self, diagram, ev):
+    def onKeyDown(self, diagram, ev) -> None:
         if ev.key == 'Delete':
             if self.state == self.States.DECORATED:
                 # Delete the connection
@@ -353,27 +361,37 @@ class RerouteStates(BehaviourFSM):
                 self.widget.router.deleteWaypoint()
                 diagram.rerouteConnections(self.widget)
 
-    def delete(self, diagram):
+    def delete(self, diagram) -> None:
         if self.state != self.States.NONE:
             self.clear_decorations()
 
-    def decorate(self):
+    def decorate(self) -> None:
         self.widget.router.decorate(self.widget, self.diagram.canvas)
 
-    def clear_decorations(self):
+    def clear_decorations(self) -> None:
         self.widget.router.clear_decorations()
 
 
+class ConnectionStates(enum.IntEnum):
+    NONE = enum.auto()
+    A_SELECTED = enum.auto()
+    RECONNECTING = enum.auto()
+
+class ConnectionRoles(enum.IntEnum):
+    START = enum.auto()
+    FINISH = enum.auto()
+
 class ConnectionEditor(BehaviourFSM):
-    States = enum.IntEnum('States', 'NONE A_SELECTED RECONNECTING')
-    ConnectionRoles = enum.IntEnum('ConnectionRoles', 'START FINISH')
+    States = ConnectionStates
     def __init__(self):
         self.state = self.States.NONE
         self.a_party = None
         self.connection: Optional[Relationship] = None
         self.b_connection_role = None
         self.path = None
-    def mouseDownShape(self, diagram, widget, ev):
+    def is_at_rest(self) -> bool:
+        return self.state == self.States.NONE
+    def mouseDownShape(self, diagram, widget, ev) -> None:
         party = widget.getConnectionTarget(ev)
         if self.state in [self.States.A_SELECTED, self.States.RECONNECTING]:
             if diagram.allowsConnection(self.a_party, party):
@@ -381,9 +399,9 @@ class ConnectionEditor(BehaviourFSM):
                     diagram.connect(self.a_party, party)
                 elif self.state == self.States.RECONNECTING:
                     match self.b_connection_role:
-                        case self.ConnectionRoles.START:
+                        case ConnectionRoles.START:
                             self.connection.start = party
-                        case self.ConnectionRoles.FINISH:
+                        case ConnectionRoles.FINISH:
                             self.connection.finish = party
                     diagram.reroute(self.connection)
 
@@ -395,8 +413,8 @@ class ConnectionEditor(BehaviourFSM):
             # Create a temporary path to follow the mouse
             x, y = [int(i) for i in (self.a_party.getPos() + self.a_party.getSize()/2).astuple()]
             self.path = svg.line(x1=x, y1=y, x2=x, y2=y, stroke_width=2, stroke="gray")
-            diagram.canvas <= self.path
-    def onMouseMove(self, diagram, ev):
+            _ = diagram.canvas <= self.path
+    def onMouseMove(self, diagram, ev) -> None:
         if self.state == self.States.NONE:
             return
         pos = getMousePos(ev)
@@ -405,10 +423,10 @@ class ConnectionEditor(BehaviourFSM):
         v = pos - self.a_party.getPos()
         delta = (v.normalize()) * 2
         self.path['x2'], self.path['y2'] = [int(i) for i in (pos - delta).astuple()]
-    def delete(self, diagram):
+    def delete(self, diagram) -> None:
         if self.state != self.States.NONE:
             self.path.remove()
-    def onKeyDown(self, diagram, ev):
+    def onKeyDown(self, diagram, ev) -> None:
         if ev.key == 'Escape':
             if self.state == self.States.A_SELECTED:
                 # Delete the connection
@@ -432,22 +450,23 @@ class Diagram(OwnerInterface):
     def __init__(self, config: DiagramConfiguration, widgets):
         self.selection = None
         self.mouse_events_fsm = None
-        self.children = []
-        self.connections = []
+        self.children: List[Shape] = []
+        self.connections: List[Relationship] = []
         self.widgets = widgets
         self.config = config
+        self.diagram_id: int = 0
 
-    def close(self):
+    def close(self) -> None:
         # Release the resources of this diagram and delete references to it.
         self.children = []
         self.connections = []
         if self in diagrams:
             diagrams.remove(self)
 
-    def getCanvas(self):
+    def getCanvas(self):        # Sadly, Brython does not export their Tag type.
         return self.canvas
 
-    def onChange(self):
+    def onChange(self) -> None:
         self.canvas.dispatchEvent(window.CustomEvent.new("modified", {
             "bubbles": True
         }))
@@ -455,24 +474,24 @@ class Diagram(OwnerInterface):
     def get_allowed_blocks(cls, block_cls_name: str, for_drop=False) -> Dict[str, Type[Shape]]:
         raise NotImplementedError()
 
-    def addBlock(self, block):
+    def addBlock(self, block) -> None:
         if self.mouse_events_fsm is not None:
             self.mouse_events_fsm.delete(self)
 
         block.create(self)
         self.children.append(block)
 
-    def addConnection(self, connection):
+    def addConnection(self, connection) -> None:
         """ Handle a completed connection and add it to the diagram. """
         self.connections.append(connection)
         connection.create(self, self.children)
 
-    def deleteConnection(self, connection):
+    def deleteConnection(self, connection) -> None:
         if connection in self.connections:
             connection.delete()
             self.connections.remove(connection)
 
-    def deleteBlock(self, block: Shape):
+    def deleteBlock(self, block: Shape) -> None:
         block.delete()
         if block.repr_category() == ReprCategory.block:
             # Remove the block from the diagram's list of children
@@ -493,37 +512,30 @@ class Diagram(OwnerInterface):
         for c in to_remove:
             self.deleteConnection(c)
 
-    def allowsConnection(self, a, b):
+    def allowsConnection(self, a, b) -> bool:
         return True
 
-    def connect_specific(self, a, b, cls):
-        # Find the associated representation
-        repr_cls = self.config.get_repr_for_connection(cls)
-        connection = repr_cls(start=a, finish=b, waypoints=[], diagram=self.diagram_id)
-        self.addConnection(connection)
-        return connection
-
-    def connect(self, a, b):
+    def connect(self, a, b) -> None:
         """ Connect two blocks a and b.. """
         raise NotImplementedError()
 
-    def changeFSM(self, fsm):
+    def changeFSM(self, fsm) -> None:
         if self.mouse_events_fsm is not None:
             self.mouse_events_fsm.delete(self)
         self.mouse_events_fsm = fsm
 
-    def getConnectionsToShape(self, widget):
+    def getConnectionsToShape(self, widget) -> List[Relationship]:
         result = [c for c in self.connections if widget.isConnected(c.start) or widget.isConnected(c.finish)]
         return result
 
-    def rerouteConnections(self, widget):
+    def rerouteConnections(self, widget) -> None:
         if isinstance(widget, Relationship):
             widget.reroute(self.children)
         else:
             for c in self.getConnectionsToShape(widget):
                 c.reroute(self.children)
 
-    def bind(self, canvas):
+    def bind(self, canvas) -> None:
         self.canvas = canvas
         canvas.bind('click', self.onClick)
         canvas.bind('mouseup', self.onMouseUp)
@@ -543,16 +555,16 @@ class Diagram(OwnerInterface):
         for widget in self.widgets:
             widget(self)
 
-    def clickChild(self, widget, ev):
+    def clickChild(self, widget, ev) -> None:
         # Check if the ownership of the block has changed
         pos = getMousePos(ev)
         self.takeOwnership(widget, pos, self)
 
-    def dblclickChild(self, widget, ev):
+    def dblclickChild(self, widget, ev) -> None:
         # To be overloaded by child classes
         pass
 
-    def mouseDownChild(self, widget, ev, update_func=None):
+    def mouseDownChild(self, widget, ev, update_func=None) -> None:
         if not self.mouse_events_fsm:
             self.mouse_events_fsm = ResizeFSM(self)
         self.mouse_events_fsm.mouseDownShape(self, widget, ev)
@@ -575,14 +587,14 @@ class Diagram(OwnerInterface):
         }
         self.trigger_event(widget, 'shape_selected', event_detail)
 
-    def trigger_event(self, widget, event_name, event_detail):
+    def trigger_event(self, widget, event_name, event_detail) -> None:
         self.canvas.dispatchEvent(window.CustomEvent.new(event_name, {
             "bubbles":True,
             "detail": event_detail
         }))
 
 
-    def mouseDownConnection(self, connection, ev, update_function=None):
+    def mouseDownConnection(self, connection, ev, update_function=None) -> None:
         if not self.mouse_events_fsm or self.mouse_events_fsm.is_at_rest():
             self.mouse_events_fsm = RerouteStates(self)
         self.mouse_events_fsm.mouseDownConnection(self, connection, ev)
@@ -601,34 +613,31 @@ class Diagram(OwnerInterface):
         }
         self.trigger_event(connection, 'shape_selected', event_detail)
 
-    def takeOwnership(self, widget, pos, ex_owner):
+    def takeOwnership(self, widget, pos, ex_owner) -> None:
         pass
 
-    def onClick(self, ev):
+    def onClick(self, ev) -> None:
         pass
 
-    def onMouseDown(self, ev):
+    def onMouseDown(self, ev) -> None:
         self.mouse_events_fsm and self.mouse_events_fsm.mouseDownBackground(self, ev)
 
-    def onMouseUp(self, ev):
+    def onMouseUp(self, ev) -> None:
         self.mouse_events_fsm and self.mouse_events_fsm.onMouseUp(self, ev)
 
-    def onMouseMove(self, ev):
+    def onMouseMove(self, ev) -> None:
         self.mouse_events_fsm and self.mouse_events_fsm.onMouseMove(self, ev)
 
-    def onKeyDown(self, ev):
+    def onKeyDown(self, ev) -> None:
         self.mouse_events_fsm and self.mouse_events_fsm.onKeyDown(self, ev)
 
-    def handleDragStart(self, ev):
+    def handleDragStart(self, ev) -> None:
         self.mouse_events_fsm and self.mouse_events_fsm.handleDragStart(self, ev)
 
-    def onHover(self):
+    def onHover(self) -> None:
         pass
 
-    def getMenu(self):
-        pass
-
-    def onDrop(self, ev):
+    def onDrop(self, ev) -> None:
         """ Handler for the 'drop' event.
             Without having a modelling context, a "drop" is meaningless.
             Child classes can implement this function.
@@ -636,22 +645,22 @@ class Diagram(OwnerInterface):
         pass
 
 
-    def serialize(self):
+    def serialize(self) -> str:
         # Output the model in JSON format
         details = {'blocks': self.children,
                    'connections': self.connections}
         return json.dumps(details, cls=ExtendibleJsonEncoder)
 
-    def updateElement(self, element):
+    def updateElement(self, element) -> None:
         if is_dataclass(element):
             self.datastore and self.datastore.update(element)
 
-    def selectConnectionClass(self, clss, cb):
+    def selectConnectionClass(self, clss, cb) -> None:
         """ Function that builds a dialog for selecting a specific connection type.
             When a selection is made, a callback is called with the selected class.
         """
         d = Dialog('Select relationship')
-        d.panel <= html.DIV("Please select the type of connection")
+        _ = d.panel <= html.DIV("Please select the type of connection")
         l = html.UL()
         selection = None
         def add_option(cls):
@@ -662,8 +671,8 @@ class Diagram(OwnerInterface):
                 d.close()
             return o
         for cls in clss:
-            l <= add_option(cls)
-        d.panel <= l
+            _ = l <= add_option(cls)
+        _ = d.panel <= l
 
 diagrams = []
 
@@ -683,8 +692,8 @@ def createSvgButtonBar(canvas, icons, callbacks, hover_texts=None, x=0, y=0):
         r = svg.rect(id=cb.__name__, x=xi, y=y, width=width, height=width, fill='#EFF0F1', stroke='#000000',
                            stroke_width='1', ry='2')
         g = icon(xi+2*margin, y+2*margin, width-4*margin)
-        canvas <= r
-        canvas <= g
+        _ = canvas <= r
+        _ = canvas <= g
         r.bind('click', cb)
         g.bind('click', cb)
 
