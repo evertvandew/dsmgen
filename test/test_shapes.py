@@ -3,7 +3,7 @@
 from test_frame import prepare, test, run_tests, expect_exception
 
 import shapes
-from svg_shapes import wrapText, getTextWidth
+from svg_shapes import wrapText, getTextWidth, pyphen
 
 @prepare
 def test_text_rendering():
@@ -13,7 +13,11 @@ def test_text_rendering():
         txts = ["Dit is een testtekst", 'Dit is een test-', 'Dit is een', 'Dit is een', 'Dit is', 'Dit']
         print('Full size:', [f"{txt}: {getTextWidth(txt)}" for txt in txts])
         widths = [110, 84, 50, 20, 10]
-        expected = ['Dit is een testtekst', 'Dit is een\ntesttekst', 'Dit is\neen\ntesttekst', 'Dit\nis\neen\ntesttekst', 'Dit\nis\neen\ntesttekst']
+        if pyphen:
+            expected = ['Dit is een testtekst', 'Dit is een test-\ntekst', 'Dit is\neen test-\ntekst',
+                        'Dit\nis\neen\ntesttekst', 'Dit\nis\neen\ntesttekst']
+        else:
+            expected = ['Dit is een testtekst', 'Dit is een\ntesttekst', 'Dit is\neen\ntesttekst', 'Dit\nis\neen\ntesttekst', 'Dit\nis\neen\ntesttekst']
         for w, e in zip(widths, expected):
             result = wrapText(txts[0], w)
             assert '\n'.join(result) == e, f"Not the same for width {w}: {repr(chr(10).join(result))}, {e}"

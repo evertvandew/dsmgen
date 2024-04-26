@@ -106,7 +106,7 @@ class OwnerInterface:
     def get_canvas(self):
         return getattr(self, 'canvas', None)
     def get_children(self) -> Optional[List[Type[Self]]]:
-        raise NotImplementedError()
+        return getattr(self, 'children', None)
     def clickChild(self, widget, ev):
         raise NotImplementedError()
     def dblclickChild(self, widget, ev):
