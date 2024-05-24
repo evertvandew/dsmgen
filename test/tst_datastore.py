@@ -1,7 +1,8 @@
 
 import json
 from test_frame import prepare, test, run_tests
-from data_store import DataConfiguration, DataStore, Collection, ExtendibleJsonEncoder, ReprCategory
+from data_store import DataConfiguration, DataStore, Collection, ExtendibleJsonEncoder, ReprCategory, UndoableDataStore, \
+    CompoundAction
 import generate_project     # Ensures the client is built up to date
 from unittest.mock import Mock
 from build import sysml_data as sm
@@ -359,6 +360,94 @@ def data_store_tests():
         assert 155 not in ds.shadow_copy[Collection.block]
         check_expected_response()
 
+    @test
+    def test_undo_redo():
+        clear_expected_response()
+        # Test adding, updating, loading and deleting ports.
+        # First create the block and model they belong to.
+        # Ports are never created without a pre-existing block.
+        ds = UndoableDataStore(config)
+
+        # Add a new representation + model
+        model = client.Block(name='Test1', description='This is a test block', parent=456)
+        item = ModeledShapeAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
+        add_expected_response('/data/Block', 'post', Response(201, json={'Id': 123}))
+        add_expected_response('/data/_BlockRepresentation', 'post', Response(201, json={'Id': 121}))
+        ds.add(item)
+
+        # Update the representation and model
+        item.x = 200
+        item.model_entity.name = 'This is not a test'
+        add_expected_response('/data/Block/123', 'post', Response(201))
+        add_expected_response('/data/_BlockRepresentation/121', 'post', Response(201))
+        ds.update(item)
+
+        # Delete the representation
+        add_expected_response('/data/_BlockRepresentation/121', 'delete', Response(204))
+        ds.delete(item)
+        # Check the item is truly deleted, but not the model item
+        assert ds.get_live_instance(item) is None
+        assert ds.get_shadow_copy(item) is None
+        assert ds.get_live_instance(item.model_entity) is not None
+        assert ds.get_shadow_copy(item.model_entity) is not None
+
+
+        # The undo stack should have three elements, two of which are compounded actions.
+        assert len(ds.undo_queue) == 3
+        assert len([a for a in ds.undo_queue if isinstance(a, CompoundAction)]) == 2
+
+        # Undo the delete
+        add_expected_response('/data/_BlockRepresentation', 'post', Response(201, json={'Id': 121}))
+        ds.undo_one_action()
+        assert len(ds.undo_queue) == 2
+        assert ds.get_live_instance(item) is item
+        assert ds.get_shadow_copy(item) is not None
+
+        # Undo the update
+        add_expected_response('/data/Block/123', 'post', Response(201))
+        add_expected_response('/data/_BlockRepresentation/121', 'post', Response(201))
+        ds.undo_one_action()
+        assert item.x == 100 and item.model_entity.name=="Test1"
+        assert len(ds.undo_queue) == 1
+
+        # Undo the add
+        add_expected_response('/data/Block/123', 'delete', Response(204))
+        add_expected_response('/data/_BlockRepresentation/121', 'delete', Response(204))
+        ds.undo_one_action()
+        assert ds.get_live_instance(item) is None
+        assert ds.get_shadow_copy(item) is None
+        assert ds.get_live_instance(item.model_entity) is None
+        assert ds.get_shadow_copy(item.model_entity) is None
+
+
+        # The undo stack should be empty, but he redo stack should have three actions.
+        assert len(ds.undo_queue) == 0
+        assert len(ds.redo_queue) == 3
+
+        # Redo the add
+        add_expected_response('/data/Block', 'post', Response(201, json={'Id': 123}))
+        add_expected_response('/data/_BlockRepresentation', 'post', Response(201, json={'Id': 121}))
+        ds.redo_one_action()
+        assert ds.get_live_instance(item) is item
+        assert ds.get_shadow_copy(item) is not None
+        assert ds.get_live_instance(item.model_entity) is item.model_entity
+        assert ds.get_shadow_copy(item.model_entity) is not None
+
+        # Redo the update
+        add_expected_response('/data/Block/123', 'post', Response(201))
+        add_expected_response('/data/_BlockRepresentation/121', 'post', Response(201))
+        ds.redo_one_action()
+        assert item.x == 200 and item.model_entity.name=="This is not a test"
+
+        # Redo the delete
+        add_expected_response('/data/_BlockRepresentation/121', 'delete', Response(204))
+        ds.redo_one_action()
+        assert ds.get_live_instance(item) is None
+        assert ds.get_shadow_copy(item) is None
+        assert ds.get_live_instance(item.model_entity) is item.model_entity
+        assert ds.get_shadow_copy(item.model_entity) is not None
+
+
 if __name__ == '__main__':
-    run_tests('*.test_get_diagram')
+    run_tests('*.test_undo_redo')
     run_tests()
