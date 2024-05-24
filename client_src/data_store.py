@@ -22,10 +22,11 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
+import logging
 from enum import Enum, IntEnum, auto
 import json
 from dataclasses import dataclass, is_dataclass, fields, field
-from typing import Dict, Callable, List, Any, Iterable, Tuple, Optional, Type
+from typing import Dict, Callable, List, Any, Iterable, Tuple, Optional, Type, Protocol
 from dispatcher import EventDispatcher
 from math import inf         # Do not delete: used when evaluating waypoint strings
 from contextlib import contextmanager
@@ -102,6 +103,7 @@ def dc_from_dict(cls, ddict):
     arguments = {k: v for k, v in ddict.items() if k in keys}
     return cls(**arguments)
 
+
 class DataStore(EventDispatcher):
     def __init__(self, configuration: DataConfiguration):
         super().__init__()
@@ -131,7 +133,7 @@ class DataStore(EventDispatcher):
                 return getattr(o, 'ports', [])
 
 
-    def add(self, record: StorableElement) -> StorableElement:
+    def add(self, record: StorableElement, redo=False) -> StorableElement:
         """ Persist a new element """
         collection = record.get_collection()
         # Representations also have a record with model details that may or may not already exist.
@@ -142,7 +144,7 @@ class DataStore(EventDispatcher):
                 if not getattr(model, 'parent', True):
                     model.parent = record.get_diagram()
                 # Add the model item
-                self.add(model)
+                self.add(model, redo)
 
             def on_complete(update: JsonResponse):
                 if update.status > 299:
@@ -171,7 +173,7 @@ class DataStore(EventDispatcher):
                     record.Id = update.json['Id']
                     assert self.update_cache(record) is record
             ajax.post(f'/data/{record.get_db_table()}', blocking=True, data=data, oncomplete=on_complete,
-                      mode='json', headers={"Content-Type": "application/json"})
+                      mode='json', headers={"Content-Type": "application/json", 'Redo': str(redo)})
             if record.Id < 1:
                 raise RuntimeError("Could not add record")
             self.add_data(record)
@@ -444,6 +446,14 @@ class DataStore(EventDispatcher):
             self.live_instances[collection][record.Id] = record
             return record
 
+    def get_shadow_copy(self, record: StorableElement) -> Optional[StorableElement]:
+        collection = record.get_collection()
+        return self.shadow_copy[collection].get(record.Id, None)
+
+    def get_live_instance(self, record: StorableElement) -> Optional[StorableElement]:
+        collection = record.get_collection()
+        return self.live_instances[collection].get(record.Id, None)
+
     def split_representation_item(self, collection, record) -> (Dict, StorableElement):
         repr = record.asdict()
         return repr, record.model_entity
@@ -470,3 +480,161 @@ class DataStore(EventDispatcher):
                 types.append(t)
                 values.append(getattr(instance_representation, k, ''))
         return names, types, values
+
+
+
+
+class UndoableAction(Protocol):
+    def undo(self, ds: 'UndoableDataStore'):
+        raise NotImplementedError
+
+    def redo(self, ds: 'UndoableDataStore'):
+        raise NotImplementedError
+
+
+class AddAction(UndoableAction):
+    def __init__(self, item: StorableElement):
+        """ Create an undo point for a newly created item """
+        # We need to know the ID it got from the database
+        assert getattr(item, 'Id')
+        self.item = item
+    def undo(self, ds):
+        ds.undo_add(self.item)
+    def redo(self, ds):
+        ds.redo_add(self.item)
+
+class UpdateAction(UndoableAction):
+    def __init__(self, updated: StorableElement, original:StorableElement):
+        # With the update function, the internal state of the pre and post situation must be recorded.
+        # That means we need to make copies of the internal objects.
+        self.updated = updated.copy()
+        self.original = original.copy()
+    def undo(self, ds):
+        ds.undo_update(self.updated, self.original)
+    def redo(self, ds):
+        ds.redo_update(self.updated, self.original)
+
+class DeleteAction(UndoableAction):
+    def __init__(self, item: StorableElement):
+        self.item = item
+
+    def undo(self, ds):
+        ds.undo_delete(self.item)
+
+    def redo(self, ds):
+        ds.redo_delete(self.item)
+
+
+class CompoundAction(UndoableAction):
+    def __init__(self, actions: List[UndoableAction]):
+        """ Actions are given in de order in which they were applied, they will by undone in reverse order. """
+        self.actions = actions
+    def undo(self, ds):
+        for action in reversed(self.actions):
+            action.undo(ds)
+
+    def redo(self, ds):
+        for action in self.actions:
+            action.redo(ds)
+
+
+class UndoableDataStore(DataStore):
+    def __init__(self, configuration: DataConfiguration):
+        super().__init__(configuration)
+        self.undo_queue: List[UndoableAction] = []
+        self.redo_queue: List[UndoableAction] = []
+        self.recorded_actions = []
+        self.record_level = 0
+
+    @contextmanager
+    def action_recorder(self):
+        is_root = self.record_level == 0
+        if is_root:
+            self.recorded_actions = []
+        self.record_level += 1
+
+        yield self.recorded_actions
+        if is_root:
+            if len(self.recorded_actions) > 1:
+                self.undo_queue.append(CompoundAction(self.recorded_actions))
+            if len(self.recorded_actions) == 1:
+                self.undo_queue.append(self.recorded_actions[0])
+
+            self.record_level = 0
+            self.recorded_actions = []
+        else:
+            self.record_level -= 1
+
+    def add(self, record: StorableElement, redo=False):
+        with self.action_recorder() as actions:
+            result = super().add(record, redo)
+            actions.append(AddAction(result))
+        return result
+
+    def update(self, record: StorableElement):
+        with self.action_recorder() as actions:
+            actions.append(UpdateAction(record, self.get_shadow_copy(record)))
+            result = super().update(record)
+        return result
+
+    def delete(self, record: StorableElement):
+        with self.action_recorder() as actions:
+            result = super().delete(record)
+            actions.append(DeleteAction(record))
+        return result
+
+    def undo_one_action(self):
+        if not self.undo_queue:
+            return
+        action = self.undo_queue.pop(-1)
+        try:
+            action.undo(self)
+        except:
+            logging.exception("Problem undoing action")
+        self.redo_queue.append(action)
+
+    def redo_one_action(self):
+        if not self.redo_queue:
+            return
+        action = self.redo_queue.pop(-1)
+        try:
+            action.redo(self)
+        except:
+            logging.exception("Problem redoing action")
+        self.undo_queue.append(action)
+
+    def undo_add(self, item: StorableElement):
+        super().delete(item)
+
+    def redo_add(self, item: StorableElement):
+        # Normally, an object to be added can not have an id. The redo flag disables this check.
+        # That way, any references within the undo_queue remain correct
+        super().add(item, redo=True)
+
+    def undo_update(self, updated: StorableElement, original: StorableElement):
+        # Retrieve the live object and update it, then call the Update function.
+        live_instance = self.get_live_instance(updated)
+        for k, v in original.asdict().items():
+            if hasattr(live_instance, k):
+                try:
+                    setattr(live_instance, k, v)
+                except AttributeError:
+                    pass
+        super().update(live_instance)
+
+    def redo_update(self, updated: StorableElement, original: StorableElement):
+        # Retrieve the live object and update it, then call the Update function.
+        live_instance = self.get_live_instance(updated)
+        for k, v in updated.asdict().items():
+            if hasattr(live_instance, k):
+                try:
+                    setattr(live_instance, k, v)
+                except AttributeError:
+                    pass
+        super().update(live_instance)
+
+    def undo_delete(self, item: StorableElement):
+        super().add(item, redo=True)
+
+    def redo_delete(self, item: StorableElement):
+        super().delete(item)
