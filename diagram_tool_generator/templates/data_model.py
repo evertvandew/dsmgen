@@ -321,7 +321,7 @@ class AWrapper:
         """
         if session is None:
             with session_context() as session:
-                self.store(session)
+                self.store(session, accept_id=accept_id)
         else:
             if (not accept_id) and self.Id and int(self.Id):
                 self.update()
@@ -417,8 +417,8 @@ class ABlock(AWrapper):
         return {
             'type': self.get_entity_type(),
             'subtype': self.__class__.__name__,
-            'parent': self.parent if hasattr(self, 'parent') else None,
-            'association': self.association if hasattr(self, 'association') else None,
+            'parent': getattr(self, 'parent', None),
+            'association': getattr(self, 'association', None),
             'definition': None,
             'order': self.order
         }
@@ -433,7 +433,7 @@ class AInstance(ABlock):
         return {
             'type': self.get_entity_type(),
             'subtype': self.__class__.__name__,
-            'parent': self.parent if hasattr(self, 'parent') else None,
+            'parent': getattr(self, 'parent', None),
             'definition': self.definition,
             'order': self.order
         }

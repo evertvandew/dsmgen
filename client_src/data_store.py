@@ -136,6 +136,9 @@ class DataStore(EventDispatcher):
     def add(self, record: StorableElement, redo=False) -> StorableElement:
         """ Persist a new element """
         collection = record.get_collection()
+        params = {}
+        if redo:
+            params = {'redo': True}
         # Representations also have a record with model details that may or may not already exist.
         if model := record.get_model_details():
             # Check if this is a new model item (they can be created inside a diagram)
@@ -155,8 +158,9 @@ class DataStore(EventDispatcher):
                     assert self.update_cache(record) is record
 
             data = json.dumps(record, cls=ExtendibleJsonEncoder)
+
             ajax.post(f'{self.configuration.base_url}/{record.get_db_table()}', blocking=True, data=data,
-                      oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
+                      oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"}, params=params)
             self.add_data(record)
             # For ports, also update the ports collections in the parent block.
             if record.repr_category() == ReprCategory.port:
@@ -173,7 +177,7 @@ class DataStore(EventDispatcher):
                     record.Id = update.json['Id']
                     assert self.update_cache(record) is record
             ajax.post(f'/data/{record.get_db_table()}', blocking=True, data=data, oncomplete=on_complete,
-                      mode='json', headers={"Content-Type": "application/json", 'Redo': str(redo)})
+                      mode='json', headers={"Content-Type": "application/json"}, params=params)
             if record.Id < 1:
                 raise RuntimeError("Could not add record")
             self.add_data(record)

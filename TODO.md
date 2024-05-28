@@ -10,8 +10,9 @@
   * clicking the triangle acts on all children as well, not just the one clicked on.
 
 # Refactoring
+* No longer have "Instance" in the core model, instead add optional parameters to block representations.
 * Use `get_type_hints` instead of raw `__annotations__`.
-* Rename fields used for internal purposes with underscores so there can be no clashes with user-named fields.
+* Split internal fields into separate structures so there can be no clashes with user-named fields.
 * Refactor the typing system in the specification files, so that it is class-based for all types with
   simple functions to determine concrete types in various contexts, conversions between them and default values.
 * Make parts in the model definition that are used in generating the tool, parts of the decorator call
@@ -20,6 +21,7 @@
 * Get rid of mechanisms where the presence of an attribute decides actions. Replace these with (member) functions.
 
 # Future enhancements
+* Add a list of port shapes
 * Place texts with an offset, and allow that offset to be edited. Perhaps also the bounding box of the text.
 * When opening a diagram for the second time, open the existing diagram instead.
 * Support selecting multiple elements and moving them.

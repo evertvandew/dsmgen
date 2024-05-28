@@ -285,7 +285,13 @@ def add_entity_data(path):
     if not (table := dm.__dict__.get(path, '')):
         return flask.make_response('Not found', 404)
     data = get_request_data()
+    data_id = data.get('Id', 0)
     data = {k:v for k, v in data.items() if k not in ['children', '__classname__', 'Id']}
+    accept_id = flask.request.args.get('redo', 'false').lower() in ['true', 'y', '1']
+    if accept_id:
+        data['Id'] = data_id
+    elif data_id:
+        return flask.make_response('Illegal request', 400)
     if issubclass(table, dm.Base):
         with dm.session_context() as session:
             record = table(**data)
@@ -295,7 +301,7 @@ def add_entity_data(path):
             return flask.make_response(json.dumps(record.asdict()), 201)
     else:
         record = table(**data)
-        record.store()
+        record.store(accept_id=accept_id)
         result = record.asjson()
         return flask.make_response(result, 201)
 

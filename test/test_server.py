@@ -391,6 +391,28 @@ def test_server():
         assert results['_definition']['description'] == 'Dit is een test'
         assert results['_definition']['parameters'] == ''
 
+    @test
+    def redo_add():
+        sm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
+        clear_db()
+        # True to add an object with a pre-set ID.
+        item = sm.Note(Id=123, description="Don't mind me")
+        r = requests.post(
+            base_url+'/data/Note',
+            data=json.dumps(item.asdict()),
+            headers={'Content-Type': 'application/json'}
+        )
+        assert r.status_code > 399
+        # Try again, now with the redo-flag
+        r = requests.post(
+            base_url+'/data/Note',
+            params={'redo': True},
+            data=json.dumps({'Id': 123, 'description': "Don't mind me"}),
+            headers={'Content-Type': 'application/json'}
+        )
+        assert r.status_code == 201
+
+
 if __name__ == '__main__':
-    run_tests('*.test_create_instance_no_parameters')
+    run_tests('*.redo_add')
     run_tests()

@@ -252,9 +252,9 @@ class ResizeFSM(BehaviourFSM):
             if self.state != ResizeStates.NONE:
                 widget = self.widget
                 d = Dialog(f'Delete {type(widget).__name__}', ok_cancel=True)
-                d.panel <= f'Delete {type(widget).__name__}'
+                _ = d.panel <= f'Delete {type(widget).__name__}'
                 if hasattr(widget, 'name'):
-                    d.panel <= f' "{widget.name}"'
+                    _ = d.panel <= f' "{widget.name}"'
 
                 @bind(d.ok_button, "click")
                 def ok(ev):
