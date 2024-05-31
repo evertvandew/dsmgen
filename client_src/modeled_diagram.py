@@ -78,7 +78,8 @@ class ModeledDiagram(Diagram):
             if type(source).__name__ in datastore.configuration.port_entities:
                 # Remove the port from its parent `ports` collection.
                 model_parent = self.datastore.get(Collection.block, source.parent)
-                model_parent.ports.remove(source)
+                if source in model_parent.ports:
+                    model_parent.ports.remove(source)
                 # Find any representations of this port
                 reprs = [p for c in self.children for p in getattr(c, 'ports', []) if p.model_entity.Id == source.Id]
                 for r in reprs:
@@ -88,12 +89,20 @@ class ModeledDiagram(Diagram):
                     # Only remove them from the ports collection maintained by this class
                     parent.ports.remove(r)
                     self.datastore.update_cache(parent)
+                # Find any relationships to this port
+                to_delete = []
+                for c in self.connections:
+                    if c.model_entity.source.Id == source.Id or c.model_entity.target.Id == source.Id:
+                        to_delete.append(c.model_entity)
+                for e in to_delete:
+                    self.datastore.delete(e)
             elif source.get_collection() in Collection.representations():
                 if isinstance(source, Port):
                     # Remove the port from the block it belongs to, then redraw the block.
                     block = self.datastore.live_instances[Collection.block_repr][source.parent]
-                    block.ports.remove(source)
-                    block.updateShape(block.shape)
+                    if source in block.ports:
+                        block.ports.remove(source)
+                        block.updateShape(block.shape)
                 else:
                     Diagram.deleteBlock(self, source)
 

@@ -1886,6 +1886,32 @@ def integration_tests():
         assert len(context.ds.undo_queue) == 4
         assert len(context.ds.redo_queue) == 0
 
+        # Now try to undo a delete.
+        # Delete a port, which should also delete the connection.
+        add_expected_response('/data/FlowPort/17', 'delete', Response(204, json=[]))
+        add_expected_response('/data/_BlockRepresentation/4', 'delete', Response(204, json=[]))
+        add_expected_response('/data/FlowPortConnection/1', 'delete', Response(204, json=[]))
+        add_expected_response('/data/_RelationshipRepresentation/1', 'delete', Response(204, json=[]))
+
+        context.data_store.delete(context.data_store.get(Collection.block, 17))
+        check_expected_response()
+
+        add_expected_response('/data/FlowPort', 'post', Response(201, json={'Id': 17}))
+        add_expected_response('/data/_BlockRepresentation', 'post', Response(201, json={'Id': 4}))
+        add_expected_response('/data/FlowPortConnection', 'post', Response(201, json={'Id': 1}))
+        add_expected_response('/data/_RelationshipRepresentation', 'post', Response(201, json={'Id': 1}))
+
+        context.diagrams.undo()
+        check_expected_response()
+
+        add_expected_response('/data/FlowPort/17', 'delete', Response(204, json=[]))
+        add_expected_response('/data/_BlockRepresentation/4', 'delete', Response(204, json=[]))
+        add_expected_response('/data/FlowPortConnection/1', 'delete', Response(204, json=[]))
+        add_expected_response('/data/_RelationshipRepresentation/1', 'delete', Response(204, json=[]))
+
+        context.diagrams.redo()
+        check_expected_response()
+
 
 if __name__ == '__main__':
     # import cProfile
