@@ -53,7 +53,7 @@ import diagrams
 import shapes
 from property_editor import dataClassEditor, longstr, OptionalRef, parameter_spec, stylingEditorForm, parameter_types
 from storable_element import Collection, StorableElement, from_dict
-from data_store import DataStore, DataConfiguration, ExtendibleJsonEncoder, parameter_values
+from data_store import UndoableDataStore, DataConfiguration, ExtendibleJsonEncoder, parameter_values
 from model_interface import EditableParameterDetails
 from svg_shapes import getMarkerDefinitions
 from tab_view import TabView
@@ -269,7 +269,7 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
 
     % if generator.md.is_relationship(entity):
     @classmethod
-    def from_dict(cls, data_store: DataStore, **details) -> Self:
+    def from_dict(cls, data_store: UndoableDataStore, **details) -> Self:
         self = from_dict(cls, **details)
         # Connections always connect to two blocks. Ports are also represented as blocks for this exact purpose.
         self.source = data_store.get(Collection.block, details['source'])
@@ -277,7 +277,7 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
         return self
     %elif  generator.md.is_instance_of(entity):
     @classmethod
-    def from_dict(cls, data_store: DataStore, **details) -> Self:
+    def from_dict(cls, data_store: UndoableDataStore, **details) -> Self:
         self = from_dict(cls, **details)
         if self.definition:
             self.definition = data_store.get(Collection.block, self.definition)
@@ -457,10 +457,10 @@ data_config = DataConfiguration(
         base_url='/data'
     )
 
-def run(explorer: str, canvas: str, details: str) -> Tuple[DataStore, TabView]:
+def run(explorer: str, canvas: str, details: str) -> Tuple[UndoableDataStore, TabView]:
     config = data_config
 
-    data_store = DataStore(config)
+    data_store = UndoableDataStore(config)
 
     blank = document[explorer]
     diagram_tabview = TabView(canvas)

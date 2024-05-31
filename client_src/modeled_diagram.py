@@ -26,11 +26,12 @@ from browser import console, svg
 from browser.widgets.dialog import InfoDialog
 from diagrams import Diagram, getMousePos, DiagramConfiguration
 import shapes
-from data_store import DataStore, ReprCategory, StorableElement, Collection, ReprCategory
-from modeled_shape import ModeledRelationship, ModelEntity, ModeledShape
+from data_store import UndoableDataStore, ReprCategory, StorableElement, Collection, ReprCategory
+from modeled_shape import ModeledRelationship, ModelEntity, ModeledShape, Port
+
 
 class ModeledDiagram(Diagram):
-    def __init__(self, config: DiagramConfiguration, widgets, datastore: DataStore, diagram_id: int):
+    def __init__(self, config: DiagramConfiguration, widgets, datastore: UndoableDataStore, diagram_id: int):
         super().__init__(config, widgets)
         self.datastore = datastore               # Interface for getting and storing diagram state
         self.diagram_id = diagram_id
@@ -49,7 +50,7 @@ class ModeledDiagram(Diagram):
                     # Check it is represented in each representation
                     if not any(source.Id == p.model_entity.Id for p in r.ports):
                         p = repr_cls(parent=r.Id, model_entity=source, diagram=self.diagram_id)
-                        self.datastore.add(p)
+                        self.datastore.add_complex(p)
                         # Redraw the shape
                         r.updateShape(r.shape)
 
@@ -70,7 +71,7 @@ class ModeledDiagram(Diagram):
                     if not source in [p.model_entity for p in r.ports]:
                         p = repr_cls(block=source.Id, parent=r.Id, model_entity=source, diagram=self.diagram_id)
                         r.ports.append(p)
-                        self.datastore.add(p)
+                        self.datastore.add_complex(p)
                         r.shape.updateShape()
 
         def deleteAction(event, source: StorableElement, ds, details):
@@ -87,6 +88,14 @@ class ModeledDiagram(Diagram):
                     # Only remove them from the ports collection maintained by this class
                     parent.ports.remove(r)
                     self.datastore.update_cache(parent)
+            elif source.get_collection() in Collection.representations():
+                if isinstance(source, Port):
+                    # Remove the port from the block it belongs to, then redraw the block.
+                    block = self.datastore.live_instances[Collection.block_repr][source.parent]
+                    block.ports.remove(source)
+                    block.updateShape(block.shape)
+                else:
+                    Diagram.deleteBlock(self, source)
 
         def updateAction(event, source: StorableElement, ds, details):
             if type(source).__name__ in datastore.configuration.block_entities:
@@ -95,6 +104,15 @@ class ModeledDiagram(Diagram):
                 # Update the shapes
                 for r in reprs:
                     r.updateShape(r.shape)
+            elif source.get_collection() in Collection.representations():
+                # Support for the undo & redo actions.
+                console.log("UPDATE UPDATE UPDATE")
+                if source in self.children:
+                    console.log("SOURCE Updating the shape")
+                    source.updateShape(source.shape)
+                    self.rerouteConnections(source)
+                else:
+                    console.log("SOURCE not in children")
 
 
 
@@ -105,7 +123,7 @@ class ModeledDiagram(Diagram):
     def child_update(self, action: shapes.UpdateType, child: StorableElement):
         match action:
             case shapes.UpdateType.add:
-                self.datastore.add(child)
+                self.datastore.add_complex(child)
             case shapes.UpdateType.update:
                 self.datastore.update(child)
             case shapes.UpdateType.delete:
@@ -136,7 +154,7 @@ class ModeledDiagram(Diagram):
         # Create the representation of the connection.
         representation = ModeledRelationship(model_entity=connection, start=a, finish=b, diagram=self.diagram_id)
         # Add the connection to the diagram & database
-        self.datastore and self.datastore.add(representation)
+        self.datastore and self.datastore.add_complex(representation)
         super().addConnection(representation)
 
     def deleteConnection(self, connection):
@@ -226,8 +244,21 @@ class ModeledDiagram(Diagram):
 
     def trigger_event(self, widget, event_name, event_detail):
         super().trigger_event(widget, event_name, event_detail)
+        console.log(f"TRIGGERING event: {event_name}, {widget}, {event_detail}")
         self.datastore and self.datastore.trigger_event(event_name, widget, **event_detail)
 
     def dblclickChild(self, widget, ev):
         self.datastore.trigger_event('dblclick', self, target_dbid=widget.model_entity.Id,
                                      target_type=type(widget.model_entity).__name__)
+
+    def onKeyDown(self, ev) -> None:
+        console.log("ModelDiagram Key down")
+        if ev.key == 'z' and ev.ctrlKey:
+            if ev.shiftKey:
+                # Redo
+                self.datastore.redo_one_action()
+            else:
+                # Undo
+                self.datastore.undo_one_action()
+        else:
+            super().onKeyDown(ev)

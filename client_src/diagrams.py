@@ -261,6 +261,9 @@ class ResizeFSM(BehaviourFSM):
                     d.close()
                     self.unselect()
                     diagram.deleteBlock(widget)
+        elif ev.key == 'Escape':
+            if self.state not in [ResizeStates.NONE, ResizeStates.DECORATED]:
+                self.state = ResizeStates.DECORATED
 
 class ReroutingState(enum.IntEnum):
     NONE = enum.auto()
@@ -496,12 +499,14 @@ class Diagram(OwnerInterface):
         if block.repr_category() == ReprCategory.block:
             # Remove the block from the diagram's list of children
             if owner := block.owner():
-                owner.children.remove(block)
+                if block in owner.children:
+                    owner.children.remove(block)
         elif block.repr_category() == ReprCategory.message:
             # Remove the message from the relationship's list of messages
             for c in self.connections:
                 if c.Id == block.parent:
-                    c.messages.remove(block)
+                    if block in c.messages:
+                        c.messages.remove(block)
 
         # Also delete all connections with this block or its ports
         to_remove = []
@@ -629,6 +634,7 @@ class Diagram(OwnerInterface):
         self.mouse_events_fsm and self.mouse_events_fsm.onMouseMove(self, ev)
 
     def onKeyDown(self, ev) -> None:
+        console.log("Diagram Key down")
         self.mouse_events_fsm and self.mouse_events_fsm.onKeyDown(self, ev)
 
     def handleDragStart(self, ev) -> None:
@@ -752,7 +758,7 @@ class BlockCreateWidget:
         instance = cls(x=300, y=300, height=self.height, width=int(1.6*self.height), diagram=self.diagram_id,
                        category=ReprCategory.block)
         instance.model_entity = representation.logical_class(parent=self.diagram_id)
-        diagram.datastore.add(instance)
+        diagram.datastore.add_complex(instance)
         diagram.addBlock(instance)
 
 

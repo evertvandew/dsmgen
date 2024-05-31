@@ -133,7 +133,7 @@ def make_explorer(holder, api: DataStore, allowed_children):
         def on_add(ev, cls: Type[ModelEntity], parent):
             def callback(data):
                 new_object = cls(parent=parent, **data)
-                api.add(new_object)
+                api.add_complex(new_object)
             getDetailsPopup(cls, callback)
         def bind_add_action(item):
             return item.__name__, lambda ev: on_add(ev, item, data_element.Id)

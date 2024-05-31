@@ -22,6 +22,7 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
+from browser import console
 import logging
 from enum import Enum, IntEnum, auto
 import json
@@ -132,13 +133,29 @@ class DataStore(EventDispatcher):
             if o.repr_category() == ReprCategory.block:
                 return getattr(o, 'ports', [])
 
-
     def add(self, record: StorableElement, redo=False) -> StorableElement:
-        """ Persist a new element """
-        collection = record.get_collection()
+        """ Persist a simple element, without any considerations for dependencies. """
         params = {}
         if redo:
             params = {'redo': True}
+
+        def on_complete(update: JsonResponse):
+            if update.status > 299:
+                alert("Block could not be created")
+            else:
+                # Set the ID of the object that was added.
+                record.Id = update.json['Id']
+                assert self.update_cache(record) is record
+
+        data = json.dumps(record, cls=ExtendibleJsonEncoder)
+        ajax.post(f'{self.configuration.base_url}/{record.get_db_table()}', blocking=True, data=data,
+                  oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"}, params=params)
+        return record
+
+
+    def add_complex(self, record: StorableElement, redo=False) -> StorableElement:
+        """ Persist a new element """
+        collection = record.get_collection()
         # Representations also have a record with model details that may or may not already exist.
         if model := record.get_model_details():
             # Check if this is a new model item (they can be created inside a diagram)
@@ -147,21 +164,10 @@ class DataStore(EventDispatcher):
                 if not getattr(model, 'parent', True):
                     model.parent = record.get_diagram()
                 # Add the model item
-                self.add(model, redo)
+                self.add_complex(model, redo)
+                self.add_data(record)
 
-            def on_complete(update: JsonResponse):
-                if update.status > 299:
-                    alert("Block could not be created")
-                else:
-                    # Set the ID of the object that was added.
-                    record.Id = update.json['Id']
-                    assert self.update_cache(record) is record
-
-            data = json.dumps(record, cls=ExtendibleJsonEncoder)
-
-            ajax.post(f'{self.configuration.base_url}/{record.get_db_table()}', blocking=True, data=data,
-                      oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"}, params=params)
-            self.add_data(record)
+            self.add(record, redo)
             # For ports, also update the ports collections in the parent block.
             if record.repr_category() == ReprCategory.port:
                 repr_parent = self.live_instances[Collection.block_repr][record.get_parent()]
@@ -169,15 +175,9 @@ class DataStore(EventDispatcher):
                     repr_parent.ports.append(record)
                     self.update_cache(repr_parent)
                     self.update_data(repr_parent)
-            return record
+            self.add_data(record)
         else:
-            data = json.dumps(record, cls=ExtendibleJsonEncoder)
-            def on_complete(update):
-                if update.status < 300:
-                    record.Id = update.json['Id']
-                    assert self.update_cache(record) is record
-            ajax.post(f'/data/{record.get_db_table()}', blocking=True, data=data, oncomplete=on_complete,
-                      mode='json', headers={"Content-Type": "application/json"}, params=params)
+            self.add(record, redo)
             if record.Id < 1:
                 raise RuntimeError("Could not add record")
             self.add_data(record)
@@ -188,7 +188,7 @@ class DataStore(EventDispatcher):
                     parent_block.ports.append(record)
                     self.update_cache(parent_block)
                     self.update_data(parent_block)
-            return record
+        return record
 
     def update(self, record: StorableElement):
         collection = record.get_collection()
@@ -211,7 +211,7 @@ class DataStore(EventDispatcher):
                 data = json.dumps(repr, cls=ExtendibleJsonEncoder)
                 ajax.post(f'{self.configuration.base_url}/{record.get_db_table()}/{record.Id}', blocking=True, data=data,
                           oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
-                self.update_data(repr)
+                self.update_data(record)
 
         else:
             # Handle non-representations
@@ -226,6 +226,9 @@ class DataStore(EventDispatcher):
         """ Returns true if the deletion is successful. """
         collection = record.get_collection()
 
+        if not record.Id in self.live_instances[collection]:
+            return True
+
         # Find any dependencies and delete these first.
         to_delete = []
         if collection == Collection.block_repr:
@@ -238,7 +241,7 @@ class DataStore(EventDispatcher):
             to_delete.extend(r for r in self.live_instances[Collection.relation].values() if r.target == record.Id)
             # Don't do the representations of these relations, they will be deleted at another point.
         if collection == Collection.relation:
-            to_delete.extend(r for r in self.live_instances[Collection.relation_repr].values() if r.relation == record.Id)
+            to_delete.extend(r for r in self.live_instances[Collection.relation_repr].values() if r.relationship == record.Id)
         for d in to_delete:
             self.delete(d)
 
@@ -366,7 +369,7 @@ class DataStore(EventDispatcher):
 
         ajax.get(f'/data/diagram_contents/{diagram_id}', mode='json', oncomplete=on_data)
 
-    def create_representation(self, block_cls, block_id, drop_details):
+    def create_representation(self, block_cls, block_id, drop_details) -> StorableElement:
         result = None
         def on_complete(update: JsonResponse):
             nonlocal result
@@ -381,7 +384,7 @@ class DataStore(EventDispatcher):
                         data=data, oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
         return result
 
-    def decode_representation(self, data: dict):
+    def decode_representation(self, data: dict) -> StorableElement:
         """ Create a representation object out of a data dictionary """
         model_cls = self.all_classes[data['_entity']['__classname__']]
         details = data['_entity'].copy()
@@ -506,6 +509,8 @@ class AddAction(UndoableAction):
         ds.undo_add(self.item)
     def redo(self, ds):
         ds.redo_add(self.item)
+    def __str__(self):
+        return f'Add: {self.item}'
 
 class UpdateAction(UndoableAction):
     def __init__(self, updated: StorableElement, original:StorableElement):
@@ -517,6 +522,8 @@ class UpdateAction(UndoableAction):
         ds.undo_update(self.updated, self.original)
     def redo(self, ds):
         ds.redo_update(self.updated, self.original)
+    def __str__(self):
+        return f'Update: {self.updated}'
 
 class DeleteAction(UndoableAction):
     def __init__(self, item: StorableElement):
@@ -527,6 +534,8 @@ class DeleteAction(UndoableAction):
 
     def redo(self, ds):
         ds.redo_delete(self.item)
+    def __str__(self):
+        return f'Delete: {self.item}'
 
 
 class CompoundAction(UndoableAction):
@@ -540,6 +549,8 @@ class CompoundAction(UndoableAction):
     def redo(self, ds):
         for action in self.actions:
             action.redo(ds)
+    def __str__(self):
+        return f'Compound: {[str(a) for a in self.actions]}'
 
 
 class UndoableDataStore(DataStore):
@@ -549,6 +560,10 @@ class UndoableDataStore(DataStore):
         self.redo_queue: List[UndoableAction] = []
         self.recorded_actions = []
         self.record_level = 0
+
+    def clear_recorder(self):
+        self.record_level = 0
+        self.recorded_actions = []
 
     @contextmanager
     def action_recorder(self):
@@ -572,7 +587,13 @@ class UndoableDataStore(DataStore):
     def add(self, record: StorableElement, redo=False):
         with self.action_recorder() as actions:
             result = super().add(record, redo)
+
             actions.append(AddAction(result))
+        return result
+
+    def add_complex(self, record: StorableElement, redo=False) -> StorableElement:
+        with self.action_recorder() as action:
+            result = super().add_complex(record, redo)
         return result
 
     def update(self, record: StorableElement):
@@ -587,25 +608,38 @@ class UndoableDataStore(DataStore):
             actions.append(DeleteAction(record))
         return result
 
+    def create_representation(self, block_cls, block_id, drop_details) -> StorableElement:
+        result = super().create_representation(block_cls, block_id, drop_details)
+        with self.action_recorder() as actions:
+            actions.append(AddAction(result))
+            for ch in result.children:
+                actions.append(AddAction(ch))
+        return result
+
     def undo_one_action(self):
+        console.log(f"UNDOING -- queue: {self.undo_queue}")
+        self.record_level = 1       # Capture actions, do NOT create a new undo action.
         if not self.undo_queue:
             return
         action = self.undo_queue.pop(-1)
         try:
             action.undo(self)
-        except:
-            logging.exception("Problem undoing action")
-        self.redo_queue.append(action)
+        finally:
+            self.redo_queue.append(action)
+            self.clear_recorder()
+
 
     def redo_one_action(self):
+        console.log(f"REDOING -- queue: {self.undo_queue}")
+        self.record_level = 1       # Capture actions, do NOT create a new undo action.
         if not self.redo_queue:
             return
         action = self.redo_queue.pop(-1)
         try:
             action.redo(self)
-        except:
-            logging.exception("Problem redoing action")
-        self.undo_queue.append(action)
+        finally:
+            self.undo_queue.append(action)
+            self.clear_recorder()
 
     def undo_add(self, item: StorableElement):
         super().delete(item)

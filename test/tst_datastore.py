@@ -135,7 +135,7 @@ def data_store_tests():
             return Response(201, json={'Id': 123})
 
         add_expected_response('/data/Block', 'post', get_response=check_request)
-        ds.add(item)
+        ds.add_complex(item)
         assert item.Id == 123
         assert ok
         assert ds.shadow_copy[Collection.block][123] == item
@@ -156,7 +156,7 @@ def data_store_tests():
 
         add_expected_response('/data/Block', 'post', get_response=check_request_model)
         add_expected_response('/data/_BlockRepresentation', 'post', get_response=check_request_repr)
-        ds.add(item)
+        ds.add_complex(item)
         assert item.block == 123
         assert item.Id == 121
         assert 123 in ds.shadow_copy[Collection.block]
@@ -197,7 +197,7 @@ def data_store_tests():
 
         add_expected_response('/data/BlockReference', 'post', get_response=check_request_model)
         add_expected_response('/data/_RelationshipRepresentation', 'post', get_response=check_request_repr)
-        ds.add(item)
+        ds.add_complex(item)
         assert item.relationship == 123
         assert item.Id == 121
         assert 123 in ds.shadow_copy[Collection.relation]
@@ -221,7 +221,7 @@ def data_store_tests():
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/_BlockRepresentation', 'post', get_response=check_request_repr)
-        ds.add(item)
+        ds.add_complex(item)
         assert item.Id == 121
         assert 123 in ds.shadow_copy[Collection.block]
         assert 121 in ds.shadow_copy[Collection.block_repr]
@@ -322,7 +322,7 @@ def data_store_tests():
                               check_request=check_request_data)
         add_expected_response('/data/_BlockRepresentation', 'post', Response(201, json={'Id': 65}),
                               check_request=check_request_data)
-        ds.add(p1)
+        ds.add_complex(p1)
         # Expect the most important fields to be set by the datastore
         assert p1.block == 155
         assert p1.parent == 121
@@ -373,7 +373,7 @@ def data_store_tests():
         item = ModeledShapeAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
         add_expected_response('/data/Block', 'post', Response(201, json={'Id': 123}))
         add_expected_response('/data/_BlockRepresentation', 'post', Response(201, json={'Id': 121}))
-        ds.add(item)
+        ds.add_complex(item)
 
         # Update the representation and model
         item.x = 200
@@ -449,5 +449,5 @@ def data_store_tests():
 
 
 if __name__ == '__main__':
-    run_tests('*.test_undo_redo')
+    run_tests('*.test_ports')
     run_tests()

@@ -269,7 +269,7 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
         if len(port_types) == 1:
             # Just add the new port to database, its logic will cause it to be added to relevant collections.
             # Use the default values for each of the attributes of the port.
-            data_store.add(port_types[0](parent=o.Id))
+            data_store.add_complex(port_types[0](parent=o.Id))
             fillTable()
             return
 
@@ -291,7 +291,7 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
         def ok(ev):
             # Determine what type the user selected
             index = int(port_selector.value)
-            data_store.add(port_types[index](parent=o.Id))
+            data_store.add_complex(port_types[index](parent=o.Id))
             d.close()
             fillTable()
 

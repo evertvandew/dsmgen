@@ -17,7 +17,7 @@ class Collection(Enum):
 
     @classmethod
     def representations(cls):
-        return [cls.block_repr, cls.relation_repr]
+        return [cls.block_repr, cls.relation_repr, cls.message_repr]
 
     @classmethod
     def oppose(cls, c):
