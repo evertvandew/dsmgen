@@ -242,7 +242,7 @@ class Style:
     def __str__(self):
         return str(self.__dict__)
 
-class tag:
+class DOMNode:
     """ Base class for all tags.
         Tags have a uniform interface, so no tags need custom attributes or code.
     """
@@ -270,7 +270,7 @@ class tag:
                 if '<' in content:
                     raise RuntimeError("HTML content is not (yet) supported by this mockup")
                 self.text = content
-            elif isinstance(content, tag):
+            elif isinstance(content, DOMNode):
                 self <= content
             elif isinstance(content, Iterable):
                 self <= content
@@ -281,8 +281,8 @@ class tag:
         children = ''.join(str(c) for c in self.children)
         return f"{self.tagname()}({self.text} {children})"
 
-    def __le__(self, other: Union['tag', str, Iterable]) -> None:
-        if isinstance(other, tag):
+    def __le__(self, other: Union['DOMNode', str, Iterable]) -> None:
+        if isinstance(other, DOMNode):
             # Check if the element is moved to another place.
             if other.parent:
                 other.parent.children.remove(other)
@@ -316,7 +316,7 @@ class tag:
             return
 
     def __add__(self, other):
-        if isinstance(other, tag):
+        if isinstance(other, DOMNode):
             self <= other
         elif isinstance(other, str):
             assert '<' not in other, "HTML is not (yet) supported"
@@ -369,7 +369,7 @@ class tag:
             while self in self.parent.children:
                 self.parent.children.remove(self)
 
-    def select(self, key) -> List["tag"]:
+    def select(self, key) -> List["DOMNode"]:
         return self.get(selector=key)
 
     def select_one(self, key):
@@ -403,31 +403,31 @@ class tag:
 # Definition of all the tags supported by Brython.
 # These could be generated more efficiently than typing all the classes out like this,
 # but now editors and e.g. mypy can check on their correct usage.
-class A(tag): pass
+class A(DOMNode): pass
 
-class ABBR(tag): pass
+class ABBR(DOMNode): pass
 
-class ACRONYM(tag): pass
+class ACRONYM(DOMNode): pass
 
-class ADDRESS(tag): pass
+class ADDRESS(DOMNode): pass
 
-class APPLET(tag): pass
+class APPLET(DOMNode): pass
 
-class AREA(tag): pass
+class AREA(DOMNode): pass
 
-class B(tag): pass
+class B(DOMNode): pass
 
-class BASE(tag): pass
+class BASE(DOMNode): pass
 
-class BASEFONT(tag): pass
+class BASEFONT(DOMNode): pass
 
-class BDO(tag): pass
+class BDO(DOMNode): pass
 
-class BIG(tag): pass
+class BIG(DOMNode): pass
 
-class BLOCKQUOTE(tag): pass
+class BLOCKQUOTE(DOMNode): pass
 
-class BODY(tag):
+class BODY(DOMNode):
     def getElementById(self, id: str):
         return self[id]
 
@@ -437,73 +437,73 @@ class BODY(tag):
     def appendChild(self, element):
         self.children.append(element)
 
-class BR(tag): pass
+class BR(DOMNode): pass
 
-class BUTTON(tag): pass
+class BUTTON(DOMNode): pass
 
-class CAPTION(tag): pass
+class CAPTION(DOMNode): pass
 
-class CENTER(tag): pass
+class CENTER(DOMNode): pass
 
-class CITE(tag): pass
+class CITE(DOMNode): pass
 
-class CODE(tag): pass
+class CODE(DOMNode): pass
 
-class COL(tag): pass
+class COL(DOMNode): pass
 
-class COLGROUP(tag): pass
+class COLGROUP(DOMNode): pass
 
-class DD(tag): pass
+class DD(DOMNode): pass
 
-class DEL(tag): pass
+class DEL(DOMNode): pass
 
-class DFN(tag): pass
+class DFN(DOMNode): pass
 
-class DIR(tag): pass
+class DIR(DOMNode): pass
 
-class DIV(tag): pass
+class DIV(DOMNode): pass
 
-class DL(tag): pass
+class DL(DOMNode): pass
 
-class DT(tag): pass
+class DT(DOMNode): pass
 
-class EM(tag): pass
+class EM(DOMNode): pass
 
-class FIELDSET(tag): pass
+class FIELDSET(DOMNode): pass
 
-class FONT(tag): pass
+class FONT(DOMNode): pass
 
-class FORM(tag): pass
+class FORM(DOMNode): pass
 
-class FRAME(tag): pass
+class FRAME(DOMNode): pass
 
-class FRAMESET(tag): pass
+class FRAMESET(DOMNode): pass
 
-class H1(tag): pass
+class H1(DOMNode): pass
 
-class H2(tag): pass
+class H2(DOMNode): pass
 
-class H3(tag): pass
+class H3(DOMNode): pass
 
-class H4(tag): pass
+class H4(DOMNode): pass
 
-class H5(tag): pass
+class H5(DOMNode): pass
 
-class H6(tag): pass
+class H6(DOMNode): pass
 
-class HEAD(tag): pass
+class HEAD(DOMNode): pass
 
-class HR(tag): pass
+class HR(DOMNode): pass
 
-class HTML(tag): pass
+class HTML(DOMNode): pass
 
-class I(tag): pass
+class I(DOMNode): pass
 
-class IFRAME(tag): pass
+class IFRAME(DOMNode): pass
 
-class IMG(tag): pass
+class IMG(DOMNode): pass
 
-class INPUT(tag):
+class INPUT(DOMNode):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'value' in kwargs:
@@ -512,70 +512,70 @@ class INPUT(tag):
         else:
             self.value = 0 if self.attrs.get('type', 'text') == 'number' else ''
 
-class INS(tag): pass
+class INS(DOMNode): pass
 
-class ISINDEX(tag): pass
+class ISINDEX(DOMNode): pass
 
-class KBD(tag): pass
+class KBD(DOMNode): pass
 
-class LABEL(tag): pass
+class LABEL(DOMNode): pass
 
-class LEGEND(tag): pass
+class LEGEND(DOMNode): pass
 
-class LI(tag): pass
+class LI(DOMNode): pass
 
-class LINK(tag): pass
+class LINK(DOMNode): pass
 
-class MAP(tag): pass
+class MAP(DOMNode): pass
 
-class MENU(tag): pass
+class MENU(DOMNode): pass
 
-class META(tag): pass
+class META(DOMNode): pass
 
-class NOFRAMES(tag): pass
+class NOFRAMES(DOMNode): pass
 
-class NOSCRIPT(tag): pass
+class NOSCRIPT(DOMNode): pass
 
-class OBJECT(tag): pass
+class OBJECT(DOMNode): pass
 
-class OL(tag): pass
+class OL(DOMNode): pass
 
-class OPTGROUP(tag): pass
+class OPTGROUP(DOMNode): pass
 
-class OPTION(tag): pass
+class OPTION(DOMNode): pass
 
-class P(tag): pass
+class P(DOMNode): pass
 
-class PARAM(tag): pass
+class PARAM(DOMNode): pass
 
-class PRE(tag): pass
+class PRE(DOMNode): pass
 
-class Q(tag): pass
+class Q(DOMNode): pass
 
-class S(tag): pass
+class S(DOMNode): pass
 
-class SAMP(tag): pass
+class SAMP(DOMNode): pass
 
-class SCRIPT(tag): pass
+class SCRIPT(DOMNode): pass
 
-class SELECT(tag):
+class SELECT(DOMNode):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.value = 0
 
-class SMALL(tag): pass
+class SMALL(DOMNode): pass
 
-class SPAN(tag): pass
+class SPAN(DOMNode): pass
 
-class STRIKE(tag): pass
+class STRIKE(DOMNode): pass
 
-class STRONG(tag): pass
+class STRONG(DOMNode): pass
 
-class STYLE(tag): pass
+class STYLE(DOMNode): pass
 
-class SUB(tag): pass
+class SUB(DOMNode): pass
 
-class SUP(tag): pass
+class SUP(DOMNode): pass
 
 
 @dataclass
@@ -590,109 +590,109 @@ class DOMMatrix:
     def is2D(self) -> bool:
         return True
 
-class SVG(tag):
+class SVG(DOMNode):
     def getScreenCTM(self) -> DOMMatrix:
         # Return the default transformation matrix
         # No offset, rotation, scaling or skewing
         return DOMMatrix()
 
-class TABLE(tag): pass
+class TABLE(DOMNode): pass
 
-class TBODY(tag): pass
+class TBODY(DOMNode): pass
 
-class TD(tag): pass
+class TD(DOMNode): pass
 
 class TEXTAREA(INPUT): pass
 
-class TFOOT(tag): pass
+class TFOOT(DOMNode): pass
 
-class TH(tag): pass
+class TH(DOMNode): pass
 
-class THEAD(tag): pass
+class THEAD(DOMNode): pass
 
-class TITLE(tag): pass
+class TITLE(DOMNode): pass
 
-class TR(tag): pass
+class TR(DOMNode): pass
 
-class TT(tag): pass
+class TT(DOMNode): pass
 
-class U(tag): pass
+class U(DOMNode): pass
 
-class UL(tag): pass
+class UL(DOMNode): pass
 
-class VAR(tag): pass
+class VAR(DOMNode): pass
 
-class ARTICLE(tag): pass
+class ARTICLE(DOMNode): pass
 
-class ASIDE(tag): pass
+class ASIDE(DOMNode): pass
 
-class AUDIO(tag): pass
+class AUDIO(DOMNode): pass
 
-class BDI(tag): pass
+class BDI(DOMNode): pass
 
-class CANVAS(tag): pass
+class CANVAS(DOMNode): pass
 
-class COMMAND(tag): pass
+class COMMAND(DOMNode): pass
 
-class DATA(tag): pass
+class DATA(DOMNode): pass
 
-class DATALIST(tag): pass
+class DATALIST(DOMNode): pass
 
-class EMBED(tag): pass
+class EMBED(DOMNode): pass
 
-class FIGCAPTION(tag): pass
+class FIGCAPTION(DOMNode): pass
 
-class FIGURE(tag): pass
+class FIGURE(DOMNode): pass
 
-class FOOTER(tag): pass
+class FOOTER(DOMNode): pass
 
-class HEADER(tag): pass
+class HEADER(DOMNode): pass
 
-class KEYGEN(tag): pass
+class KEYGEN(DOMNode): pass
 
-class MAIN(tag): pass
+class MAIN(DOMNode): pass
 
-class MARK(tag): pass
+class MARK(DOMNode): pass
 
-class MATH(tag): pass
+class MATH(DOMNode): pass
 
-class METER(tag): pass
+class METER(DOMNode): pass
 
-class NAV(tag): pass
+class NAV(DOMNode): pass
 
-class OUTPUT(tag): pass
+class OUTPUT(DOMNode): pass
 
-class PROGRESS(tag): pass
+class PROGRESS(DOMNode): pass
 
-class RB(tag): pass
+class RB(DOMNode): pass
 
-class RP(tag): pass
+class RP(DOMNode): pass
 
-class RT(tag): pass
+class RT(DOMNode): pass
 
-class RTC(tag): pass
+class RTC(DOMNode): pass
 
-class RUBY(tag): pass
+class RUBY(DOMNode): pass
 
-class SECTION(tag): pass
+class SECTION(DOMNode): pass
 
-class SOURCE(tag): pass
+class SOURCE(DOMNode): pass
 
-class SUMMARY(tag): pass
+class SUMMARY(DOMNode): pass
 
-class TEMPLATE(tag): pass
+class TEMPLATE(DOMNode): pass
 
-class TIME(tag): pass
+class TIME(DOMNode): pass
 
-class TRACK(tag): pass
+class TRACK(DOMNode): pass
 
-class VIDEO(tag): pass
+class VIDEO(DOMNode): pass
 
-class WBR(tag): pass
+class WBR(DOMNode): pass
 
-class DETAILS(tag): pass
+class DETAILS(DOMNode): pass
 
-class DIALOG(tag):
+class DIALOG(DOMNode):
     def showModal(self):
         if not self.parent:
             document <= self
@@ -700,9 +700,9 @@ class DIALOG(tag):
     def close(self):
         pass
 
-class MENUITEM(tag): pass
+class MENUITEM(DOMNode): pass
 
-class PICTURE(tag): pass
+class PICTURE(DOMNode): pass
 
 
 ###############################################################################

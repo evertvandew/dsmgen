@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
-from browser import document, console, html, bind
+from browser import document, console, html, bind, DOMNode
 from browser.widgets.dialog import Dialog
 import enum
 import diagrams
@@ -29,6 +29,49 @@ from model_interface import ModelEntity, EditableParameterDetails
 from shapes import HIDDEN, Stylable
 from data_store import DataStore, ExtendibleJsonEncoder, parameter_spec
 
+
+line_cls = 'eline'
+name_cls = 'ename'
+
+
+def toggle_caret(ev):
+    ev.stopPropagation()
+    ev.preventDefault()
+    c = ev.target
+    holder = c.parent.parent
+    children = holder.select(f'.{line_cls}')
+    if 'fa-caret-right' in list(c.classList):
+        c.classList.remove('fa-caret-right')
+        c.classList.add('fa-caret-down')
+        for child in children:
+            child.style['display'] = 'block'
+    else:
+        c.classList.add('fa-caret-right')
+        c.classList.remove('fa-caret-down')
+        for child in children:
+            child.style['display'] = 'none'
+
+
+def mk_collapsable(heading: str|DOMNode, contents: List[DOMNode], line_id: Optional[int]=None):
+    """ Make contents collapsable. """
+    if isinstance(heading, str):
+        heading = html.B(heading)
+    de = html.DIV()
+    dh = html.DIV()
+    _ = dh <= html.SPAN(Class="caret fa fa-caret-right", style={"width": "1em"})
+    _ = dh <= html.SPAN(heading)
+    _ = de <= dh
+    if line_id:
+        d = html.DIV(contents, Class=line_cls, id=line_id)
+    else:
+        d = html.DIV(contents, Class=line_cls)
+    d.style['display'] = 'none'
+    _ = de <= d
+
+    for c in de.select('.caret'):
+        c.bind('click', toggle_caret)
+
+    return de
 
 class longstr(str): pass
 
@@ -202,9 +245,9 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
     div = html.DIV()
     table = html.TABLE()
     table.className = 'porttable'
-    div <= html.H3(field.name) + '\n' + table
+    _ = div <= mk_collapsable(field.name, table)
 
-    def bindRowToEditor(row, item: ModelEntity, delete):
+    def bindRowToEditor(row: DOMNode, item: ModelEntity, delete: DOMNode):
         row.bind('click', lambda ev: editDialog(item))
         delete.bind('click', lambda ev: (confirmDeleteDialog(item, row), ev.stopPropagation()))
 
@@ -214,17 +257,17 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
         for i, item in enumerate(sorted_ports):
             row = html.TR(Class='port_row', data_mid=item.Id)
             for f in item.get_editable_parameters():
-                row <= html.TD(str(f.current_value))
+                _ = row <= html.TD(str(f.current_value))
             # Add a delete button for each port
             delete = html.BUTTON('X', style="background-color:red; color:white", type='button',
                                  id=f'delete_port_{i}')
-            row <= delete
-            table <= row
+            _ = row <= delete
+            _ = table <= row
             bindRowToEditor(row, item, delete)
 
     def confirmDeleteDialog(item, row):
         d = Dialog("Test", ok_cancel=('Yes', 'No'))
-        d.panel <=  "Delete this port?"
+        _ = d.panel <=  "Delete this port?"
 
         @bind(d.ok_button, "click")
         def yes(ev):
@@ -244,7 +287,7 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
         all_editables = current.get_editable_parameters()
 
         for f in all_editables:
-            d.panel <= html.LABEL(f.name) + getInputForField(f) + html.BR()
+            _ = d.panel <= html.LABEL(f.name) + getInputForField(f) + html.BR()
 
         converters = {f.name: createFromValue(f.type) for f in all_editables}
 
@@ -282,9 +325,9 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
         # We make a single dict of all editable options.
         port_selector = html.SELECT(id="port_selector")
         for i, port_class in enumerate(port_types):
-            port_selector <= html.OPTION(port_class.__name__, value=i)
+            _ = port_selector <= html.OPTION(port_class.__name__, value=i)
 
-        d.panel <= html.LABEL("Port type:") + port_selector
+        _ = d.panel <= html.LABEL("Port type:") + port_selector
 
         # Event handler for "Ok" button
         @bind(d.ok_button, "click")
@@ -309,26 +352,32 @@ def dataClassEditorForm(o: ModelEntity, editable_fields: List[EditableParameterD
     form = html.FORM()
 
     for field in editable_fields:
-        console.log(f'Placing field: {field}')
         iff = getInputForField(field)
         if iff:
+            de = html.DIV()
+            de.className = "mb-3 row"
             label = html.LABEL(field.name)
-            label.className ="col-sm-3 col-form-label"
-            _ = form <= label
-            _ = form <= iff
-            _ = form <= html.BR()
+            label.className = "col-sm-3 col-form-label"
+            _ = de <= label
+            iff.className = "form-control"
+            dc = html.DIV()
+            dc.className = 'col-sm-9'
+            _ = dc <= iff
+            _ = de <= dc
+            _ = form <= de
 
     port_types = o.get_allowed_ports() if o else []
     if port_types and data_store:
         f = [f for f in fields(o) if f.name == 'ports'][0]
         _ = form <= createPortEditor(o, f, port_types, data_store)
+    console.log(f"Returning form {form}")
     return form
 
 def stylingEditorForm(o: Stylable):
     # Add an editor for style elements
-    form = html.FORM()
+
     if isStylable(o):
-        _ = form <= html.H3("Styling")
+        form = html.FORM()
         style_keys = o.getStyleKeys()
         for key in style_keys:
             label = html.LABEL(key)
@@ -336,7 +385,7 @@ def stylingEditorForm(o: Stylable):
             _ = form <= label
             _ = form <= getInputForStyle(o, key, o.getStyle(key, ''))
             _ = form <= html.BR()
-    return form
+        return mk_collapsable('Styling', form)
 
 def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[EditableParameterDetails],
                   repr: Optional[Stylable]=None):
@@ -365,9 +414,10 @@ def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameter
         data_store: REST api client that persists the object being edited / created.
         repr: A representation of the model Entity that
     """
-    form = dataClassEditorForm(o, parameters, data_store)
+    editor = html.DIV()
+    _ = editor <= mk_collapsable(f'{type(o).__name__}: {getattr(o, "name", "")}', dataClassEditorForm(o, parameters, data_store))
     if repr and isStylable(repr):
-        _ = form <= stylingEditorForm(repr)
+        _ = editor <= stylingEditorForm(repr)
     # Add a SAVE button
     def onSave(_):
         # Because this is a Closure, we can use the captured variables
@@ -379,7 +429,8 @@ def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameter
     b = html.BUTTON("Save", type="button", id='save_properties')
     b.className = "btn btn-primary"
     b.bind("click", onSave)
-    return form, b
+    _ = editor <= b
+    return editor
 
 
 def getDetailsPopup(cls: Type[ModelEntity], cb: Callable):

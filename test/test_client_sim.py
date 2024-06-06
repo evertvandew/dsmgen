@@ -333,7 +333,7 @@ class IntegrationContext:
                 return rid
 
         class DiagramsApi(HtmlApi):
-            parent: html.tag = d['canvas']
+            parent: html.DOMNode = d['canvas']
 
             def current_diagram(self) -> ModeledDiagram:
                 return integration_context.diagram_tabview.current_diagram
@@ -573,7 +573,7 @@ class IntegrationContext:
                 self.parent.parent.dispatchEvent(events.KeyDown(key='z', ctrlKey=True, shiftKey=True))
 
         class PropertyEditorApi(HtmlApi):
-            parent: html.tag = d['details']
+            parent: html.DOMNode = d['details']
 
             def save(self):
                 """ Save the current values in the port editor to the model.. """

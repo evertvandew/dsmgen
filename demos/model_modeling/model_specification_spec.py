@@ -8,7 +8,7 @@ md = ModelDefinition()
 md.ModelVersion('0.1')
 
 available_shapes = "bar box circle closedcircle cloud component diamond document drum ellipse folder hexagon hourglass label note obliquerect octagon rect ringedclosedcircle square stickman tape triangledown triangleup tunnel"
-available_line_endings = "arrow halfarrow pointer triangle diamond longdiamond square arrowopen halfarrowopen pointeropen triangleopen diamondopen longdiamondopen squareopen hat linearror halflinearror one only_one zero_or_one many zero_or_many"
+available_line_endings = "none arrow halfarrow pointer triangle diamond longdiamond square arrowopen halfarrowopen pointeropen triangleopen diamondopen longdiamondopen squareopen hat linearror halflinearror one only_one zero_or_one many zero_or_many"
 available_port_shapes = "square cup connector circle half_circle triangle_in triangle_out diamond"
 
 ###############################################################################

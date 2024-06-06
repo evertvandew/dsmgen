@@ -35,6 +35,8 @@ html, body {
     width:calc(70% - 3px);
     float: right;
     height:calc(30% - 3px);
+    max-height: calc(30% - 3px);
+    overflow:scroll;
     margin: 0;
 }
 

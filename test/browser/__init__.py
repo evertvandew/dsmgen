@@ -1,6 +1,6 @@
 
 import sys
-from .html import BODY
+from .html import BODY, DOMNode
 
 document = BODY()
 

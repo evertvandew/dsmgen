@@ -24,33 +24,12 @@ from typing import Type
 from data_store import DataStore, ExtendibleJsonEncoder, StorableElement
 import json
 
-from property_editor import getDetailsPopup
+from property_editor import getDetailsPopup, toggle_caret, name_cls, line_cls
 from modeled_shape import ModelEntity, ModelRepresentation
 from context_menu import mk_context_menu
 
-line_cls = 'eline'
-name_cls = 'ename'
-
 
 class Element: pass
-
-def toggle_caret(ev):
-    ev.stopPropagation()
-    ev.preventDefault()
-    c = ev.target
-    holder = c.parent.parent
-    children = holder.select(f'.{line_cls}')
-    if 'fa-caret-right' in list(c.classList):
-        c.classList.remove('fa-caret-right')
-        c.classList.add('fa-caret-down')
-        for child in children:
-            child.style['display'] = 'block'
-    else:
-        c.classList.add('fa-caret-right')
-        c.classList.remove('fa-caret-down')
-        for child in children:
-            child.style['display'] = 'none'
-
 
 def format_name(name):
     """ Do additional formatting for a name displayed in the explorer """

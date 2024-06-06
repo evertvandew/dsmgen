@@ -5,10 +5,12 @@
 <meta charset="utf-8">
 <script type="text/javascript" src="/src/brython.js"></script>
 <script type="text/javascript" src="/src/brython_stdlib.js"></script>
+<link href="/assets/css/bootstrap.min.css" rel="stylesheet" crossorigin="anonymous">
 <link rel="stylesheet" type="text/css" href="/assets/css/fontawesome.min.css" />
 <link rel="stylesheet" type="text/css" href="/assets/css/solid.min.css" />
 <link rel="stylesheet" type="text/css" href="/stylesheet.css" />
-
+<script src="/assets/js/jquery-3.7.0.min.js" crossorigin="anonymous"></script>
+<script src="/assets/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
 
 </head>
 
@@ -16,7 +18,7 @@
 <body onload="brython(1)">
     <div id="explorer"></div>
     <div id="canvas"></div>
-    <div id="details"></div>
+    <div id="details" class="accordion"></div>
 
     <script type="text/python">
         from ${generator.module_name}client import run
