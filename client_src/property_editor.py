@@ -422,7 +422,7 @@ def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameter
     def onSave(_):
         # Because this is a Closure, we can use the captured variables
         # Get the new values for the editable fields
-        update_data = getFormValues(form, o, parameters, repr)
+        update_data = getFormValues(editor, o, parameters, repr)
         if callable(update):
             update(json.dumps(update_data, cls=ExtendibleJsonEncoder))
 

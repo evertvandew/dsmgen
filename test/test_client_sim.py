@@ -1915,6 +1915,6 @@ def integration_tests():
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.undo_redo')
+    run_tests('*.connection_property_editor')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')
