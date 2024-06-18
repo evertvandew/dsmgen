@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
 
 
-from browser import document, svg, console, window, bind, html
+from browser import document, svg, console, window, bind, html, DOMNode
 from browser.widgets.dialog import Dialog, InfoDialog
 
 
@@ -85,6 +85,27 @@ def moveAll(widget, decorators) -> None:
     for o in Orientations:
         moveSingleHandle(decorators, widget, o)
 
+def mk_scrollable(canvas: DOMNode):
+    """ Make an SVG widget scrollable. """
+    @bind(canvas, 'wheel')
+    def scroll_wheel(ev):
+        ev.preventDefault()
+        viewbox = canvas.attrs.get('viewBox', None)
+        if not viewbox:
+            viewbox = f'0 0 {canvas.width} {canvas.height}'
+        values = [float(v) for v in viewbox.split()]
+
+        if ev.shiftKey:
+            factor = values[2] * ev.deltaY / 132 / 20
+            values[0] += factor
+        elif ev.ctrlKey:
+            factor = values[3] * ev.deltaY / 132 / 20
+            values[1] += factor
+        else:
+            factor = 1.1 ** (ev.deltaY / 132)
+            values[2] *= factor
+            values[3] *= factor
+        canvas.attrs['viewBox'] = ' '.join(str(v) for v in values)
 
 class FSMEnvironment:
     """ The FSM needs to talk back to its "environment", the Diagram object. """
@@ -541,6 +562,7 @@ class Diagram(OwnerInterface):
                 c.reroute(self.children)
 
     def bind(self, canvas) -> None:
+        mk_scrollable(canvas)
         self.canvas = canvas
         canvas.bind('click', self.onClick)
         canvas.bind('mouseup', self.onMouseUp)
@@ -763,7 +785,7 @@ class BlockCreateWidget:
 
 
 def load_diagram(diagram_id, diagram_cls, config: DiagramConfiguration, datastore, canvas):
-    diagram = diagram_cls(config, [BlockCreateWidget, EditingModeWidget], datastore, diagram_id)
+    diagram: Diagram = diagram_cls(config, [BlockCreateWidget, EditingModeWidget], datastore, diagram_id)
     diagrams.append(diagram)
     diagram.bind(canvas)
     diagram.load_diagram()
