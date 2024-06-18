@@ -99,12 +99,12 @@ def mk_scrollable(canvas: DOMNode):
             factor = values[2] * ev.deltaY / 132 / 20
             values[0] += factor
         elif ev.ctrlKey:
-            factor = values[3] * ev.deltaY / 132 / 20
-            values[1] += factor
-        else:
             factor = 1.1 ** (ev.deltaY / 132)
             values[2] *= factor
             values[3] *= factor
+        else:
+            factor = values[3] * ev.deltaY / 132 / 20
+            values[1] += factor
         canvas.attrs['viewBox'] = ' '.join(str(v) for v in values)
 
 class FSMEnvironment:
