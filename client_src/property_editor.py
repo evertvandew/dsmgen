@@ -52,20 +52,26 @@ def toggle_caret(ev):
             child.style['display'] = 'none'
 
 
-def mk_collapsable(heading: str|DOMNode, contents: List[DOMNode], line_id: Optional[int]=None):
+def mk_collapsable(heading: str|DOMNode, contents: List[DOMNode], line_id: Optional[int]=None, start_visible=False):
     """ Make contents collapsable. """
     if isinstance(heading, str):
         heading = html.B(heading)
     de = html.DIV()
     dh = html.DIV()
-    _ = dh <= html.SPAN(Class="caret fa fa-caret-right", style={"width": "1em"})
+    if start_visible:
+        _ = dh <= html.SPAN(Class="caret fa fa-caret-down", style={"width": "1em"})
+    else:
+        _ = dh <= html.SPAN(Class="caret fa fa-caret-right", style={"width": "1em"})
     _ = dh <= html.SPAN(heading)
     _ = de <= dh
     if line_id:
         d = html.DIV(contents, Class=line_cls, id=line_id)
     else:
         d = html.DIV(contents, Class=line_cls)
-    d.style['display'] = 'none'
+    if start_visible:
+        d.style['display'] = 'block'
+    else:
+        d.style['display'] = 'none'
     _ = de <= d
 
     for c in de.select('.caret'):
@@ -370,7 +376,6 @@ def dataClassEditorForm(o: ModelEntity, editable_fields: List[EditableParameterD
     if port_types and data_store:
         f = [f for f in fields(o) if f.name == 'ports'][0]
         _ = form <= createPortEditor(o, f, port_types, data_store)
-    console.log(f"Returning form {form}")
     return form
 
 def stylingEditorForm(o: Stylable):
@@ -415,7 +420,8 @@ def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameter
         repr: A representation of the model Entity that
     """
     editor = html.DIV()
-    _ = editor <= mk_collapsable(f'{type(o).__name__}: {getattr(o, "name", "")}', dataClassEditorForm(o, parameters, data_store))
+    _ = editor <= mk_collapsable(f'{type(o).__name__}: {getattr(o, "name", "")}',
+                                 dataClassEditorForm(o, parameters, data_store), start_visible=True)
     if repr and isStylable(repr):
         _ = editor <= stylingEditorForm(repr)
     # Add a SAVE button
