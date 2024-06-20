@@ -1,4 +1,5 @@
 from typing import Self, Any
+from enum import IntEnum, auto
 from model_definition import (ModelDefinition, required,
                               parameter_values, detail, longstr, XRef, parameter_spec,
                               hidden)
@@ -6,6 +7,15 @@ from model_definition import (ModelDefinition, required,
 # The tooling expects an ModelDifinition object named `md`
 md = ModelDefinition()
 md.ModelVersion('0.1')
+
+
+@md.register_enum
+class PeripheralClass(IntEnum):
+    IOPin = auto()
+    Timer = auto()
+    Uart = auto()
+    Can = auto()
+
 
 
 @md.LogicalModel(styling='icon:folder')
@@ -70,22 +80,37 @@ class SubProgram:
 class Input:
     name: str
     parent: XRef('ports', SubProgram, SubProgramDefinition, BlockDefinition, hidden)
+    data_type: str
 
 @md.Port(styling = "shape:square;fill:yellow;icon:arrows-alt-h")
 class Output:
     name: str
     parent: XRef('ports', SubProgram, SubProgramDefinition, BlockDefinition, hidden)
+    data_type: str
 
+@md.Port(styling = "shape:square;fill:yellow;icon:arrows-alt-h")
+class BufferedIn:
+    name: str
+    parent: XRef('ports', SubProgram, SubProgramDefinition, BlockDefinition, hidden)
+    data_type: str
+
+@md.Port(styling = "shape:square;fill:yellow;icon:arrows-alt-h")
+class BufferedOut:
+    name: str
+    parent: XRef('ports', SubProgram, SubProgramDefinition, BlockDefinition, hidden)
+    data_type: str
 
 @md.Port(styling = "shape:square;fill:green;icon:arrows-alt-h")
 class AsyncInput:
     name: str
     parent: XRef('ports', SubProgram, SubProgramDefinition, BlockDefinition, hidden)
+    data_type: str
 
 @md.Port(styling = "shape:square;fill:green;icon:arrows-alt-h")
 class AsyncOutput:
     name: str
     parent: XRef('ports', SubProgram, SubProgramDefinition, BlockDefinition, hidden)
+    data_type: str
 
 @md.Relationship(styling='endmarker:arrow')
 class SynchronousChannel:
@@ -97,14 +122,23 @@ class AsyncChannel:
     source: XRef('source', AsyncOutput)
     target: XRef('target', AsyncInput)
 
+@md.Relationship(styling='endmarker:arrow')
+class BufferedChannel:
+    source: XRef('source', BufferedOut)
+    target: XRef('target', BufferedIn)
 
 @md.Port(parents=[SubProgram, SubProgramDefinition, BlockDefinition])
 class ConfigInput:
     name: str
+    parent: XRef('ports', SubProgram, SubProgramDefinition, BlockDefinition, hidden)
+    peripheral_class: PeripheralClass
 
 @md.Port(parents=[SubProgram, SubProgramDefinition, BlockDefinition])
 class ConfigOutput:
     name: str
+    parent: XRef('ports', SubProgram, SubProgramDefinition, BlockDefinition, hidden)
+    parameters: (parameter_spec, detail)
+    peripheral_class: PeripheralClass
 
 @md.Relationship(source=[ConfigOutput], target=[ConfigInput])
 class ConfigChannel:

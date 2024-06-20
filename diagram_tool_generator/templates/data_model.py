@@ -25,6 +25,7 @@ along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
 
+from enum import EnumType
 from dataclasses import fields
 import model_definition as md
 
@@ -66,6 +67,14 @@ def _fk_pragma_on_connect(dbapi_con, con_record):
 event.listen(engine, 'connect', _fk_pragma_on_connect)
 
 Session = sessionmaker(engine)
+
+
+%for cls in [c for c in generator.md.custom_types if isinstance(c, EnumType)]:
+class ${cls.__name__}(IntEnum):
+%for option in cls:
+    ${option.name} = ${option.value}
+%endfor
+%endfor
 
 class OptionalRef:
     def __init__(self, t):

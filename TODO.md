@@ -21,6 +21,7 @@
 * Get rid of mechanisms where the presence of an attribute decides actions. Replace these with (member) functions.
 
 # Future enhancements
+* Allow the server to switch databases, as directed by the client.
 * Add a list of port shapes
 * Place texts with an offset, and allow that offset to be edited. Perhaps also the bounding box of the text.
 * When opening a diagram for the second time, open the existing diagram instead.

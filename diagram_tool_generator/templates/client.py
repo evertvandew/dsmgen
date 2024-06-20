@@ -31,7 +31,7 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
-
+from enum import EnumType
 import model_definition as mdef
 from model_definition import fields, is_dataclass, parameter_spec
 
@@ -67,6 +67,13 @@ def resolve(name: str) -> Type[ms.ModelEntity]:
     for p in parts:
         var = getattr(var, p)
     return var
+
+%for cls in [c for c in generator.md.custom_types if isinstance(c, EnumType)]:
+class ${cls.__name__}(IntEnum):
+%for option in cls:
+    ${option.name} = ${option.value}
+%endfor
+%endfor
 
 # Modelling 'Entities:'
 % for entity in generator.ordered_items:

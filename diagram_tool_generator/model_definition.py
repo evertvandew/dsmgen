@@ -31,9 +31,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
 from datetime import datetime, time
-from enum import IntEnum, auto
+from enum import IntEnum, auto, EnumType
 from typing import List, Any, Optional, Dict
 from dataclasses import dataclass, field, is_dataclass, fields
+import sqlalchemy
 
 
 # Define a number of types that are used in reporting the class of a model entity.
@@ -86,6 +87,7 @@ class ModelDefinition:
     type_conversions: Dict[str, TypeConversion] = field(default_factory=dict)
     element_lookup: Dict[str, Any] = field(default_factory=dict)
     styling_definition: Dict[str, Any] = field(default_factory=dict)
+    custom_types: List[type] = field(default_factory=list)
 
 
     def __post_init__(self):
@@ -170,6 +172,15 @@ class ModelDefinition:
         conversion = TypeConversion(cls.__name__, sqlalchemy, server, client)
         self.type_conversions[cls.__name__] = conversion
 
+    def register_enum(self, cls: EnumType):
+        """ Decorator to define an enum for use in this system. """
+        # Add __json__ conversion functions
+        cls.__json__ = lambda e: e.value
+        if not hasattr(cls, 'default'):
+            cls.default = cls(1)
+        self.add_type_conversion(cls, TypeDefault('Enum', 0), TypeDefault(cls.__name__, 1), TypeDefault(cls.__name__, 1))
+        self.custom_types.append(cls)
+        return cls
 
     def Entity(self, styling='', parents=None):
         """ Definition of a thing rendered as a "shape": blocks, actors, objects, actions, etc, etc, etc """
