@@ -422,11 +422,11 @@ class IntegrationContext:
                 self.press_ok()
                 check_expected_response()
 
-            def click_block(self, rid: int):
+            def click_block(self, rid: int, altKey=False, shiftKey=False, ctrlKey=False):
                 shape = self.resolve(rid).shape
-                shape.dispatchEvent(events.MouseDown())
-                shape.dispatchEvent(events.MouseUp())
-                shape.dispatchEvent(events.Click())
+                shape.dispatchEvent(events.MouseDown(altKey=altKey, shiftKey=shiftKey, ctrlKey=ctrlKey))
+                shape.dispatchEvent(events.MouseUp(altKey=altKey, shiftKey=shiftKey, ctrlKey=ctrlKey))
+                shape.dispatchEvent(events.Click(altKey=altKey, shiftKey=shiftKey, ctrlKey=ctrlKey))
 
             def click_relation(self, rid: int):
                 shape = self.parent.select(f'[data-category="{ReprCategory.relationship}"][data-rid="{rid}"]')[0]
@@ -1912,9 +1912,49 @@ def integration_tests():
         context.diagrams.redo()
         check_expected_response()
 
+    @test
+    def multi_select():
+        # Create a diagram with multiple blocks: try to select and move them together.
+        # Create a diagram with two blocks and display it
+        context = IntegrationContext(hierarchy=[
+            client.SubProgramDefinition(Id=5, name="Requirements").asdict()
+        ])
+        data = [
+            {"Id": 1, "diagram": 5, "block": 6, "parent": None, "x": 347.0, "y": 188.0, "z": 0.0, "width": 64.0,
+             "height": 40.0, "order": 0, "orientation": 4, "styling": "", "category": 2,
+             "__classname__": "_BlockRepresentation",
+             "_entity": {
+                 "order": 0, "Id": 6, "name": "A", "parent": 5, "__classname__": "Block"
+             }
+             },
+            {
+                "Id": 2, "diagram": 5, "block": 7, "parent": None, "x": 647.0, "y": 188.0, "z": 0.0, "width": 64.0,
+                "height": 40.0, "order": 0, "styling": "", "category": 2,
+                "__classname__": "_BlockRepresentation",
+                "_entity": {
+                    "order": 0, "Id": 7, "name": "A", "parent": 5, "__classname__": "Block"
+                }
+            }
+
+        ]
+        add_expected_response('/data/diagram_contents/5', 'get', Response(200, json=data))
+        context.explorer.dblclick_element(mid=5)
+
+        # Select both blocks
+        context.diagrams.click_block(1)
+        context.diagrams.click_block(2, ctrlKey=True)
+        # Drag one block for 100 pixels
+        # The move function expects a change for #1. Add one for #2.
+        add_expected_response('/data/_BlockRepresentation/2', 'post', Response(200, json=None))
+        context.diagrams.move_block(1, [100.0, 0.0])
+        # Check both were moved.
+        assert context.data_store.live_instances[Collection.block_repr][1].getPos().x == data[0]['x']+100.0
+        assert context.data_store.live_instances[Collection.block_repr][2].getPos().x == data[1]['x']+100.0
+
+
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.connection_property_editor')
+    run_tests('*.multi_select')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')

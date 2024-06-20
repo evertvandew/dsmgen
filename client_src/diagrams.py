@@ -144,26 +144,32 @@ class ResizeStates(enum.IntEnum):
     DECORATED = enum.auto()
     MOVING = enum.auto()
     RESIZING = enum.auto()
+    MULTISELECT = enum.auto()
 
 class ResizeFSM(BehaviourFSM):
     def __init__(self, diagram):
         super().__init__()
         self.state: ResizeStates = ResizeStates.NONE
         self.diagram = diagram
-        self.widget: Optional[Shape | List[Shape]] = None
+        self.selection: List[Shape] = []
+        self.initial_pos: List[Point] = []
         self.decorators = {}
+        self.outlines = []
 
     def is_at_rest(self) -> bool:
         return self.state == ResizeStates.NONE
 
     def mouseDownShape(self, diagram, widget, ev) -> None:
-        if self.state != ResizeStates.NONE and self.widget != widget:
-            self.unselect()
+        if self.state != ResizeStates.NONE and widget not in self.selection:
+            if ev.ctrlKey or ev.shiftKey:
+                self.select(widget)
+            else:
+                self.unselect()
         if self.state == ResizeStates.NONE:
             self.select(widget)
         self.state = ResizeStates.MOVING
         self.dragstart = getMousePos(ev)
-        self.initial_pos = widget.getPos()
+        self.initial_pos = [w.getPos() for w in self.selection]
         ev.stopPropagation()
         ev.preventDefault()
 
@@ -176,38 +182,34 @@ class ResizeFSM(BehaviourFSM):
         fsm.mouseDownConnection(diagram, widget, ev)
 
     def mouseDownBackground(self, diagram, ev) -> None:
-        if self.widget and ev.target == self.widget.shape:
+        if self.selection and ev.target in [w.shape for w in self.selection]:
             self.state = ResizeStates.MOVING
             return
-        if self.state == ResizeStates.DECORATED:
+        if self.state in [ResizeStates.DECORATED, ResizeStates.MULTISELECT]:
             self.unselect()
         self.state = ResizeStates.NONE
-        return
-        # FIXME: check if this code needs to be removed.
-        self.dragstart = getMousePos(ev)
-        if self.widget:
-            self.initial_pos = diagram.selection.getPos()
-            self.initial_size = diagram.selection.getSize()
-
 
     def onMouseUp(self, diagram, ev) -> None:
         # If an object was being moved, evaluate if it changed owner
-        if self.state == ResizeStates.MOVING:
+        if self.state == ResizeStates.MOVING and len(self.selection)==1:
             pos = getMousePos(ev)
-            diagram.evaluateOwnership(self.widget, pos, self.widget.owner)
+            widget = self.selection[0]
+            diagram.evaluateOwnership(widget, pos, widget.owner)
         if self.state in [ResizeStates.MOVING, ResizeStates.RESIZING]:
-            self.diagram.updateElement(self.widget)
-            self.state = ResizeStates.DECORATED
+            for widget in self.selection:
+                self.diagram.updateElement(widget)
+            self.state = ResizeStates.DECORATED if len(self.selection) == 1 else ResizeStates.MULTISELECT
 
     def onMouseMove(self, diagram, ev) -> None:
-        if self.state in [ResizeStates.NONE, ResizeStates.DECORATED]:
+        if self.state in [ResizeStates.NONE, ResizeStates.DECORATED, ResizeStates.MULTISELECT]:
             return
         delta = getMousePos(ev) - self.dragstart
         if self.state == ResizeStates.RESIZING:
-            self.onDrag(self.initial_pos, self.initial_size, delta)
+            self.onDrag(self.initial_pos[0], self.initial_size, delta)
         if self.state == ResizeStates.MOVING:
-            self.widget.setPos(self.initial_pos + delta)
-            diagram.rerouteConnections(self.widget)
+            for widget, initial_pos in zip(self.selection, self.initial_pos):
+                widget.setPos(initial_pos + delta)
+                diagram.rerouteConnections(widget)
 
     def delete(self, diagram) -> None:
         """ Called when the FSM is about to be deleted"""
@@ -217,23 +219,31 @@ class ResizeFSM(BehaviourFSM):
     def startResize(self, widget, orientation, ev) -> None:
         self.dragstart = getMousePos(ev)
         self.state = ResizeStates.RESIZING
-        self.initial_pos = widget.getPos()
+        self.initial_pos = [w.getPos() for w in self.selection]
         self.initial_size = widget.getSize()
 
+    def clear_decorations(self) -> None:
+        for dec in self.decorators.values():
+            dec.remove()
+        self.decorators = {}
+        for widget in self.selection:
+            widget.unsubscribe(resize_role)
+
     def unselect(self) -> None:
-        if self.widget.isResizable():
-            for dec in self.decorators.values():
-                dec.remove()
-            self.decorators = {}
-            if self.widget:
-                self.widget.unsubscribe(resize_role)
-        self.widget = None
+        self.clear_decorations()
+        for widget in self.selection:
+            widget.highlight(False)
+            if widget.isResizable():
+                widget.unsubscribe(resize_role)
+        self.selection = []
+        self.outlines = []
         self.state = ResizeStates.NONE
 
     def select(self, widget) -> None:
-        self.widget = widget
+        widget.highlight()
+        self.selection.append(widget)
 
-        if widget.isResizable():
+        if len(self.selection) == 1 and widget.isResizable():
             self.decorators = {k: svg.circle(r=5, stroke_width=0, fill="#29B6F2", data_index=int(k), Class=handle_class)
                                for k in Orientations}
             x, y, width, height = [getattr(widget, k) for k in ['x', 'y', 'width', 'height']]
@@ -254,11 +264,19 @@ class ResizeFSM(BehaviourFSM):
                 bind_decorator(d, orientation)
 
             widget.subscribe(resize_role, lambda w: moveAll(w, self.decorators))
+            self.state = ResizeStates.DECORATED
+        else:
+            # Remove the decorations from the first selection
+            self.clear_decorations()
+            self.state = ResizeStates.MULTISELECT
 
     def onDrag(self, origin, original_size, delta) -> None:
+        if len(self.selection) != 1:
+            return
+        widget = self.selection[0]
         dx, dy, sx, sy, mx, my = orientation_details[self.dragged_handle]
         d = self.decorators[self.dragged_handle]
-        shape = self.widget
+        shape = widget
         movement = Point(x=delta.x * dx, y=delta.y * dy)
         # alert(f"{delta}, {dx}, {dy}, {sx}, {sy}")
         shape.setPos(origin + movement)
@@ -270,18 +288,24 @@ class ResizeFSM(BehaviourFSM):
 
     def onKeyDown(self, diagram, ev) -> None:
         if ev.key == 'Delete':
+            # Check if the user indeed wants to delete something.
             if self.state != ResizeStates.NONE:
-                widget = self.widget
-                d = Dialog(f'Delete {type(widget).__name__}', ok_cancel=True)
-                _ = d.panel <= f'Delete {type(widget).__name__}'
-                if hasattr(widget, 'name'):
-                    _ = d.panel <= f' "{widget.name}"'
+                widgets = self.selection
+                if len(widgets) > 1:
+                    d = Dialog(f'Delete selection', ok_cancel=True)
+                    _ = d.panel <= f'Delete blocks'
+                else:
+                    d = Dialog(f'Delete {type(widgets[0]).__name__}', ok_cancel=True)
+                    _ = d.panel <= f'Delete {type(widgets[0]).__name__}'
+                names = ', '.join(getattr(f'"{w}"', 'name', f'[{type(w).__name__}]') for w in widgets)
+                _ = d.panel <= f' {names}'
 
                 @bind(d.ok_button, "click")
                 def ok(ev):
                     d.close()
                     self.unselect()
-                    diagram.deleteBlock(widget)
+                    for widget in widgets:
+                        diagram.deleteBlock(widget)
         elif ev.key == 'Escape':
             if self.state not in [ResizeStates.NONE, ResizeStates.DECORATED]:
                 self.state = ResizeStates.DECORATED

@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
-from browser import svg, window
+from browser import svg, window, console
 import enum
 from weakref import ref
 import math
@@ -224,6 +224,8 @@ class Shape(Stylable, StorableElement):
     owner = None
 
     def __post_init__(self):
+        self.shape = None
+        self.highlight_shape = None
         if not isinstance(self.styling, dict):
             if not self.styling:
                 self.styling = {}
@@ -238,6 +240,9 @@ class Shape(Stylable, StorableElement):
     def setPos(self, new: Point):
         self.x, self.y = new.astuple()
         self.updateShape(self.shape)
+        if self.highlight_shape:
+            self.highlight_shape.attrs['x'] = self.x
+            self.highlight_shape.attrs['y'] = self.y
         for s in self.subscribers.values():
             s(self)
     def getSize(self) -> Point:
@@ -245,6 +250,9 @@ class Shape(Stylable, StorableElement):
     def setSize(self, new: Point):
         self.width, self.height = new.astuple()
         self.updateShape(self.shape)
+        if self.highlight_shape:
+            self.highlight_shape.attrs['width'] = self.width
+            self.highlight_shape.attrs['height'] = self.height
 
     def getShape(self):
         shape_type = self.getShapeDescriptor()
@@ -363,6 +371,16 @@ class Shape(Stylable, StorableElement):
             like the PortLabel, this must be determined runtime.
         """
         return getattr(self, 'logical_class', None)
+
+    def highlight(self, on=True):
+        """ Highlight the shape, as in when the shape is selected. """
+        if on and not self.highlight_shape:
+                self.highlight_shape = svg.rect(x=self.x, y=self.y, width=self.width, height=self.height, stroke_width=2,
+                                                stroke='#29B6F2', fill='none')
+                _ = self.shape <= self.highlight_shape
+        if not on and self.highlight_shape:
+            self.highlight_shape.remove()
+            self.highlight_shape = None
 
 @dataclass
 class CP:
