@@ -145,6 +145,7 @@ class ResizeStates(enum.IntEnum):
     MOVING = enum.auto()
     RESIZING = enum.auto()
     MULTISELECT = enum.auto()
+    AREA_SELECT = enum.auto()
 
 class ResizeFSM(BehaviourFSM):
     def __init__(self, diagram):
@@ -155,6 +156,7 @@ class ResizeFSM(BehaviourFSM):
         self.initial_pos: List[Point] = []
         self.decorators = {}
         self.outlines = []
+        self.selection_area = None
 
     def is_at_rest(self) -> bool:
         return self.state == ResizeStates.NONE
@@ -185,11 +187,35 @@ class ResizeFSM(BehaviourFSM):
         if self.selection and ev.target in [w.shape for w in self.selection]:
             self.state = ResizeStates.MOVING
             return
-        if self.state in [ResizeStates.DECORATED, ResizeStates.MULTISELECT]:
-            self.unselect()
-        self.state = ResizeStates.NONE
+        if self.state in [ResizeStates.NONE, ResizeStates.DECORATED, ResizeStates.MULTISELECT]:
+            self.state = ResizeStates.AREA_SELECT
+            pos = getMousePos(ev)
+            self.initial_pos = pos
+            self.selection_area = svg.rect(x=pos.x, y=pos.y, width=0, height=0, fill='none', stroke='black')
+            _ = self.diagram.canvas <= self.selection_area
 
     def onMouseUp(self, diagram, ev) -> None:
+        if self.state == ResizeStates.AREA_SELECT:
+            if not (ev.ctrlKey or ev.shiftKey):
+                self.unselect()
+
+            pos = getMousePos(ev)
+            xs = [self.initial_pos.x, pos.x]
+            ys = [self.initial_pos.y, pos.y]
+            minx, maxx = min(xs), max(xs)
+            miny, maxy = min(ys), max(ys)
+
+            for w in self.diagram.children:
+                if w.x < minx or w.y < miny or w.x+w.width > maxx or w.y+w.height >  maxy:
+                    continue
+                if w in self.selection:
+                    continue
+                self.select(w)
+            self.selection_area.remove()
+            self.selection_area = None
+            self.state = {0: ResizeStates.NONE, 1: ResizeStates.DECORATED}.get(len(self.selection), ResizeStates.MULTISELECT)
+            return
+
         # If an object was being moved, evaluate if it changed owner
         if self.state == ResizeStates.MOVING and len(self.selection)==1:
             pos = getMousePos(ev)
@@ -202,6 +228,19 @@ class ResizeFSM(BehaviourFSM):
 
     def onMouseMove(self, diagram, ev) -> None:
         if self.state in [ResizeStates.NONE, ResizeStates.DECORATED, ResizeStates.MULTISELECT]:
+            return
+        if self.state == ResizeStates.AREA_SELECT:
+            pos = getMousePos(ev)
+            if pos.x > self.initial_pos.x:
+                self.selection_area.attrs['width'] = pos.x - self.initial_pos.x
+            else:
+                self.selection_area.attrs['width'] = self.initial_pos.x - pos.x
+                self.selection_area.attrs['x'] = pos.x
+            if pos.y > self.initial_pos.y:
+                self.selection_area.attrs['height'] = pos.y - self.initial_pos.y
+            else:
+                self.selection_area.attrs['height'] = self.initial_pos.y - pos.y
+                self.selection_area.attrs['y'] = pos.y
             return
         delta = getMousePos(ev) - self.dragstart
         if self.state == ResizeStates.RESIZING:
@@ -240,6 +279,8 @@ class ResizeFSM(BehaviourFSM):
         self.state = ResizeStates.NONE
 
     def select(self, widget) -> None:
+        if widget in self.selection:
+            return
         widget.highlight()
         self.selection.append(widget)
 
@@ -309,6 +350,7 @@ class ResizeFSM(BehaviourFSM):
         elif ev.key == 'Escape':
             if self.state not in [ResizeStates.NONE, ResizeStates.DECORATED]:
                 self.state = ResizeStates.DECORATED
+
 
 class ReroutingState(enum.IntEnum):
     NONE = enum.auto()
@@ -497,7 +539,7 @@ class Diagram(OwnerInterface):
 
     def __init__(self, config: DiagramConfiguration, widgets):
         self.selection = None
-        self.mouse_events_fsm = None
+        self.mouse_events_fsm = ResizeFSM(self)
         self.children: List[Shape] = []
         self.connections: List[Relationship] = []
         self.widgets = widgets
@@ -680,7 +722,6 @@ class Diagram(OwnerInterface):
         self.mouse_events_fsm and self.mouse_events_fsm.onMouseMove(self, ev)
 
     def onKeyDown(self, ev) -> None:
-        console.log("Diagram Key down")
         self.mouse_events_fsm and self.mouse_events_fsm.onKeyDown(self, ev)
 
     def handleDragStart(self, ev) -> None:

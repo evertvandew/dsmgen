@@ -24,8 +24,6 @@
 * Add a list of port shapes
 * Place texts with an offset, and allow that offset to be edited. Perhaps also the bounding box of the text.
 * When opening a diagram for the second time, open the existing diagram instead.
-* Support selecting multiple elements and moving them.
-* Implement selection by drawing a rectangle with the mouse.
 * Highlight the currently active editing mode (block mode or connection mode).
 * Honour the `pattern` style for blocks and relationships. Perhaps rename to `linepattern`.
 * Do not allow the root item to be deleted. Or alternatively, spawn a new one if necessary.
@@ -63,6 +61,8 @@
 
 
 # Done:
+* Support selecting multiple elements and moving them.
+* Implement selection by drawing a rectangle with the mouse.
 * Support managing multiple diagrams using tabs.
 * Edit the styling of lines.
 * When a user deletes the last representation of a connection, the underlying connection must be deleted.
