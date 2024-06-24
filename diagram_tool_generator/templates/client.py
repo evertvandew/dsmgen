@@ -32,6 +32,7 @@ along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
 from enum import EnumType
+import inspect
 import model_definition as mdef
 from model_definition import fields, is_dataclass, parameter_spec
 
@@ -128,6 +129,10 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     default_styling = shapes.BasicShape.getDescriptor("${base_shape_name}").getDefaultStyle().copy()
     % endif
     default_styling.update(${repr(generator.styling[entity.__name__])})
+
+    %if hasattr(entity, 'getStyle'):
+${inspect.getsource(entity.getStyle)}
+    %endif
 
 
     def __eq__(self, other) -> bool:

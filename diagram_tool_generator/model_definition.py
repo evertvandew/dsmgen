@@ -34,7 +34,6 @@ from datetime import datetime, time
 from enum import IntEnum, auto, EnumType
 from typing import List, Any, Optional, Dict
 from dataclasses import dataclass, field, is_dataclass, fields
-import sqlalchemy
 
 
 # Define a number of types that are used in reporting the class of a model entity.
@@ -99,89 +98,9 @@ class ModelDefinition:
                             TypeDefault('dict', 'field(default_factory=dict)'))
         self.add_type_conversion(XRef, TypeDefault('Integer', 'None'), TypeDefault('int', 'None'), TypeDefault('int', 'None'))
 
-    @property
-    def diagrams(self) -> List[Any]:
-        return [e for e in self.model_elements if DiagramElement in e.categories]
 
-    @property
-    def hierarchy(self) -> List[Any]:
-        return [e for e in self.model_elements if ExplorableElement in e.categories]
-
-    @property
-    def representables(self) -> List[Any]:
-        return [e for e in self.model_elements if RepresentableElement in e.categories]
-
-    @property
-    def relationship(self) -> List[Any]:
-        return [e for e in self.model_elements if ConnectionElement in e.categories]
-    @property
-    def blocks(self) -> List[Any]:
-        return [e for e in self.model_elements
-                if RepresentableElement in e.categories
-                    and ConnectionElement not in e.categories
-                    and PortElement not in e.categories]
-    @property
-    def port(self) -> List[Any]:
-        return [e for e in self.model_elements if PortElement in e.categories]
-    @property
-    def instance_of(self) -> List[Any]:
-        return [e for e in self.model_elements if InstanceOf in e.categories]
-
-    @property
-    def all_model_items(self) -> List[Any]:
-        # Some entities are both diagrams and entities. Make sure a list of unique items is returned.
-        return self.model_elements
-
-    def is_port(self, cls):
-        return PortElement in cls.categories
-    def is_relationship(self, cls):
-        return ConnectionElement in cls.categories
-    def is_diagram(self, cls):
-        return DiagramElement in cls.categories
-    def is_representable(self, cls):
-        return RepresentableElement in cls.categories
-    def is_instance_of(self, cls):
-        return InstanceOf in cls.categories
-    def is_explorable(self, cls):
-        return ExplorableElement in cls.categories
-    def is_message(self, cls):
-        return MessageElement in cls.categories
-
-
-    def get_conversions(self, cls: Any) -> Optional[TypeConversion]:
-        name = cls if isinstance(cls, str) else (cls.__name__ if isinstance(cls, type) else type(cls).__name__)
-        if not isinstance(name, str):
-            raise False
-        return self.type_conversions.get(name, None)
-
-    def get_cls_by_name(self, name):
-        if not self.element_lookup:
-            self.element_lookup = {cls.__name__: cls for cls in self.model_elements}
-        return self.element_lookup[name]
-
-
-    def add_type_conversion(self, cls, sqlalchemy: TypeDefault, server: TypeDefault, client: TypeDefault):
-        """ Define how a custom type is represented in the various parts of the system:
-
-        Arguments:
-        cls -- The class that is used in the model specification
-        sqlalchemy -- the SQLAlchemy type used to represent this data
-        server -- how the type is represented in the dataclasses used by the server. Must be JSON serializable.
-        client -- how the type is represented in the dataclasses used by the Brython client. Must be JSON serializable.
-        """
-        conversion = TypeConversion(cls.__name__, sqlalchemy, server, client)
-        self.type_conversions[cls.__name__] = conversion
-
-    def register_enum(self, cls: EnumType):
-        """ Decorator to define an enum for use in this system. """
-        # Add __json__ conversion functions
-        cls.__json__ = lambda e: e.value
-        if not hasattr(cls, 'default'):
-            cls.default = cls(1)
-        self.add_type_conversion(cls, TypeDefault('Enum', 0), TypeDefault(cls.__name__, 1), TypeDefault(cls.__name__, 1))
-        self.custom_types.append(cls)
-        return cls
-
+    ####################################################################################################################
+    ## Decorators: used to create a model definition.
     def Entity(self, styling='', parents=None):
         """ Definition of a thing rendered as a "shape": blocks, actors, objects, actions, etc, etc, etc """
         def decorate(cls):
@@ -287,12 +206,17 @@ class ModelDefinition:
         return decorate
 
 
-    def LanedDiagram(self, *entities, styling='', parents=None):
+    def LanedDiagram(self, *entities, styling='', parents=None, vertical_lane=None, horizontal_lane=None, interconnect=None,
+                     self_message=False):
         """ A diagram with "lanes", e.g. an UML sequence diagram. """
         def decorate(cls):
             nonlocal parents
             cls.entities = entities
             cls.categories = [ExplorableElement, DiagramElement]
+            cls.vertical_lane = vertical_lane
+            cls.horizontal_lane = horizontal_lane
+            cls.interconnect = interconnect
+            cls.self_message = self_message
             parents = parents or []
             if parents or 'parent' not in cls.__annotations__:
                 cls.__annotations__['parent'] = XRef('children', *parents, hidden)
@@ -344,6 +268,100 @@ class ModelDefinition:
 
     def get_version(self):
         return self.model_version
+
+    ####################################################################################################################
+    ## Helpers for using a model definition to generate code.
+    @property
+    def diagrams(self) -> List[Any]:
+        return [e for e in self.model_elements if DiagramElement in e.categories]
+
+    @property
+    def hierarchy(self) -> List[Any]:
+        return [e for e in self.model_elements if ExplorableElement in e.categories]
+
+    @property
+    def representables(self) -> List[Any]:
+        return [e for e in self.model_elements if RepresentableElement in e.categories]
+
+    @property
+    def relationship(self) -> List[Any]:
+        return [e for e in self.model_elements if ConnectionElement in e.categories]
+
+    @property
+    def blocks(self) -> List[Any]:
+        return [e for e in self.model_elements
+                if RepresentableElement in e.categories
+                and ConnectionElement not in e.categories
+                and PortElement not in e.categories]
+
+    @property
+    def port(self) -> List[Any]:
+        return [e for e in self.model_elements if PortElement in e.categories]
+
+    @property
+    def instance_of(self) -> List[Any]:
+        return [e for e in self.model_elements if InstanceOf in e.categories]
+
+    @property
+    def all_model_items(self) -> List[Any]:
+        # Some entities are both diagrams and entities. Make sure a list of unique items is returned.
+        return self.model_elements
+
+    def is_port(self, cls):
+        return PortElement in cls.categories
+
+    def is_relationship(self, cls):
+        return ConnectionElement in cls.categories
+
+    def is_diagram(self, cls):
+        return DiagramElement in cls.categories
+
+    def is_representable(self, cls):
+        return RepresentableElement in cls.categories
+
+    def is_instance_of(self, cls):
+        return InstanceOf in cls.categories
+
+    def is_explorable(self, cls):
+        return ExplorableElement in cls.categories
+
+    def is_message(self, cls):
+        return MessageElement in cls.categories
+
+    def get_conversions(self, cls: Any) -> Optional[TypeConversion]:
+        name = cls if isinstance(cls, str) else (cls.__name__ if isinstance(cls, type) else type(cls).__name__)
+        if not isinstance(name, str):
+            raise False
+        return self.type_conversions.get(name, None)
+
+    def get_cls_by_name(self, name):
+        if not self.element_lookup:
+            self.element_lookup = {cls.__name__: cls for cls in self.model_elements}
+        return self.element_lookup[name]
+
+    def add_type_conversion(self, cls, sqlalchemy: TypeDefault, server: TypeDefault, client: TypeDefault):
+        """ Define how a custom type is represented in the various parts of the system:
+
+        Arguments:
+        cls -- The class that is used in the model specification
+        sqlalchemy -- the SQLAlchemy type used to represent this data
+        server -- how the type is represented in the dataclasses used by the server. Must be JSON serializable.
+        client -- how the type is represented in the dataclasses used by the Brython client. Must be JSON serializable.
+        """
+        conversion = TypeConversion(cls.__name__, sqlalchemy, server, client)
+        self.type_conversions[cls.__name__] = conversion
+
+    def register_enum(self, cls: EnumType):
+        """ Decorator to define an enum for use in this system. """
+        # Add __json__ conversion functions
+        cls.__json__ = lambda e: e.value
+        if not hasattr(cls, 'default'):
+            cls.default = cls(1)
+        self.add_type_conversion(cls, TypeDefault('Enum', 0), TypeDefault(cls.__name__, 1),
+                                 TypeDefault(cls.__name__, 1))
+        self.custom_types.append(cls)
+        return cls
+
 
 
 ###############################################################################

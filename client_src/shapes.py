@@ -615,7 +615,7 @@ class Relationship(Stylable):
 
     def __post_init__(self):
         # Also set the routing_method strategy object and message container.
-        self.routing_method: RoutingMethod = router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)
+        self.router: RoutingStrategy = None
         self.messages: List[Shape] = []
         self.points: Optional[List[Point]] = None
         self.owner: Optional[OwnerInterface] = None
@@ -679,9 +679,14 @@ class Relationship(Stylable):
             first_point = None
             last_point = None
 
-        router: RoutingStrategy = getattr(self, 'router', None) or router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)()
-        router.route(self, all_blocks)
-        self.router = router
+        router_cls = router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)
+        if type(self.router) != router_cls:
+            # If this is NOT the first time routing, erase all waypoints.
+            if self.router:
+                self.waypoints = []
+            self.router = router_cls()
+
+        self.router.route(self, all_blocks)
         if first_point is not None:
             first_delta = self.points[0] - first_point
             last_delta = self.points[-1] - last_point

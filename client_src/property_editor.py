@@ -403,7 +403,9 @@ def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[Editable
 
     if repr and isStylable(repr):
         defaults = o.getDefaultStyle()
-        new_style = {key: createFromValue(type(default))(document[f'styling_{key}'].value) for key, default in defaults.items()}
+        new_style = {key: createFromValue(type(default))(document[f'styling_{key}'].value)
+                          if f'styling_{key}' in document else default
+                     for key, default in defaults.items()}
         update_data['styling'] = new_style
 
     return update_data

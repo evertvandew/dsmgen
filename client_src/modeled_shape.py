@@ -17,10 +17,10 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
-from typing import Any, Self, List, Dict, Optional, cast
+from typing import Any, Self, List, Dict, Optional, cast, override
 from dataclasses import dataclass, field
 import json
-from browser import svg, document
+from browser import svg, document, console
 from diagrams import Shape, Relationship, CP, Point, Orientations
 import shapes
 from svg_shapes import MsgShape
@@ -126,6 +126,20 @@ class ModeledShape(Shape, ModelRepresentation):
     def get_db_table(cls):
         return '_BlockRepresentation'
 
+    @override                                           # From Stylable
+    def getStyle(self, key, default=None):
+        """ Allow model definitions to override styling """
+        if hasattr(self.model_entity, 'getStyle'):
+            if style := self.model_entity.getStyle(key, default):
+                return style
+        if key in self.styling:
+            return self.styling[key]
+        defaults = self.getDefaultStyle()
+        if key in defaults:
+            return defaults[key]
+        if default is not None:
+            return default
+        raise RuntimeError(f"Trying to retrieve unknown styling element {key}")
 
 
 @dataclass
@@ -313,6 +327,13 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         storable_entity = cast(StorableElement, self.model_entity)
         return storable_entity.Id
 
+    def getDefaultStyle(self):
+        style = {}
+        # TODO: Add support for texts with the connection # style.update(self.TextWidget.getDefaultStyle())
+        style.update(self.default_style)
+        style.update(self.model_entity.getDefaultStyle())
+        return style
+
     def onContextMenu(self, ev):
         ev.stopPropagation()
         ev.preventDefault()
@@ -384,6 +405,22 @@ class ModeledRelationship(Relationship, ModelRepresentation):
 
     def get_db_table(cls):
         return '_RelationshipRepresentation'
+
+    @override                                           # From Stylable
+    def getStyle(self, key, default=None):
+        """ Allow model definitions to override styling """
+        if hasattr(self.model_entity, 'getStyle'):
+            if style := self.model_entity.getStyle(key, default):
+                return style
+        if key in self.styling:
+            return self.styling[key]
+        defaults = self.getDefaultStyle()
+        if key in defaults:
+            return defaults[key]
+        if default is not None:
+            return default
+        raise RuntimeError(f"Trying to retrieve unknown styling element {key}")
+
 
 @dataclass
 class Message(ModeledShape):
