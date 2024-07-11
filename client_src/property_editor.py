@@ -207,6 +207,7 @@ def getInputForStyle(o: Any, key, value):
         for option in t:
             if value == option:
                 input <= html.OPTION(option.name, value=option.value, selected=1)
+                input.value = option.value
             else:
                 input <= html.OPTION(option.name, value=option.value)
         return input
@@ -402,9 +403,10 @@ def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[Editable
         update_data[field.name] = constructor(form.select_one(f'#edit_{field.name}').value)
 
     if repr and isStylable(repr):
-        defaults = o.getDefaultStyle()
-        new_style = {key: createFromValue(type(default))(document[f'styling_{key}'].value)
-                          if f'styling_{key}' in document else default
+        defaults = repr.getDefaultStyle()
+        fields = {key: document.select( f'#styling_{key}') for key in defaults.keys()}
+        fields = {k: v[0].value for k, v in fields.items() if v}
+        new_style = {key: createFromValue(type(default))(fields.get(key, default))
                      for key, default in defaults.items()}
         update_data['styling'] = new_style
 

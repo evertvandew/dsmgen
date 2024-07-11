@@ -58,6 +58,11 @@ class Block:
     name: str
     description: (longstr, detail)
 
+@md.Entity(styling="shape:stickman")
+class Actor:
+    name: str
+    description: longstr
+
 @md.CompoundEntity(parents=[StructuralModel], elements=[Note, "Block"], styling = "shape:rect;structure:Block;blockcolor:yellow;icon:square-full;icon:image")
 class SubProgramDefinition:
     name: str
@@ -119,12 +124,15 @@ class EndState:
     name: str
     description: longstr
 
-@md.Message(targets=[BlockReference], parents=[Block])
-class ClassMessage:
+
+@md.Entity(styling="shape:rect", parents=[Self, StructuralModel])
+class Class:
     name: str
-    kind: selection('function event message create destroy')
-    arguments: str
-    description: longstr
+    description: (longstr, detail)
+
+@md.BlockInstance(parents=[Any], definitions=[Class])
+class ObjectInstance:
+    name: str
 
 @md.BlockDiagram(Block, Note, Constraint, BlockInstance, EndState, styling='icon:image')
 class BlockDefinitionDiagram:
@@ -146,6 +154,44 @@ class UseCase:
 class UseCaseDiagram:
     parent: XRef('children', Block, FunctionalModel, hidden)
     name: str
+
+
+###############################################################################
+## Behavioural Diagrams
+@md.Relationship(styling="endmarker:none", source=[Actor, ObjectInstance, Block], target=[Actor, ObjectInstance, Block])
+class CommunicationLink: pass
+
+
+@md.BlockDiagram(ObjectInstance, Actor, Note, Constraint, styling='icon:image', parents=[Block, Class, FunctionalModel])
+class CommunicationDiagram:
+    name: str
+
+@md.Message(targets=[CommunicationLink, ObjectInstance, BlockReference], parents=[Class, Block, CommunicationDiagram])
+class ClassMessage:
+    name: str
+    kind: selection('function event message create destroy')
+    arguments: str
+    description: longstr
+
+@md.Relationship(styling = "")
+class LifeLine:
+    source: XRef('a', Actor, ObjectInstance, hidden)
+    target: XRef('b', Actor, ObjectInstance, hidden)
+    name: str
+
+@md.Relationship(styling='')
+class SequencedMessage:
+    source: XRef('a', Actor, ObjectInstance, hidden)
+    target: XRef('b', Actor, ObjectInstance, hidden)
+    name: str
+    kind: selection('function event message return create destroy')
+
+
+@md.LanedDiagram(ObjectInstance, Actor, Note, Constraint, vertical_lane=[ObjectInstance, Actor],
+                 interconnect=SequencedMessage, self_message=True, parents=[FunctionalModel, UseCase])
+class SequenceDiagram:
+    name: str
+
 
 
 md.initial_state([
