@@ -369,7 +369,7 @@ class DataStore(EventDispatcher):
 
         ajax.get(f'/data/diagram_contents/{diagram_id}', mode='json', oncomplete=on_data)
 
-    def create_representation(self, block_cls, block_id, drop_details) -> StorableElement:
+    def create_representation(self, block_cls, block_id, drop_details, category: Optional[ReprCategory]=None) -> StorableElement:
         result = None
         def on_complete(update: JsonResponse):
             nonlocal result
@@ -377,8 +377,11 @@ class DataStore(EventDispatcher):
                 alert("Representation could not be created")
             else:
                 result = self.decode_representation(update.json)
-                result.ports = [ch for ch in result.children if ch.repr_category() == ReprCategory.port]
+                if hasattr(result, 'children'):
+                    result.ports = [ch for ch in result.children if ch.repr_category() == ReprCategory.port]
 
+        if category:
+            drop_details['category'] = category
         data = json.dumps(drop_details)
         ajax.post(f'{self.configuration.base_url}/{block_cls}/{block_id}/create_representation', blocking=True,
                         data=data, oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
@@ -608,12 +611,13 @@ class UndoableDataStore(DataStore):
             actions.append(DeleteAction(record))
         return result
 
-    def create_representation(self, block_cls, block_id, drop_details) -> StorableElement:
-        result = super().create_representation(block_cls, block_id, drop_details)
+    def create_representation(self, block_cls, block_id, drop_details, category=None) -> StorableElement:
+        result = super().create_representation(block_cls, block_id, drop_details, category)
         with self.action_recorder() as actions:
             actions.append(AddAction(result))
-            for ch in result.children:
-                actions.append(AddAction(ch))
+            if hasattr(result, 'children'):
+                for ch in result.children:
+                    actions.append(AddAction(ch))
         return result
 
     def undo_one_action(self):

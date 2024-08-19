@@ -1,7 +1,9 @@
 """
 Visual Modelling client.
 """
+import laned_diagram
 import svg_shapes
+from database_selector import database_selector
 
 <%
 """
@@ -49,6 +51,7 @@ import types
 from enum import IntEnum
 from inspect import getmro
 from modeled_diagram import ModeledDiagram
+from laned_diagram import LanedDiagram, LanedShape
 import modeled_shape as ms
 import diagrams
 import shapes
@@ -150,7 +153,24 @@ ${inspect.getsource(entity.getStyle)}
     def get_icon(self):
         return "${generator.md.get_style(entity, 'icon', 'folder')}"
 
-    % if generator.md.is_diagram(entity):
+    % if generator.md.is_laned_diagram(entity):
+    class Diagram(LanedDiagram):
+        allowed_drops_blocks = {${", ".join(generator.get_allowed_drops(entity))}}
+        allowed_create_blocks = {${", ".join(generator.get_allowed_creates(entity))}}
+        vertical_lane = [${', '.join(c.__name__ for c in entity.vertical_lane)}]
+        horizontal_lane = [${', '.join(c.__name__ for c in entity.horizontal_lane)}]
+        interconnect = ${entity.interconnect.__name__}
+        self_message = ${repr(entity.self_message)}
+
+        @classmethod
+        def get_allowed_blocks(cls, for_drop=False) -> Dict[str, Type[ms.ModelEntity]]:
+            # The allowed blocks are given as a Dict[str, str]. Here we replace the str references to classes
+            # by actual classes.
+            if for_drop:
+                return {k: resolve(v) for k, v in cls.allowed_drops_blocks.items()}
+            else:
+                return {k: resolve(v) for k, v in cls.allowed_create_blocks.items()}
+    % elif generator.md.is_diagram(entity):
     class Diagram(ModeledDiagram):
         allowed_drops_blocks = {${", ".join(generator.get_allowed_drops(entity))}}
         allowed_create_blocks = {${", ".join(generator.get_allowed_creates(entity))}}
@@ -204,12 +224,16 @@ ${inspect.getsource(entity.getStyle)}
     %elif generator.get_allowed_ports().get(entity.__name__, []) or generator.md.is_instance_of(entity):
         if category == ms.ReprCategory.block:
             return ms.ModeledShapeAndPorts
+        elif category == ms.ReprCategory.laned_block:
+            return laned_diagram.LanedShape
     %elif generator.md.is_message(entity):
         if category == ms.ReprCategory.message:
             return ms.Message
     %else:
         if category == ms.ReprCategory.block:
             return ms.ModeledShape
+        elif category == ms.ReprCategory.laned_block:
+            return laned_diagram.LanedShape
     %endif
 
     %endif
@@ -484,6 +508,7 @@ def run(explorer: str, canvas: str, details: str) -> Tuple[UndoableDataStore, Ta
         """ Called when an element was left-clicked. """
         on_explorer_dblclick(data_store, details, diagram_tabview)
 
+    _ = blank <= html.DIV(database_selector())
     data_store.subscribe('dblclick', blank, on_dblclick, context={'canvas': canvas})
     data_store.subscribe('click', blank, on_explorer_click)
     make_explorer(blank, data_store, allowed_children)

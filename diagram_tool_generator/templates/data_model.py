@@ -1,3 +1,4 @@
+from typing import List
 <%
 """
     Template for generating the data model for the visual modelling environment.
@@ -48,17 +49,28 @@ def get_sql_type(t):
 %>
 
 from datetime import datetime, time
+import os
+import os.path
 import json
 from enum import IntEnum, auto
 from contextlib import contextmanager
+from urllib.parse import urlparse
 import logging
 from dataclasses import dataclass, fields, asdict, field, is_dataclass
 from sqlalchemy import (create_engine, Column, Integer, String, DateTime,
      ForeignKey, event, Time, Float, LargeBinary, Enum)
 from sqlalchemy.orm import scoped_session, sessionmaker, backref, relationship, reconstructor
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
+from sqlalchemy.sql import text
 
 
+GEN_VERSION = "0.2"
+
+parts = urlparse("${config.dbase_url}")
+if parts.scheme == 'sqlite':
+    data_dir = './' + os.path.split(parts.path)[0]
+else:
+    data_dir = None
 engine = create_engine("${config.dbase_url}")
 
 def _fk_pragma_on_connect(dbapi_con, con_record):
@@ -87,6 +99,13 @@ class OptionalRef:
                 return None
         return self.t(value)
 
+def get_database_name():
+    url = str(engine.url)
+    parts = urlparse(url)
+    if parts.scheme != 'sqlite':
+        return 'unsupported'
+    return os.path.split(parts.path)[1]
+
 
 def changeDbase(url):
     """ Used for testing against a non-standard database """
@@ -94,6 +113,26 @@ def changeDbase(url):
     engine = create_engine(url)
     Session = sessionmaker(engine)
 
+
+def list_available_databases() -> List[str]:
+    """List all available databases in the 'data' subdirectory."""
+    if not data_dir:
+        return []
+    db_files = [f for f in os.listdir(data_dir) if f.endswith('.sqlite3')]
+    print('Found databases:', db_files)
+    return db_files
+
+def switch_database(db_name: str) -> str:
+    """Switch to the specified database using changeDatabase."""
+    available_databases = list_available_databases()
+    if db_name in available_databases:
+        # Construct the database URL
+        db_url = f"sqlite:///build/data/{db_name}"
+        # Call the existing changeDatabase function
+        changeDbase(db_url)
+        return f"Switched to database: {db_name}"
+    else:
+        raise ValueError(f"Database '{db_name}' does not exist.")
 
 class MyBase:
     @declared_attr
@@ -146,12 +185,29 @@ class Version(Base):
     versionnr: str = Column(String)
 
 
+def update_db_v0_1(session) -> str:
+    """ Update from v0.1 to 0.2. """
+    # Add the "category" field to all representations.
+    # Added to see the difference between a regular and a laned block.
+    session.execute(text(f'ALTER TABLE _messagerepresentation ADD COLUMN "category" INTEGER DEFAULT {ReprCategory.message.value};'))
+    session.execute(text(f'ALTER TABLE _relationshiprepresentation ADD COLUMN "category" INTEGER DEFAULT {ReprCategory.relationship.value};'))
+    session.execute(text(f'UPDATE version SET versionnr="{GEN_VERSION}" WHERE category="generator";'))
+    return GEN_VERSION
+
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     with session_context() as session:
-        if session.query(Version).count() < 2:
-            session.add(Version(category="generator", versionnr="0.1"))
+        versions = session.query(Version).all()
+        if len(versions) < 2:
+            session.add(Version(category="generator", versionnr=GEN_VERSION))
             session.add(Version(category="model", versionnr=${generator.md.get_version()}))
+        else:
+            gen_version = [v for v in versions if v.category=='generator'][0].versionnr
+            while gen_version != GEN_VERSION:
+                updater = globals().get(f"update_db_v{gen_version.replace('.', '_')}")
+                gen_version = updater(session)
 
         % if generator.md.initial_records:
         if session.query(_Entity).count() == 0:
@@ -176,6 +232,7 @@ class ReprCategory(IntEnum):
     port = auto()
     relationship = auto()
     message = auto()
+    laned_block = auto()
 
 
 class EntityType(IntEnum):
@@ -244,6 +301,7 @@ class _MessageRepresentation(Base):
     orientation: float = Column(Float)
     direction: int = Column(Integer)
     styling: str = Column(String)
+    category: int = Column(Integer)
 
     def post_init(self):
         """ In the database, styling is stored as a string. """
@@ -267,6 +325,7 @@ class _RelationshipRepresentation(Base):
     routing: bytes = Column(String)       # JSON list of Co-ordinates of nodes
     z: float = Column(Float)                   # For ensuring the line goes over the right blocks.
     styling: str = Column(String)
+    category: int = Column(Integer)
 
     def post_init(self):
         """ In the database, styling is stored as a string. """

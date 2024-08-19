@@ -28,6 +28,7 @@ import logging
 import flask
 import magic
 import sys
+import sqlite3
 from typing import Any, Dict
 from dataclasses import is_dataclass
 from sqlalchemy.orm import aliased
@@ -57,7 +58,7 @@ INSTANCE_ENTITIES = [${ir}]
 PARAMETER_SPECIFICATIONS = ${repr(parameter_specifications)}
 
 
-def get_request_data():
+def get_request_data() -> Dict[str, Any]:
     if flask.request.data:
         encoding = flask.request.args.get('encoding')
         if encoding == 'base64':
@@ -165,7 +166,7 @@ def create_block_representation(index, table, data, session, dm):
         width=data['width'],
         height=data['height'],
         styling='',
-        category = dm.ReprCategory.block
+        category = data.get('category', dm.ReprCategory.block)
     )
     record.post_init()
     session.add(record)
@@ -198,7 +199,8 @@ def create_relation_representation(index: int, table: type, data: Dict[str, Any]
         routing=data['routing'],
         z=data['z'],
         styling='',
-        rel_cls=table.__name__ + 'Representation'
+        rel_cls=table.__name__ + 'Representation',
+        category=data.get('category', dm.ReprCategory.relationship)
     )
     record.post_init()
     session.add(record)
@@ -208,9 +210,64 @@ def create_relation_representation(index: int, table: type, data: Dict[str, Any]
     return flask.make_response(json.dumps(record), 201)
 
 
+###############################################################################
+## Functions for selecting the database to use.
+@app.route('/current_database', methods=['GET'])
+def get_current_database():
+    return flask.jsonify(dm.get_database_name()), 200
+
+
+@app.route('/databases', methods=['GET'])
+def get_databases():
+    """Retrieve a list of available databases."""
+    databases = dm.list_available_databases()
+    return flask.jsonify(databases), 200
+
+
+@app.route('/databases', methods=['POST'])
+def create_db():
+    """Create a new database."""
+    data = flask.request.get_json()
+    db_name = data.get('name')
+    if not db_name.endswith('.sqlite3'):
+        db_name = db_name + '.sqlite3'
+    db_path = os.path.join(dm.data_dir, db_name)
+
+    if os.path.exists(db_path):
+        return flask.jsonify({"error": "Database already exists."}), 400
+
+    # Create the database
+    conn = sqlite3.connect(db_path)
+    # Close the connection
+    conn.close()
+
+    return flask.jsonify({"message": f"Database '{db_name}' created."}), 201
+
+
+@app.route('/databases/<string:db_name>/activate', methods=['PUT'])
+def activate_db(db_name):
+    """Activate the specified database."""
+    try:
+        message = dm.switch_database(db_name)
+        return flask.jsonify({"message": message}), 200
+    except ValueError as e:
+        return flask.jsonify({"error": str(e)}), 400
+
+
+@app.route('/databases/<string:db_name>', methods=['DELETE'])
+def delete_db(db_name):
+    """Delete the specified database."""
+    db_path = os.path.join(dm.data_dir, db_name)
+
+    if not os.path.exists(db_path):
+        return flask.jsonify({"error": "Database does not exist."}), 404
+
+    os.remove(db_path)
+    return flask.jsonify({"message": f"Database '{db_name}' deleted."}), 200
+
+
 # #############################################################################
 # # Serve the dynamic data: the contents of the model as created and edited by the user.
-
 @app.route("/data/<path:path>", methods=['GET'])
 def get_entities(path):
     """ For low-level tables, allow all of them to be obtained in one go. """
