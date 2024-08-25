@@ -277,6 +277,7 @@ class IntegrationContext:
                 rid = None
 
                 def determine_response(url, method, kwargs):
+                    """ Simulate the behaviour of the server handling the create_representation function. """
                     nonlocal rid
                     request_cls: Type[StorableElement] = integration_context.data_store.all_classes[url.split('/')[2]]
                     rid = integration_context.get_new_id(
@@ -301,12 +302,15 @@ class IntegrationContext:
                         )
                     else:
                         entity: StorableElement = integration_context.data_store.get(Collection.block, mid)
+
+                    data = json.loads(kwargs['data'])
+                    category = data.get('category', None) or ReprCategory.block
                     content = {
                         'Id': rid,
                         '_entity': entity.asdict(),
                         'children': children,
-                        'category': ReprCategory.block,
-                        '__classname__': request_cls.get_representation_cls(modeled_shape.ReprCategory.block).__name__
+                        'category': category,
+                        '__classname__': request_cls.get_representation_cls(category).__name__
                     }
                     # Determine if the diagram is asking for an Instance.
                     if request_cls.is_instance_of():
@@ -342,8 +346,11 @@ class IntegrationContext:
                 """ Count how many diagrams are in the editor. """
                 return len(d['canvas'].select(f'.{tv.body_cls}'))
 
-            def blocks(self) -> int:
+            def blocks(self) -> List:
                 return self.current_diagram().children
+
+            def connections(self) -> List:
+                return self.current_diagram().connections
 
             def prepare_contents(self, contents: Dict[int, Any]):
                 """ Prepare the Ajax communications mockup to yield the contents for specific diagrams. """
@@ -661,6 +668,7 @@ class IntegrationContext:
         self.diagrams = DiagramsApi()
         self.property_editor = PropertyEditorApi()
 
+        add_expected_response(f'/current_database', 'get', Response(201, json="test_db"))
         if hierarchy:
             add_expected_response(f'/data/hierarchy', 'get', Response(201, json=hierarchy))
 
@@ -1951,10 +1959,44 @@ def integration_tests():
         assert context.data_store.live_instances[Collection.block_repr][1].getPos().x == data[0]['x']+100.0
         assert context.data_store.live_instances[Collection.block_repr][2].getPos().x == data[1]['x']+100.0
 
+    @test
+    def laned_diagram():
+        # Start with a system where there are two classes with a connection.
+        context = IntegrationContext(hierarchy=[
+            client.FunctionalModel(Id=1).asdict(),
+            client.StructuralModel(Id=2).asdict(),
+            client.Class(Id=10, parent=2, name='A').asdict(),
+            client.Class(Id=11, parent=2, name='B').asdict(),
+            client.SequenceDiagram(Id=20, parent=1).asdict()
+        ])
+        # Create a sequence diagram
+        add_expected_response('/data/diagram_contents/20', 'get', Response(200, json=[]))
+        context.explorer.dblclick_element(mid=20)
+
+        # Instantiate two blocks in the diagram
+        context.explorer.drag_to_diagram(10, client.ObjectSequenceInstance)
+        context.explorer.drag_to_diagram(10, client.ObjectSequenceInstance)
+
+        assert len(context.diagrams.blocks()) == 2
+        for shape in context.diagrams.blocks():
+            assert isinstance(shape, client.LanedShape)
+
+        # Draw a message between the two blocks
+        context.diagrams.connect(1, 2, client.SequencedMessage)
+        assert len(context.diagrams.connections()) == 1
+
+        # Draw another message between the two block
+        context.diagrams.connect(1, 2, client.SequencedMessage)
+        assert len(context.diagrams.connections()) == 2
+
+        # Draw a message-to-self on the second block
+        context.diagrams.connect(2, 2, client.SequencedMessage)
+        assert len(context.diagrams.connections()) == 3
+
 
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.multi_select')
+    run_tests('*.laned_diagram')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')

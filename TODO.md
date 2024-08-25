@@ -10,6 +10,7 @@
   * clicking the triangle acts on all children as well, not just the one clicked on.
 
 # Refactoring
+* Ensure `storable_element.py` and `data_model.py` share the same `ReprCategory` class.
 * No longer have "Instance" in the core model, instead add optional parameters to block representations.
 * Use `get_type_hints` instead of raw `__annotations__`.
 * Split internal fields into separate structures so there can be no clashes with user-named fields.
@@ -39,6 +40,11 @@
 * Allow conversion of one relationship to another
 * Support for "laned" diagrams (sequence diagrams, gantt charts)
 * Support for "puzzle" plug-in diagrams (scratch, Nassi–Shneiderman)
+  * Puzzle piece = statement
+  * Ellipse / block with rounded corners = value
+  * Hexagon = expression
+  * Straight top + puzzle bottom = activation, start of algorithm, event.
+  * Puzzle top + straight bottom = ending of algorithm or program.
 * Support for container blocks
   * Limiting the position of internal waypoints to within the container
   * Dynamically create and remove ports as connections crossing the boundary are changed.

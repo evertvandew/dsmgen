@@ -237,9 +237,8 @@ def create_db():
         return flask.jsonify({"error": "Database already exists."}), 400
 
     # Create the database
-    conn = sqlite3.connect(db_path)
-    # Close the connection
-    conn.close()
+    engine = dm.create_engine('sqlite:///${config.server_dir}/data/' + db_name)
+    dm.init_db(engine)
 
     return flask.jsonify({"message": f"Database '{db_name}' created."}), 201
 

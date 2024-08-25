@@ -16,6 +16,14 @@ class byte:
     """ For use a data type"""
     pass
 
+class word:
+    """ For use a data type"""
+    pass
+
+@dataclass
+class can_msg:
+    address: word
+    data: List[byte]
 
 class PortType(IntEnum):
     Sync = auto()
@@ -66,7 +74,8 @@ class BlockDefinition:
     outputs: Dict[str, Port] = field(default_factory=dict)
     parameters: Dict[str, Parameter] = field(default_factory=dict)
 
-stdlib = {'Basic IO': {
+stdlib = {
+    'Basic IO': {
         'DI': BlockDefinition(
             inputs={'trigger': Port(), 'pin': Port(port_type=PortType.IOConfig, data_type=dm.PeripheralClass.IOPin)},
             outputs={'value': Port(data_type=bool)},
@@ -136,7 +145,45 @@ stdlib = {'Basic IO': {
             },
             outputs={'data_rx': Port(data_type=byte)},
             parameters={'baudrate': Parameter(int, 9600)}
-        )
+        ),
+        'CAN': BlockDefinition(
+            inputs={
+                'data_tx': Port(port_type=PortType.Buffered, data_type=can_msg),
+                'filter': Port(port_type=PortType.Async, data_type=word),
+                'data_pin': Port(port_type=PortType.IOConfig, data_type=dm.PeripheralClass.IOPin),
+                'enable_pin': Port(port_type=PortType.IOConfig, data_type=dm.PeripheralClass.IOPin),
+                'can_device': Port(port_type=PortType.IOConfig, data_type=dm.PeripheralClass.Can)
+            },
+            outputs={'data_rx': Port(data_type=can_msg)},
+            parameters={'baudrate': Parameter(int, 500000)}
+        ),
+    },
+    'conversions': {
+        'mux': BlockDefinition(),
+        'demux': BlockDefinition(),
+        'struct_construct': BlockDefinition(),
+        'struct_deconstruct': BlockDefinition(),
+        'dict_insert': BlockDefinition(),
+        'dict_extract': BlockDefinition(),
+        'type_cast': BlockDefinition(),
+    },
+    'math': {
+        'sum': BlockDefinition(),
+        'mult': BlockDefinition(),
+        'gain': BlockDefinition(),
+        'expression': BlockDefinition(),
+        'integrate': BlockDefinition(),
+        'differentiate': BlockDefinition(),
+        'low_pass': BlockDefinition(),
+        'high_pass': BlockDefinition(),
+        'transfer_function': BlockDefinition(),
+        'PID_controller': BlockDefinition(),
+        'average': BlockDefinition(),
+        'quaternions': {
+            'rotate': BlockDefinition(),
+            'add_rotations': BlockDefinition(),
+            'normalize': BlockDefinition(),
+        }
     }
 }
 

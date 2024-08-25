@@ -8,11 +8,13 @@ def get_current_database(_request=None):
 
 # Function to update the current database display
 def update_current_database(req):
-    current_db = req.json
-    console.log(f"Got the current database: {current_db}")
-    document['database-selector'].clear()
-    _ = document['database-selector'] <= f"Current DB: {current_db}"
-    document['database-selector'].data_value = current_db
+    if selector := document.get(selector='#database-selector'):
+        # Selector is a list of objects found. Select the first one of them.
+        selector = selector[0]
+        current_db = req.json
+        selector.clear()
+        _ = selector <= f"Current DB: {current_db}"
+        selector.data_value = current_db
 
 # Function to display the database management dialog
 def database_management_dialog(ev):

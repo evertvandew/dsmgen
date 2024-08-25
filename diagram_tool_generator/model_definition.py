@@ -211,10 +211,11 @@ class ModelDefinition:
         """ A diagram with "lanes", e.g. an UML sequence diagram. """
         def decorate(cls):
             nonlocal parents
+            assert not (horizontal_lane and vertical_lane)
             cls.entities = entities
             cls.categories = [ExplorableElement, DiagramElement]
-            cls.vertical_lane = vertical_lane
-            cls.horizontal_lane = horizontal_lane
+            cls.vertical_lane = vertical_lane or []
+            cls.horizontal_lane = horizontal_lane or []
             cls.interconnect = interconnect
             cls.self_message = self_message
             parents = parents or []
@@ -327,6 +328,9 @@ class ModelDefinition:
 
     def is_message(self, cls):
         return MessageElement in cls.categories
+
+    def is_laned_diagram(self, cls):
+        return self.is_diagram(cls) and hasattr(cls, 'vertical_lane')
 
     def get_conversions(self, cls: Any) -> Optional[TypeConversion]:
         name = cls if isinstance(cls, str) else (cls.__name__ if isinstance(cls, type) else type(cls).__name__)

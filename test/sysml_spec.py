@@ -173,21 +173,21 @@ class ClassMessage:
     arguments: str
     description: longstr
 
-@md.Relationship(styling = "")
-class LifeLine:
-    source: XRef('a', Actor, ObjectInstance, hidden)
-    target: XRef('b', Actor, ObjectInstance, hidden)
+
+@md.BlockInstance(parents=[Any], definitions=[Class])
+class ObjectSequenceInstance:
     name: str
+
 
 @md.Relationship(styling='')
 class SequencedMessage:
-    source: XRef('a', Actor, ObjectInstance, hidden)
-    target: XRef('b', Actor, ObjectInstance, hidden)
+    source: XRef('a', Actor, ObjectSequenceInstance, hidden)
+    target: XRef('b', Actor, ObjectSequenceInstance, hidden)
     name: str
     kind: selection('function event message return create destroy')
 
 
-@md.LanedDiagram(ObjectInstance, Actor, Note, Constraint, vertical_lane=[ObjectInstance, Actor],
+@md.LanedDiagram(ObjectSequenceInstance, Actor, Note, Constraint, vertical_lane=[ObjectSequenceInstance, Actor],
                  interconnect=SequencedMessage, self_message=True, parents=[FunctionalModel, UseCase])
 class SequenceDiagram:
     name: str

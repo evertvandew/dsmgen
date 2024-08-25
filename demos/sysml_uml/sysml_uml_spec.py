@@ -175,7 +175,7 @@ class FlowPort:
     inputs: XRef('consumers', ProtocolDefinition, hidden)
     outputs: XRef('producers', ProtocolDefinition, hidden)
 
-@md.Relationship(styling='endmarker:hat')
+@md.Relationship(styling='endmarker:hat;routing_method:center2center')
 class Dependency:
     stereotype: selection("None Association Aggregation Composition")
     source: XRef('associations', Class, Block, hidden)
@@ -186,7 +186,7 @@ class Dependency:
     def getStyle(self, key, default) -> Optional[str]:
         if key == 'startmarker':
             return {
-                1: 'none', 2: 'arrow', 3: 'diamondopen', 4: 'diamond'
+                1: 'none', 2: 'none', 3: 'diamondopen', 4: 'diamond'
             }.get(self.stereotype, 'none')
 
 
@@ -225,6 +225,12 @@ class CommunicationLink: pass
 class CommunicationDiagram:
     name: str
 
+
+@md.BlockInstance(parents=[Any], definitions=[Class])
+class ObjectSequenceInstance:
+    name: str
+
+
 @md.Message(targets=[CommunicationLink, ObjectInstance], parents=[Class, Block, CommunicationDiagram])
 class ClassMessage:
     name: str
@@ -234,20 +240,22 @@ class ClassMessage:
 
 @md.Relationship(styling = "")
 class LifeLine:
-    source: XRef('a', Actor, ObjectInstance, hidden)
-    target: XRef('b', Actor, ObjectInstance, hidden)
+    source: XRef('a', Actor, ObjectSequenceInstance, hidden)
+    target: XRef('b', Actor, ObjectSequenceInstance, hidden)
     name: str
 
 @md.Relationship(styling='')
 class SequencedMessage:
-    source: XRef('a', Actor, ObjectInstance, hidden)
-    target: XRef('b', Actor, ObjectInstance, hidden)
+    source: XRef('a', Actor, ObjectSequenceInstance, hidden)
+    target: XRef('b', Actor, ObjectSequenceInstance, hidden)
     name: str
     kind: selection('function event message return create destroy')
 
 
-@md.LanedDiagram(ObjectInstance, Actor, Note, Constraint, vertical_lane=[ObjectInstance, Actor],
-                 interconnect=SequencedMessage, self_message=True, parents=[FunctionalModel, ClassDiagram, UseCaseDiagram])
+
+@md.LanedDiagram(ObjectSequenceInstance, Actor, Note, Constraint, vertical_lane=[ObjectSequenceInstance, Actor],
+                 interconnect=SequencedMessage, self_message=True, parents=[FunctionalModel, ClassDiagram, UseCase]
+                 )
 class SequenceDiagram:
     name: str
 

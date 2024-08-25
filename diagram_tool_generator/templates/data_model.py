@@ -64,7 +64,7 @@ from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.sql import text
 
 
-GEN_VERSION = "0.2"
+GEN_VERSION = "0.3"
 
 parts = urlparse("${config.dbase_url}")
 if parts.scheme == 'sqlite':
@@ -158,7 +158,7 @@ Base = declarative_base(cls=MyBase)
 
 
 @contextmanager
-def session_context():
+def session_context(factory = None):
   ''' Return an SQLAlchemy session for interacting with the database.
       The session is suitable for use in a 'with' statement such as :
 
@@ -168,7 +168,8 @@ def session_context():
       The session is committed when it goes out of scope, and rolled-back when an exception
       occurs.
   '''
-  session = Session()
+  factory = factory or Session
+  session = factory()
   try:
     yield session
     session.commit()
@@ -186,28 +187,34 @@ class Version(Base):
 
 
 def update_db_v0_1(session) -> str:
-    """ Update from v0.1 to 0.2. """
+    """ Update from v0.1 (to 0.2.) """
     # Add the "category" field to all representations.
     # Added to see the difference between a regular and a laned block.
     session.execute(text(f'ALTER TABLE _messagerepresentation ADD COLUMN "category" INTEGER DEFAULT {ReprCategory.message.value};'))
     session.execute(text(f'ALTER TABLE _relationshiprepresentation ADD COLUMN "category" INTEGER DEFAULT {ReprCategory.relationship.value};'))
     session.execute(text(f'UPDATE version SET versionnr="{GEN_VERSION}" WHERE category="generator";'))
-    return GEN_VERSION
+    return "0.2"
 
+def update_db_v0_2(session):
+    """ Update from v0.2 (to 0.3.) """
+    # Add the lane_length field to the BlockRepresentation.
+    session.execute(text(f'ALTER TABLE _blockrepresentation ADD COLUMN "lane_length" FLOAT DEFAULT 0.0;'))
+    return "0.3"
 
-
-def init_db():
-    Base.metadata.create_all(bind=engine)
-    with session_context() as session:
+def init_db(e=None):
+    global engine
+    e = e or engine
+    Base.metadata.create_all(bind=e)
+    with session_context(factory=sessionmaker(e)) as session:
         versions = session.query(Version).all()
         if len(versions) < 2:
             session.add(Version(category="generator", versionnr=GEN_VERSION))
             session.add(Version(category="model", versionnr=${generator.md.get_version()}))
         else:
-            gen_version = [v for v in versions if v.category=='generator'][0].versionnr
-            while gen_version != GEN_VERSION:
-                updater = globals().get(f"update_db_v{gen_version.replace('.', '_')}")
-                gen_version = updater(session)
+            gen_version = [v for v in versions if v.category=='generator'][0]
+            while gen_version.versionnr != GEN_VERSION:
+                updater = globals().get(f"update_db_v{gen_version.versionnr.replace('.', '_')}")
+                gen_version.versionnr = updater(session)
 
         % if generator.md.initial_records:
         if session.query(_Entity).count() == 0:
@@ -269,6 +276,7 @@ class _BlockRepresentation(Base):
     x: float = Column(Float)
     y: float = Column(Float)
     z: float = Column(Float)  # For placing blocks etc on top of each other
+    lane_length: float = Column(Float)
     width: float = Column(Float)
     height: float = Column(Float)
     order: int = Column(Integer)

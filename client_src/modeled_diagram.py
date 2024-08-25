@@ -198,7 +198,8 @@ class ModeledDiagram(Diagram):
             width=int(default_style.get('width', 64)), height=int(default_style.get('height', 40)),
             diagram=self.diagram_id,
         )
-        block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details)
+        category = self.get_representation_category(block_cls)
+        block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details, category)
         if not block:
             return
 
