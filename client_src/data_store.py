@@ -404,7 +404,7 @@ class DataStore(EventDispatcher):
             model_instance = self.update_cache(model_instance)
         if 'children' in data:
             data['children'] = [self.decode_representation(ch) for ch in data.get('children', [])]
-        if 'category' in data:
+        if 'category' in data and data['category']:
             repr_category = data['category']
         else:
             repr_category = {

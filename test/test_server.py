@@ -53,7 +53,7 @@ def test_server():
     @test
     def test_version():
         """ This is a built-in element of the database, that uses a different mechanism
-            then the entities that are actually part of the model. So it is tested seperately.
+            then the entities that are actually part of the model. So it is tested separately.
         """
         # Check there are two pre-created versions
         vurl = f'{base_url}/data/Version'
@@ -61,7 +61,7 @@ def test_server():
         assert r.status_code == 200
         records = json.loads(r.content)
         assert len(records) >= 2
-        assert records[0]['versionnr'] == '0.1'
+        assert records[0]['versionnr'] == '0.3'
         assert records[0]['category'] == 'generator'
         assert records[1]['versionnr'] == '0.1'
         assert records[1]['category'] == 'model'

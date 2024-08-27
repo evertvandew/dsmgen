@@ -379,7 +379,7 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         return self
 
     def asdict(self, ignore:Optional[List[str]]=None) -> Dict[str, Any]:
-        ignore = (ignore or []) + ['model_entity', 'start', 'finish', 'waypoints', 'id', 'category']
+        ignore = (ignore or []) + ['model_entity', 'start', 'finish', 'waypoints', 'id']
         storable_entity = cast(StorableElement, self.model_entity)
         details = StorableElement.asdict(self, ignore=ignore)
         details['relationship'] = storable_entity.Id
@@ -438,7 +438,7 @@ class Message(ModeledShape):
         return self
 
     def asdict(self, ignore:Optional[List[str]]=None) -> Dict[str, Any]:
-        ignore = (ignore or []) + ['model_entity', 'id', 'category', 'width', 'height']
+        ignore = (ignore or []) + ['model_entity', 'id', 'width', 'height']
         storable_entity = cast(StorableElement, self.model_entity)
         details = StorableElement.asdict(self, ignore=ignore)
         details['message'] = storable_entity.Id
