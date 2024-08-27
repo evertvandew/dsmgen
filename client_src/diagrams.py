@@ -826,10 +826,7 @@ class BlockCreateWidget:
                       fill='white', stroke='black', stroke_width="2")
         for i, (name, block_cls) in enumerate(blocks.items()):
             entity = block_cls()
-            repr_category = diagram.get_representation_category(block_cls)
-            print("Repr category:", repr_category)
-            print('entity', entity)
-            repr_cls = entity.get_representation_cls(repr_category)
+            repr_cls = entity.get_representation_cls(ReprCategory.block)
             representation = repr_cls(x=self.margin, y=i*(self.height+self.margin)+self.margin,
                          height=self.height, width=1.6*self.height, model_entity=entity)
             representation.logical_class = block_cls

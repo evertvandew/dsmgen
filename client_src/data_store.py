@@ -22,6 +22,8 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
+from pyasn1_modules.rfc2251 import maxInt
+
 from browser import console
 import logging
 from enum import Enum, IntEnum, auto
@@ -340,6 +342,10 @@ class DataStore(EventDispatcher):
                         if classify_representation(r) == c:
                             yield r
 
+                # Sort the received entities by their order number.
+                response.json.sort(key=lambda e: e.get('order', None) or 1000000)
+
+                # Now handle the different types of representations
                 for filter in [repr_class.block, repr_class.port, repr_class.rel, repr_class.mesg]:
                     for d in filter_reprs(response.json, filter):
                         entity = self.decode_representation(d)
@@ -369,7 +375,7 @@ class DataStore(EventDispatcher):
 
         ajax.get(f'/data/diagram_contents/{diagram_id}', mode='json', oncomplete=on_data)
 
-    def create_representation(self, block_cls, block_id, drop_details, category: Optional[ReprCategory]=None) -> StorableElement:
+    def create_representation(self, block_cls, block_id, drop_details, order, category: Optional[ReprCategory]=None) -> StorableElement:
         result = None
         def on_complete(update: JsonResponse):
             nonlocal result
@@ -380,6 +386,7 @@ class DataStore(EventDispatcher):
                 if hasattr(result, 'children'):
                     result.ports = [ch for ch in result.children if ch.repr_category() == ReprCategory.port]
 
+        drop_details['order'] = order
         if category:
             drop_details['category'] = category
         data = json.dumps(drop_details)
@@ -611,8 +618,8 @@ class UndoableDataStore(DataStore):
             actions.append(DeleteAction(record))
         return result
 
-    def create_representation(self, block_cls, block_id, drop_details, category=None) -> StorableElement:
-        result = super().create_representation(block_cls, block_id, drop_details, category)
+    def create_representation(self, block_cls, block_id, drop_details, order, category=None) -> StorableElement:
+        result = super().create_representation(block_cls, block_id, drop_details, order, category)
         with self.action_recorder() as actions:
             actions.append(AddAction(result))
             if hasattr(result, 'children'):

@@ -7,7 +7,8 @@
 * The folding / unfolding of a folder doesn't work properly:
   * folders are first shown unfolded though the triangle is folded
     is for folded
-  * clicking the triangle acts on all children as well, not just the one clicked on.
+  * clicking the triangle in the explorer acts on all children as well, not just the one clicked on.
+* Scrolling in the diagram editor also scrolls the buttons & create widget.
 
 # Refactoring
 * Ensure `storable_element.py` and `data_model.py` share the same `ReprCategory` class.
@@ -22,7 +23,6 @@
 * Get rid of mechanisms where the presence of an attribute decides actions. Replace these with (member) functions.
 
 # Future enhancements
-* Allow the server to switch databases, as directed by the client.
 * Add a list of port shapes
 * Place texts with an offset, and allow that offset to be edited. Perhaps also the bounding box of the text.
 * When opening a diagram for the second time, open the existing diagram instead.
@@ -68,6 +68,7 @@
 
 
 # Done:
+* Allow the server to switch databases, as directed by the client.
 * Support selecting multiple elements and moving them.
 * Implement selection by drawing a rectangle with the mouse.
 * Support managing multiple diagrams using tabs.

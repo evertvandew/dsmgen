@@ -88,12 +88,13 @@ class LanedDiagram(ModeledDiagram):
         result = super().addBlock(block)
         # Clip the position of the block if it is a laned block.
         if type(block.model_entity) in self.vertical_lane:
-            print("Adding a vertical laned block")
             self.lanes.append(block)
+            block.order = block.order or len(self.lanes)
             block.y = 60
             block.x = sum(b.width for b in self.lanes) + lane_margin * len(self.lanes) + block.width//2
             #block.height = self.canvas.offsetHeight
             block.updateShape()
+            print("Adding a vertical laned block", block.x, block.y, block.width)
         elif type(block.model_entity) in self.horizontal_lane:
             print("Adding a horizontal laned block")
             self.lanes.append(block)

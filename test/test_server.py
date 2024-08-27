@@ -17,14 +17,22 @@ def run_server():
     """ Start the server in a seperate process. Return the URL to access it.
         The framework will automatically stop the server when the test is finished.
     """
+    local_url = 'http://localhost:5200'
     if START_SERVER:
         server = subprocess.Popen(['/usr/local/bin/python3.11', 'sysml_run.py', '5200'], cwd=os.getcwd()+'/build')
-        time.sleep(1)         # Allow the server to start up
+        # Wait until the server is up
+        while True:
+            try:
+                r = requests.get(local_url+'/current_database')
+                if r.status_code == 200:
+                    break
+            except:
+                time.sleep(0.1)
         @cleanup
         def stop_server():
             server.terminate()
             server.wait()
-    return 'http://localhost:5200'
+    return local_url
 
 
 @prepare
@@ -414,5 +422,5 @@ def test_server():
 
 
 if __name__ == '__main__':
-    run_tests('*.redo_add')
+    run_tests('*.test_version')
     run_tests()

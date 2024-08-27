@@ -199,7 +199,9 @@ class ModeledDiagram(Diagram):
             diagram=self.diagram_id,
         )
         category = self.get_representation_category(block_cls)
-        block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details, category)
+        # Determine the initial order
+        order = len(self.children) + 1
+        block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details, order, category)
         if not block:
             return
 
