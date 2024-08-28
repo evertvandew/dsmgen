@@ -44,9 +44,10 @@ class LanedShape(ModeledShape):
         # We have a very thin visible line in a sequences diagram, so we need a second, thicker, invisible line for clicking on.
         x = self.x + self.width//2
         y = self.y+self.height
+        lane_length = self.lane_length or 1000
         self.lines = [
-            svg.line(x1=x, y1=y, x2=x, y2=y + self.lane_length, stroke='none', opacity=0.0, stroke_width='10'),
-            svg.line(x1=x, y1=y, x2=x, y2=y + self.lane_length, stroke='black', stroke_width='2')
+            svg.line(x1=x, y1=y, x2=x, y2=y + lane_length, stroke='none', opacity=0.0, stroke_width='10'),
+            svg.line(x1=x, y1=y, x2=x, y2=y + lane_length, stroke='black', stroke_width='2')
         ]
         _ = [shape <= l for l in self.lines]
         return shape
@@ -86,21 +87,39 @@ class LanedDiagram(ModeledDiagram):
         print(f"Adding a block of type {type(block.model_entity).__name__}!", [c.__name__ for c in self.vertical_lane])
         # Create the block as usual
         result = super().addBlock(block)
-        # Clip the position of the block if it is a laned block.
-        if type(block.model_entity) in self.vertical_lane:
+        if block.category == ReprCategory.laned_block:
             self.lanes.append(block)
-            block.order = block.order or len(self.lanes)
-            block.y = 60
-            block.x = sum(b.width for b in self.lanes) + lane_margin * len(self.lanes) + block.width//2
-            #block.height = self.canvas.offsetHeight
-            block.updateShape()
-            print("Adding a vertical laned block", block.x, block.y, block.width)
-        elif type(block.model_entity) in self.horizontal_lane:
-            print("Adding a horizontal laned block")
-            self.lanes.append(block)
-            block.x = 60
-            block.y = sum(b.height for b in self.lanes) + lane_margin * len(self.lanes) + block.height//2
-            #block.width = self.canvas.offsetWidth
-            block.updateShape()
-
         return result
+
+    def createNewBlock(self, block_cls) -> ModeledShape:
+        # In case this is a laned object, determine its location.
+        if block_cls in self.vertical_lane or block_cls in self.horizontal_lane:
+            cls = type(block_cls)
+            details = dict(x=300, y=300, height=self.height, width=int(1.6 * self.height), diagram=self.diagram_id,
+                           category=ReprCategory.laned_block)
+            self.place_block(block_cls, details)
+            instance = cls(**details)
+            instance.model_entity = block_cls.logical_class(parent=self.diagram_id)
+            self.addBlock(instance)
+            self.datastore.add_complex(instance)
+            return instance
+        else:
+            # Unlaned blocks use the normal creation procedure
+            return super().createNewBlock(block_cls)
+
+    def place_block(self, block_cls, details):
+        """ In diagrams that have clipping, this function updates the location of a newly created block to comply with
+            the diagram's rules.
+        """
+        print("Adding block:", block_cls, details)
+        if details['category'] == ReprCategory.laned_block:
+            if block_cls.__name__ in self.vertical_lane:
+                details['y'] = 60
+                details['x'] = sum(b.width for b in self.lanes) + lane_margin * len(self.lanes) + block.width // 2
+                details['lane_length'] = 1000
+                print("Adding a vertical laned block", details)
+            elif block_cls.__name__ in self.horizontal_lane:
+                print("Adding a horizontal laned block")
+                details['x'] = 60
+                details['y'] = sum(b.height for b in self.lanes) + lane_margin * len(self.lanes) + details['height'] // 2
+                details['lane_length'] = 1000

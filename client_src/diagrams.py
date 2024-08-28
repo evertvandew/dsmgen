@@ -536,6 +536,7 @@ class Diagram(OwnerInterface):
     ModifiedEvent = 'modified'
     ConnectionModeEvent = 'ConnectionMode'
     NormalModeEvent = 'NormalMode'
+    default_block_details = dict(x=300, y=300, height=64, width=40)
 
     def __init__(self, config: DiagramConfiguration, widgets):
         self.selection = None
@@ -566,6 +567,18 @@ class Diagram(OwnerInterface):
 
     def get_allowed_blocks(cls, block_cls_name: str, for_drop=False) -> Dict[str, Type[Shape]]:
         raise NotImplementedError()
+
+    def createNewBlock(self, template) -> Shape:
+        # Simply create a new block at the default position.
+        repr_cls = type(template)
+        details = self.default_block_details.copy()
+        instance = repr_cls(diagram=self.diagram_id,
+                       category=ReprCategory.block,
+                       **details)
+        instance.model_entity = template.logical_class(parent=self.diagram_id)
+        self.addBlock(instance)
+        return instance
+
 
     def addBlock(self, block) -> None:
         if self.mouse_events_fsm is not None:
@@ -843,13 +856,7 @@ class BlockCreateWidget:
         diagram = self.diagram()
         if diagram is None:
             return
-        # Simply create a new block at the default position.
-        cls = type(representation)
-        instance = cls(x=300, y=300, height=self.height, width=int(1.6*self.height), diagram=self.diagram_id,
-                       category=ReprCategory.block)
-        instance.model_entity = representation.logical_class(parent=self.diagram_id)
-        diagram.datastore.add_complex(instance)
-        diagram.addBlock(instance)
+        diagram.createNewBlock(representation)
 
 
 def load_diagram(diagram_id, diagram_cls, config: DiagramConfiguration, datastore, canvas):

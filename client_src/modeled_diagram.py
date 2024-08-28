@@ -21,6 +21,8 @@ import json
 from typing import Dict, Type, Any
 from weakref import ref
 
+from fontTools.unicodedata import block
+
 import data_store
 from browser import console, svg
 from browser.widgets.dialog import InfoDialog
@@ -201,13 +203,22 @@ class ModeledDiagram(Diagram):
         category = self.get_representation_category(block_cls)
         # Determine the initial order
         order = len(self.children) + 1
-        block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details, order, category)
+        drop_details.update(category=category, order=order)
+        self.place_block(block_cls, drop_details)
+        block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details)
         if not block:
             return
 
         # Add the block to the diagram
         self.addBlock(block)
 
+    def createNewBlock(self, template) -> ModeledShape:
+        instance = super().createNewBlock(template)
+        self.datastore.add_complex(instance)
+        return instance
+
+    def place_block(self, block_cls, drop_details):
+        pass
 
     def deleteBlock(self, block):
         self.datastore.delete(block)

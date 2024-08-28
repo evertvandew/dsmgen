@@ -22,8 +22,6 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
-from pyasn1_modules.rfc2251 import maxInt
-
 from browser import console
 import logging
 from enum import Enum, IntEnum, auto
@@ -375,7 +373,7 @@ class DataStore(EventDispatcher):
 
         ajax.get(f'/data/diagram_contents/{diagram_id}', mode='json', oncomplete=on_data)
 
-    def create_representation(self, block_cls, block_id, drop_details, order, category: Optional[ReprCategory]=None) -> StorableElement:
+    def create_representation(self, block_cls, block_id, drop_details) -> StorableElement:
         result = None
         def on_complete(update: JsonResponse):
             nonlocal result
@@ -386,9 +384,6 @@ class DataStore(EventDispatcher):
                 if hasattr(result, 'children'):
                     result.ports = [ch for ch in result.children if ch.repr_category() == ReprCategory.port]
 
-        drop_details['order'] = order
-        if category:
-            drop_details['category'] = category
         data = json.dumps(drop_details)
         ajax.post(f'{self.configuration.base_url}/{block_cls}/{block_id}/create_representation', blocking=True,
                         data=data, oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
@@ -618,8 +613,8 @@ class UndoableDataStore(DataStore):
             actions.append(DeleteAction(record))
         return result
 
-    def create_representation(self, block_cls, block_id, drop_details, order, category=None) -> StorableElement:
-        result = super().create_representation(block_cls, block_id, drop_details, order, category)
+    def create_representation(self, block_cls, block_id, details) -> StorableElement:
+        result = super().create_representation(block_cls, block_id, details)
         with self.action_recorder() as actions:
             actions.append(AddAction(result))
             if hasattr(result, 'children'):

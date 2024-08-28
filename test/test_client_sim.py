@@ -1464,6 +1464,6 @@ def integration_tests():
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.display_message')
+    run_tests('*.undo_redo')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')
