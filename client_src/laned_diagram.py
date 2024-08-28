@@ -91,35 +91,21 @@ class LanedDiagram(ModeledDiagram):
             self.lanes.append(block)
         return result
 
-    def createNewBlock(self, block_cls) -> ModeledShape:
-        # In case this is a laned object, determine its location.
-        if block_cls in self.vertical_lane or block_cls in self.horizontal_lane:
-            cls = type(block_cls)
-            details = dict(x=300, y=300, height=self.height, width=int(1.6 * self.height), diagram=self.diagram_id,
-                           category=ReprCategory.laned_block)
-            self.place_block(block_cls, details)
-            instance = cls(**details)
-            instance.model_entity = block_cls.logical_class(parent=self.diagram_id)
-            self.addBlock(instance)
-            self.datastore.add_complex(instance)
-            return instance
-        else:
-            # Unlaned blocks use the normal creation procedure
-            return super().createNewBlock(block_cls)
-
     def place_block(self, block_cls, details):
         """ In diagrams that have clipping, this function updates the location of a newly created block to comply with
             the diagram's rules.
         """
-        print("Adding block:", block_cls, details)
+        print("Placing block:", block_cls, details)
         if details['category'] == ReprCategory.laned_block:
-            if block_cls.__name__ in self.vertical_lane:
+            if block_cls in self.vertical_lane:
                 details['y'] = 60
-                details['x'] = sum(b.width for b in self.lanes) + lane_margin * len(self.lanes) + block.width // 2
+                details['x'] = 75 + sum(b.width for b in self.lanes) + lane_margin * len(self.lanes) + details['width'] // 2
                 details['lane_length'] = 1000
                 print("Adding a vertical laned block", details)
-            elif block_cls.__name__ in self.horizontal_lane:
+            elif block_cls in self.horizontal_lane:
                 print("Adding a horizontal laned block")
                 details['x'] = 60
                 details['y'] = sum(b.height for b in self.lanes) + lane_margin * len(self.lanes) + details['height'] // 2
                 details['lane_length'] = 1000
+                print("Adding a horizontal laned block", details)
+        print("RE Placing block:", block_cls, details)

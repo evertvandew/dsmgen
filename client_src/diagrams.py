@@ -568,17 +568,27 @@ class Diagram(OwnerInterface):
     def get_allowed_blocks(cls, block_cls_name: str, for_drop=False) -> Dict[str, Type[Shape]]:
         raise NotImplementedError()
 
-    def createNewBlock(self, template) -> Shape:
+    def createNewBlock(self, template: Shape) -> Shape:
+        """ Function to create a totally new block from a template.
+            Called by e.g. the BlockCreateWidget.
+        """
         # Simply create a new block at the default position.
-        repr_cls = type(template)
+        block_cls = template.logical_class
         details = self.default_block_details.copy()
+        category = self.get_representation_category(block_cls)
+        details['category'] = category
+        self.place_block(block_cls, details)
+
+        repr_cls = block_cls.get_representation_cls(category)
         instance = repr_cls(diagram=self.diagram_id,
-                       category=ReprCategory.block,
                        **details)
-        instance.model_entity = template.logical_class(parent=self.diagram_id)
+        instance.model_entity = block_cls(parent=self.diagram_id)
         self.addBlock(instance)
         return instance
 
+    def place_block(self, block_cls, details):
+        """ Called to allow a new block to be located by the diagram. For example snapping. """
+        pass
 
     def addBlock(self, block) -> None:
         if self.mouse_events_fsm is not None:

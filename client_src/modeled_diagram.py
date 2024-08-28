@@ -21,8 +21,6 @@ import json
 from typing import Dict, Type, Any
 from weakref import ref
 
-from fontTools.unicodedata import block
-
 import data_store
 from browser import console, svg
 from browser.widgets.dialog import InfoDialog
