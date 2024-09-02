@@ -358,7 +358,7 @@ class DataStore(EventDispatcher):
                         representations.append(entity)
 
                 # All blocks are yielded to the diagram
-                records.extend(r for r in representations if r.repr_category() == ReprCategory.block)
+                records.extend(r for r in representations if r.repr_category() in [ReprCategory.block, ReprCategory.laned_block])
 
                 # Ports are not yielded directly to the diagram, they are added to the block that owns them.
                 for p in [r for r in representations if r.repr_category() == ReprCategory.port]:
@@ -368,7 +368,7 @@ class DataStore(EventDispatcher):
                     self.update_cache([block, block.get_model_details()])
 
                 # Then handle the relationships
-                for d in [r for r in representations if r.repr_category() == ReprCategory.relationship]:
+                for d in [r for r in representations if r.repr_category() in [ReprCategory.relationship, ReprCategory.laned_connection]]:
                     records.append(d)
 
                 # Like the ports, messages are yielded through representations.

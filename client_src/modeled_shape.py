@@ -374,13 +374,13 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         result.waypoints = deepcopy(self.waypoints)
         return result
 
-    @staticmethod
-    def from_dict(data_store: DataStore, **details) -> ModelRepresentation:
-        self = from_dict(ModeledRelationship, **details)
+    @classmethod
+    def from_dict(cls, data_store: DataStore, **details) -> Self:
+        self = from_dict(cls, **details)
         self.start = data_store.get(Collection.block_repr, details['source_repr_id'])
         self.finish = data_store.get(Collection.block_repr, details['target_repr_id'])
         self.waypoints = load_waypoints(details['routing'])
-        self.category = ReprCategory.relationship
+        self.category = cls.category
         return self
 
     def asdict(self, ignore:Optional[List[str]]=None) -> Dict[str, Any]:

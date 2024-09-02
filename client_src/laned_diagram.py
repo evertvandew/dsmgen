@@ -25,7 +25,7 @@ from storable_element import ReprCategory
 Development strategy:
 ✔️ First implement adding laned blocks -> clipping them to each lane
 ✔ Implement connecting the lanes
-* Loading the diagram from the database
+✔ Loading the diagram from the database
 * Implement moving the connections up and down.
 * Implement moving the lanes left and right.
 * Implement resizing the blocks -> and resizing the lanes with it.

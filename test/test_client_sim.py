@@ -1468,10 +1468,30 @@ def integration_tests():
         context.diagrams.connect(2, 2, client.SequencedMessage)
         assert len(context.diagrams.connections()) == 3
 
+    @test
+    def load_laned_diagram():
+        json_data = """[{"Id": 37, "diagram": 45, "block": 55, "parent": null, "x": 95.0, "y": 60.0, "z": 0.0, "width": 40.0, "height": 64.0, "order": 0, "orientation": null, "styling": "", "category": 6, "lane_length": 1000.0, "_entity": {"order": 0, "Id": 55, "name": "", "description": "", "parent": 45, "__classname__": "Actor"}, "__classname__": "_BlockRepresentation"}, {"Id": 38, "diagram": 45, "block": 56, "parent": null, "x": 195.0, "y": 54.0, "z": 0.0, "width": 40.0, "height": 64.0, "order": 0, "orientation": null, "styling": "", "category": 6, "lane_length": 1000.0, "_entity": {"order": 0, "Id": 56, "name": "", "description": "", "parent": 45, "__classname__": "Actor"}, "__classname__": "_BlockRepresentation"}, {"Id": 34, "diagram": 45, "relationship": 34, "source_repr_id": 37, "target_repr_id": 38, "routing": "[]", "z": 0.0, "styling": {}, "category": 7, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 34, "source": 55, "target": 56, "name": "", "kind": 1, "parent": 45, "__classname__": "SequencedMessage"}}, {"Id": 35, "diagram": 45, "relationship": 35, "source_repr_id": 37, "target_repr_id": 38, "routing": "[[60.0, 60.0]]", "z": 0.0, "styling": {}, "category": 7, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 35, "source": 55, "target": 56, "name": "", "kind": 1, "parent": 45, "__classname__": "SequencedMessage"}}]"""
+        data = json.loads(json_data)
+        context = intergration_context(hierarchy=[
+            client.FunctionalModel(Id=1).asdict(),
+            client.StructuralModel(Id=2).asdict(),
+            client.Actor(Id=55, parent=45, name='A').asdict(),
+            client.Actor(Id=56, parent=45, name='B').asdict(),
+            client.SequenceDiagram(Id=45, parent=1).asdict()
+        ])
+        # Open the sequence diagram
+        add_expected_response('/data/diagram_contents/45', 'get', Response(200, json=data))
+        context.explorer.dblclick_element(mid=45)
+
+        assert len(context.diagrams.connections()) == 2
+        c1, c2 = context.diagrams.connections()
+        assert c1.waypoints == [Point(30,30)]
+        assert c2.waypoints == [Point(60,60)]
+
 
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.test_RingedClosedCircle')
+    run_tests('*.load_laned_diagram')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')
