@@ -51,7 +51,7 @@ import types
 from enum import IntEnum
 from inspect import getmro
 from modeled_diagram import ModeledDiagram
-from laned_diagram import LanedDiagram, LanedShape
+from laned_diagram import LanedDiagram, LanedShape, LanedMessage
 import modeled_shape as ms
 import diagrams
 import shapes
@@ -126,12 +126,7 @@ class ${entity.__name__}(ms.ModelEntity, StorableElement):
     ${key}: ${generator.get_html_type(type_)} = ${default}
     % endfor
 
-    % if generator.md.is_relationship(entity):
-    default_styling = shapes.Relationship.getDefaultStyle().copy()
-    % else:
-    default_styling = shapes.BasicShape.getDescriptor("${base_shape_name}").getDefaultStyle().copy()
-    % endif
-    default_styling.update(${repr(generator.styling[entity.__name__])})
+    default_styling = ${repr(generator.styling[entity.__name__])}
 
     %if hasattr(entity, 'getStyle'):
 ${inspect.getsource(entity.getStyle)}
@@ -216,6 +211,8 @@ ${inspect.getsource(entity.getStyle)}
     %if generator.md.is_relationship(entity):
         if category == ms.ReprCategory.relationship:
             return ms.ModeledRelationship
+        elif category == ms.ReprCategory.laned_connection:
+            return LanedMessage
     %elif generator.md.is_port(entity):
         if category == ms.ReprCategory.block:
             return PortLabel

@@ -597,7 +597,7 @@ class Diagram(OwnerInterface):
         block.create(self)
         self.children.append(block)
 
-    def addConnection(self, connection) -> None:
+    def addConnection(self, connection: Relationship) -> None:
         """ Handle a completed connection and add it to the diagram. """
         self.connections.append(connection)
         connection.create(self, self.children)

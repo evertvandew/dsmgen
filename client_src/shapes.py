@@ -398,14 +398,21 @@ class CP:
         pass
 
 class RoutingStrategy:
+    name: str = ""
     def decorate(self, connection, canvas):
+        raise NotImplementedError
+    def clear_decorations(self):
         raise NotImplementedError
     def route(self, shape, all_blocks):
         raise NotImplementedError
     def dragEnd(self, canvas):
         pass
+    @staticmethod
+    def name_lookup() -> Dict[str, type]:
+        return {cls.name: cls for cls in RoutingStrategy.__subclasses__()}
 
 class RouteCenterToCenter(RoutingStrategy):
+    name = 'center2center'
     def __init__(self):
         self.decorators = []
         self.widget = None
@@ -476,6 +483,7 @@ class RouteCenterToCenter(RoutingStrategy):
 
 
 class RouteSquare(RoutingStrategy):
+    name = 'square'
     def __init__(self):
         self.decorators = []
         self.dragged_index = None
@@ -597,8 +605,6 @@ class RouteSquare(RoutingStrategy):
         shape.selector['d'] = f"M {start.x} {start.y} {waypoints}"
         shape.terminations = (start, end)
 
-RoutingMethod = ['square', 'center2center']
-router_classes = {'center2center': RouteCenterToCenter, 'square': RouteSquare}
 
 @dataclass
 class Relationship(Stylable):
@@ -679,7 +685,8 @@ class Relationship(Stylable):
             first_point = None
             last_point = None
 
-        router_cls = router_classes.get(self.getStyle('routing_method', 'square'), RouteSquare)
+        method_name = self.getStyle('routing_method', 'square')
+        router_cls = RoutingStrategy.name_lookup().get(method_name, RouteSquare)
         if type(self.router) != router_cls:
             # If this is NOT the first time routing, erase all waypoints.
             if self.router:
@@ -704,7 +711,9 @@ class Relationship(Stylable):
             m.updateShape()
 
     def route(self, all_blocks):
-        """ The default routing is center-to-center. """
+        """ Create the graphical elements of a connection, but leave the actual route empty.
+            `reroute` needs to be called to actually define the path (attribute `d`) taken by the connection.
+        """
         # Create the line
         details = dict(d="", stroke=self.getStyle('linecolor'), stroke_width=self.getStyle('linewidth'),
                              marker_end=f"url('#{self.getStyle('endmarker')}')",

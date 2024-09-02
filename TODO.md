@@ -9,6 +9,7 @@
     is for folded
   * clicking the triangle in the explorer acts on all children as well, not just the one clicked on.
 * Scrolling in the diagram editor also scrolls the buttons & create widget.
+* Relationships are deleted without confirmation.
 
 # Refactoring
 * Ensure `storable_element.py` and `data_model.py` share the same `ReprCategory` class.

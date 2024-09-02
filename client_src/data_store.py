@@ -22,6 +22,8 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
+import sys
+
 from browser import console
 import logging
 from enum import Enum, IntEnum, auto
@@ -145,7 +147,13 @@ class DataStore(EventDispatcher):
             else:
                 # Set the ID of the object that was added.
                 record.Id = update.json['Id']
-                assert self.update_cache(record) is record
+                if (cached_record := self.update_cache(record)) is not record:
+                    # Check if the cached object is actually used.
+                    # It could be a deleted object which ID is reused by the database.
+                    if sys.getrefcount(cached_record) >= 2:
+                        print("Database ID is reused while old copies still exist!", cached_record)
+                        collection = record.get_collection()
+                        self.live_instances[collection][record.Id] = record
 
         data = json.dumps(record, cls=ExtendibleJsonEncoder)
         ajax.post(f'{self.configuration.base_url}/{record.get_db_table()}', blocking=True, data=data,
@@ -439,7 +447,6 @@ class DataStore(EventDispatcher):
             return [self.update_cache(record) for record in records]
         else:
             record = records
-            cls_name = type(record).__name__
             collection = record.get_collection()
             self.shadow_copy[collection][record.Id] = record.copy()
 

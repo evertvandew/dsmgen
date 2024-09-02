@@ -38,6 +38,7 @@ class ReprCategory(IntEnum):
     relationship = auto()
     message = auto()
     laned_block = auto()
+    laned_connection = auto()
 
 
 def from_dict(cls, **details) -> Self:

@@ -1451,10 +1451,18 @@ def integration_tests():
         # Draw a message between the two blocks
         context.diagrams.connect(1, 2, client.SequencedMessage)
         assert len(context.diagrams.connections()) == 1
+        c = context.diagrams.connections()[0]
+        assert c.default_style['routing_method'] == 'sequence_msg'
+        assert c.category == ReprCategory.laned_connection
+        assert c.waypoints == [Point(30,30)]
 
         # Draw another message between the two block
         context.diagrams.connect(1, 2, client.SequencedMessage)
         assert len(context.diagrams.connections()) == 2
+        c = context.diagrams.connections()[1]
+        assert c.default_style['routing_method'] == 'sequence_msg'
+        assert c.category == ReprCategory.laned_connection
+        assert c.waypoints == [Point(60,60)]
 
         # Draw a message-to-self on the second block
         context.diagrams.connect(2, 2, client.SequencedMessage)
@@ -1464,6 +1472,6 @@ def integration_tests():
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.undo_redo')
+    run_tests('*.test_RingedClosedCircle')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')

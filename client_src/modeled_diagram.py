@@ -156,15 +156,19 @@ class ModeledDiagram(Diagram):
             if isinstance(d, shapes.Relationship):
                 d.load(self)
 
+    def get_connection_repr(self, a, b):
+        return ReprCategory.relationship
+
     def connect_specific(self, a, b, cls):
         """ Use the information stored in the ModellingEntities to create the connection. """
         # First create the model_entity for the connection.
         connection = cls(source=a.model_entity, target=b.model_entity)
         # Create the representation of the connection.
-        representation = ModeledRelationship(model_entity=connection, start=a, finish=b, diagram=self.diagram_id)
+        repr_cls = connection.get_representation_cls(self.get_connection_repr(a, b))
+        representation = repr_cls(model_entity=connection, start=a, finish=b, diagram=self.diagram_id)
         # Add the connection to the diagram & database
         self.datastore and self.datastore.add_complex(representation)
-        super().addConnection(representation)
+        self.addConnection(representation)
 
     def deleteConnection(self, connection):
         if connection in self.connections:

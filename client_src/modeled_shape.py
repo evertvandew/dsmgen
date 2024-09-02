@@ -55,9 +55,25 @@ class ModelRepresentation(StorableElement):
     def get_model_details(self) -> Optional[Self]:
         return self.model_entity
 
+
+def getModeledStyle(modeled_item, key, default=None) -> Optional[str]:
+    """ Allow model definitions to override styling """
+    if hasattr(modeled_item.model_entity, 'getStyle'):
+        if style := modeled_item.model_entity.getStyle(key):
+            return style
+    if key in modeled_item.styling:
+        return modeled_item.styling[key]
+    defaults = modeled_item.getDefaultStyle()
+    if key in defaults:
+        return defaults[key]
+    if default is not None:
+        return default
+    raise RuntimeError(f"Trying to retrieve unknown styling element {key}")
+
+
 @dataclass
 class ModeledShape(Shape, ModelRepresentation):
-    default_style = dict(blockcolor='#FFFBD6')
+    default_style = dict(blockcolor='#ffffff')
     TextWidget = shapes.Text('text')
     category: ReprCategory = ReprCategory.block
 
@@ -129,17 +145,7 @@ class ModeledShape(Shape, ModelRepresentation):
     @override                                           # From Stylable
     def getStyle(self, key, default=None):
         """ Allow model definitions to override styling """
-        if hasattr(self.model_entity, 'getStyle'):
-            if style := self.model_entity.getStyle(key, default):
-                return style
-        if key in self.styling:
-            return self.styling[key]
-        defaults = self.getDefaultStyle()
-        if key in defaults:
-            return defaults[key]
-        if default is not None:
-            return default
-        raise RuntimeError(f"Trying to retrieve unknown styling element {key}")
+        return getModeledStyle(self, key, default)
 
 
 @dataclass
@@ -267,7 +273,6 @@ class ModeledShapeAndPorts(ModeledShape):
         shape_type.updateShape(rect, self)
         text = shape.children[1]
         self.TextWidget.updateShape(text, self)
-        print('SHAPE:', shape)
 
         # Update the ports
         sorted_ports = {orientation: sorted([p for p in self.ports if p.orientation == orientation], key=lambda x: x.order) \
@@ -409,17 +414,7 @@ class ModeledRelationship(Relationship, ModelRepresentation):
     @override                                           # From Stylable
     def getStyle(self, key, default=None):
         """ Allow model definitions to override styling """
-        if hasattr(self.model_entity, 'getStyle'):
-            if style := self.model_entity.getStyle(key, default):
-                return style
-        if key in self.styling:
-            return self.styling[key]
-        defaults = self.getDefaultStyle()
-        if key in defaults:
-            return defaults[key]
-        if default is not None:
-            return default
-        raise RuntimeError(f"Trying to retrieve unknown styling element {key}")
+        return getModeledStyle(self, key, default)
 
 
 @dataclass
