@@ -1425,6 +1425,7 @@ def integration_tests():
         # Check both were moved.
         assert context.data_store.live_instances[Collection.block_repr][1].getPos().x == data[0]['x']+100.0
         assert context.data_store.live_instances[Collection.block_repr][2].getPos().x == data[1]['x']+100.0
+        check_expected_response()
 
     @test
     def laned_diagram():
@@ -1463,10 +1464,23 @@ def integration_tests():
         assert c.default_style['routing_method'] == 'sequence_msg'
         assert c.category == ReprCategory.laned_connection
         assert c.waypoints == [Point(60,60)]
+        check_expected_response()
+
+        # Drag the second message down
+        # TODO: I am not sure if this call should be there, but I'll let it go for now.
+        add_expected_response('/data/_RelationshipRepresentation/2', 'post', Response(200, json=[]),
+                              expect_values={'routing': '[[60.0, 60.0]]'})
+        context.diagrams.click_relation(2)
+        add_expected_response('/data/_RelationshipRepresentation/2', 'post', Response(200, json=[]),
+                              expect_values={'routing': '[[100.0, 100.0]]'})
+        context.diagrams.drag_relation_handle(0, (0, 40))
+        assert c.waypoints == [Point(100,100)]
+        check_expected_response()
 
         # Draw a message-to-self on the second block
         context.diagrams.connect(2, 2, client.SequencedMessage)
         assert len(context.diagrams.connections()) == 3
+        check_expected_response()
 
     @test
     def load_laned_diagram():
@@ -1487,11 +1501,12 @@ def integration_tests():
         c1, c2 = context.diagrams.connections()
         assert c1.waypoints == [Point(30,30)]
         assert c2.waypoints == [Point(60,60)]
+        check_expected_response()
 
 
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.load_laned_diagram')
+    run_tests('*.laned_diagram')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')

@@ -405,6 +405,8 @@ class RoutingStrategy:
         raise NotImplementedError
     def route(self, shape, all_blocks):
         raise NotImplementedError
+    def dragHandle(self, pos):
+        raise NotImplementedError
     def dragEnd(self, canvas):
         pass
     @staticmethod

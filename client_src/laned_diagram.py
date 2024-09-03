@@ -25,10 +25,10 @@ from storable_element import ReprCategory
 Development strategy:
 ✔️ First implement adding laned blocks -> clipping them to each lane
 ✔ Implement connecting the lanes
-✔ Loading the diagram from the database
-* Implement moving the connections up and down.
+✔ Implement moving the connections up and down.
 * Implement moving the lanes left and right.
 * Implement resizing the blocks -> and resizing the lanes with it.
+* Loading the diagram from the database
 * Implement deleting lane objects -- and shifting the others
 * Implement message to self routing
 ✔ Implement deleting connections.
@@ -142,41 +142,15 @@ class SequenceMessageRouter(RoutingStrategy):
 
     def mouseDownHandle(self, ev):
         self.drag_start = getMousePos(ev)
+        self.initial_pos = self.widget.waypoints[0]
         current = ev.target
+        self.original_handle_pos = Point(int(current['x1']), int(current['y1']))
         current.dispatchEvent(
             window.CustomEvent.new("handle_drag_start", {"bubbles": True, "detail": {'router': self}}))
         ev.stopPropagation()
         ev.preventDefault()
 
-    def decorate(self, connection, canvas):
-        return
-        # Show a little stripe next to each line-piece
-        self.decorator = []
-        self.initial_pos = {}
-        self.widget = connection
-        self.original_handle_pos = []
-        if connection.start.x == connection.finish.x:
-            self.orientation = 'V'
-            n = Point(0,1)
-        else:
-            self.orientation = 'H'
-            n = Point(1,0)
-
-
-        c = (connection.start.getPos()+connection.finish.getPos()) / 2
-        p1 = c - 20*n
-        p2 = c + 20*n
-
-        self.original_handle_pos.append((p1, p2))
-        decorator = svg.line(x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, stroke_width=6, stroke="#29B6F2",
-                             data_orientation=self.orientation, data_index=i, Class=handle_class)
-        self.initial_pos = c
-        _ = canvas <= decorator
-        self.decorator = decorator
-        decorator.bind('mousedown', self.mouseDownHandle)
-    def clear_decorations(self):
-        pass
-    def route(self, shape, all_blocks):
+    def sequenceMessagePoints(self, shape):
         if self.orientation == 'V':
             n = Point(0,1)
             start_x = shape.start.getPos().x + shape.start.getSize().x//2
@@ -192,13 +166,54 @@ class SequenceMessageRouter(RoutingStrategy):
             delta_x = 0
         start = Point(start_x, start_y) + Point(shape.waypoints[0].x*n.x, shape.waypoints[0].y*n.y)
         delta = Point(delta_x, delta_y)
-        shape.path['d'] = f"M {start.x} {start.y} l {delta.x} {delta.y}"
-        shape.selector['d'] = f"M {start.x} {start.y} l {delta.x} {delta.y}"
-        shape.terminations = (start, start + delta)
+        return start, delta, n
+
+    def decorate(self, connection, canvas):
+        # Show a little stripe next to each line-piece
+        self.decorator = None
+        self.initial_pos = {}
+        self.widget = connection
+        self.original_handle_pos = None
+        start, delta, n = self.sequenceMessagePoints(connection)
+
+        c = -10*n + start + delta / 2
+        p1 = c - 10*n.transpose()
+        p2 = c + 10*n.transpose()
+
+        self.original_handle_pos = p1
+        decorator = svg.line(x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y, stroke_width=6, stroke="#29B6F2",
+                             data_orientation=self.orientation, data_index=0, Class=handle_class)
+        self.initial_pos = c
+        _ = canvas <= decorator
+        self.decorator = decorator
+        decorator.bind('mousedown', self.mouseDownHandle)
+    def clear_decorations(self):
+        if self.decorator:
+            self.decorator.remove()
+            self.decorator = None
+
+    def dragHandle(self, pos):
+        delta = pos - self.drag_start
+        new_pos = self.initial_pos + delta
+        h = self.decorator
+        if self.orientation == 'V':
+            new_pos = Point(new_pos.y, new_pos.y)
+            h['y1'] = int(self.original_handle_pos.y + delta.y)
+            h['y2'] = int(self.original_handle_pos.y + delta.y)
+        else:
+            new_pos = Point(new_pos.x, new_pos.x)
+            h['x1'] = int(self.original_handle_pos.x + delta.x)
+            h['x2'] = int(self.original_handle_pos.x + delta.x)
+        self.widget.waypoints[0] = new_pos
 
     def dragEnd(self, canvas):
         pass
 
+    def route(self, shape, all_blocks):
+        start, delta, n = self.sequenceMessagePoints(shape)
+        shape.path['d'] = f"M {start.x} {start.y} l {delta.x} {delta.y}"
+        shape.selector['d'] = f"M {start.x} {start.y} l {delta.x} {delta.y}"
+        shape.terminations = (start, start + delta)
 
 @dataclass
 class LanedMessage(ModeledRelationship):
