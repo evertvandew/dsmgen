@@ -26,9 +26,9 @@ Development strategy:
 ✔️ First implement adding laned blocks -> clipping them to each lane
 ✔ Implement connecting the lanes
 ✔ Implement moving the connections up and down.
-* Implement moving the lanes left and right.
+* Implement moving the lanes left and right -> shifting the lanes to the right.
 * Implement resizing the blocks -> and resizing the lanes with it.
-* Loading the diagram from the database
+* Loading the diagram from the database -- especially taking the waypoints into account.
 * Implement deleting lane objects -- and shifting the others
 * Implement message to self routing
 ✔ Implement deleting connections.
@@ -113,7 +113,7 @@ class LanedDiagram(ModeledDiagram):
         return ReprCategory.relationship
 
     def addConnection(self, connection: Relationship) -> None:
-        if connection.category == ReprCategory.laned_connection:
+        if connection.category == ReprCategory.laned_connection and not connection.waypoints:
             # Determine the offset for this message.
             max_offset = 0
             for c in self.connections:
@@ -121,7 +121,6 @@ class LanedDiagram(ModeledDiagram):
                    if c.waypoints and c.waypoints[0].x > max_offset:
                        max_offset = c.waypoints[0].x
             connection.waypoints = [Point(max_offset + 30, max_offset + 30)]
-
         result = super().addConnection(connection)
         return result
 
@@ -144,7 +143,7 @@ class SequenceMessageRouter(RoutingStrategy):
         self.drag_start = getMousePos(ev)
         self.initial_pos = self.widget.waypoints[0]
         current = ev.target
-        self.original_handle_pos = Point(int(current['x1']), int(current['y1']))
+        self.original_handle_pos = Point(float(current['x1']), float(current['y1']))
         current.dispatchEvent(
             window.CustomEvent.new("handle_drag_start", {"bubbles": True, "detail": {'router': self}}))
         ev.stopPropagation()
@@ -154,7 +153,7 @@ class SequenceMessageRouter(RoutingStrategy):
         if self.orientation == 'V':
             n = Point(0,1)
             start_x = shape.start.getPos().x + shape.start.getSize().x//2
-            start_y = min([shape.start.getPos().y+shape.start.getSize().y, shape.finish.getPos().y+shape.finish.getSize().y])
+            start_y = max([shape.start.getPos().y+shape.start.getSize().y, shape.finish.getPos().y+shape.finish.getSize().y])
             delta_x = shape.finish.getPos().x + shape.finish.getSize().x//2 - shape.start.getPos().x - shape.start.getSize().x//2
             delta_y = 0
         else:
