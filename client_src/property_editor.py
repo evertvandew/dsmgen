@@ -203,7 +203,7 @@ def getInputForStyle(o: Any, key, value):
     if 'align' in key:
         t = {'halign': HAlign, 'valign': VAlign}[key]
         input = html.SELECT(id=f"styling_{key}", name=key)
-        value = int(value)
+        value = value.value
         for option in t:
             if value == option:
                 input <= html.OPTION(option.name, value=option.value, selected=1)

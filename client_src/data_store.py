@@ -388,7 +388,8 @@ class DataStore(EventDispatcher):
             if update.status > 299:
                 alert("Representation could not be created")
             else:
-                result = self.decode_representation(update.json)
+                drop_details.update(update.json)
+                result = self.decode_representation(drop_details)
                 if hasattr(result, 'children'):
                     result.ports = [ch for ch in result.children if ch.repr_category() == ReprCategory.port]
 

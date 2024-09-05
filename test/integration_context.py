@@ -313,13 +313,14 @@ class IntegrationContext:
                 shape.dispatchEvent(events.MouseUp())
                 shape.dispatchEvent(events.Click())
 
-            def move_block(self, rid: int, cood: Tuple[float, float] | Point):
+            def move_block(self, rid: int, cood: Tuple[float, float] | Point, expect_no_change=False):
                 """ Move the block by manipulating it through mouse events
                 """
                 if isinstance(cood, Point):
                     cood = cood.astuple()
                 # Expect an update of the representation to be sent to the server.
-                add_expected_response(f'/data/_BlockRepresentation/{rid}', 'post', Response(200, json=None))
+                if not expect_no_change:
+                    add_expected_response(f'/data/_BlockRepresentation/{rid}', 'post', Response(200, json=None))
                 # Find the shape involved.
                 shape = self.resolve(rid).shape
                 # Move it.

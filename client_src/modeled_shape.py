@@ -101,7 +101,7 @@ class ModeledShape(Shape, ModelRepresentation):
         g = svg.g()
         _ = g <= shape_type.getShape(self)
         _ = g <= self.TextWidget.getShape(self)
-        g.attrs['data-category'] = int(self.repr_category())
+        g.attrs['data-category'] = self.repr_category().value
         g.attrs['data-rid'] = self.Id
         storable_entity = cast(StorableElement, self.model_entity)
         g.attrs['data-mid'] = storable_entity.Id

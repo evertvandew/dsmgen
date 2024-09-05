@@ -3,6 +3,7 @@ Tests where the Brython client is run against a simulated Brython - browser.
 """
 
 import json
+from copy import copy
 
 import data_store
 import modeled_shape
@@ -1477,6 +1478,28 @@ def integration_tests():
         assert c.waypoints == [Point(100,100)]
         check_expected_response()
 
+        # Drag the first block to the right, at some point it should jump over the second block.
+        b1, b2 = context.diagrams.blocks()
+        p1 = copy(b1.getPos())
+        p2 = copy(b2.getPos())
+        d_x = p2.x - p1.x
+        # First move it half-way across
+        # Currently, the clipping of the block happens after the initial change was sent to the database.
+        # So two changes are expected.
+        add_expected_response('/data/_BlockRepresentation/1', 'post', Response(200, json=[]))
+        add_expected_response('/data/_BlockRepresentation/2', 'post', Response(200, json=[]))
+        context.diagrams.move_block(b1.Id, [d_x//2,0], expect_no_change=True)
+        # The block should be back at the correct position
+        assert b1.getPos() == Point(75,60)
+        assert b2.getPos() == Point(159,60)
+        # Now move it over the other block. The blocks should be swapped.
+        add_expected_response('/data/_BlockRepresentation/1', 'post', Response(200, json=[]))
+        add_expected_response('/data/_BlockRepresentation/2', 'post', Response(200, json=[]))
+        context.diagrams.move_block(b1.Id, [d_x+10, 0])
+        assert b1.getPos() == Point(159,60)
+        assert b2.getPos() == Point(75,60)
+
+
         # Draw a message-to-self on the second block
         context.diagrams.connect(2, 2, client.SequencedMessage)
         assert len(context.diagrams.connections()) == 3
@@ -1507,6 +1530,6 @@ def integration_tests():
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.load_laned_diagram')
+    run_tests('*.laned_diagram')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')

@@ -26,16 +26,16 @@ Development strategy:
 ✔️ First implement adding laned blocks -> clipping them to each lane
 ✔ Implement connecting the lanes
 ✔ Implement moving the connections up and down.
-* Implement moving the lanes left and right -> shifting the lanes to the right.
-* Implement resizing the blocks -> and resizing the lanes with it.
-* Loading the diagram from the database -- especially taking the waypoints into account.
-* Implement deleting lane objects -- and shifting the others
+✔ Implement moving the lanes left and right -> shifting the lanes to the right.
+✔ Implement resizing the blocks -> and resizing the lanes with it.
+✔ Loading the diagram from the database -- especially taking the waypoints into account.
+✔ Implement deleting lane objects -- and shifting the others
+* Render the name of a message.
 * Implement message to self routing
 ✔ Implement deleting connections.
 
 """
 
-lane_margin = 20
 
 @dataclass
 class LanedShape(ModeledShape):
@@ -76,6 +76,9 @@ class LanedDragFSB(ResizeFSM):
 class LanedDiagram(ModeledDiagram):
     vertical_lane: List[type] = []
     horizontal_lane: List[type] = []
+    lane_margin = 20
+    lane_offset = 90
+    cross_offset = 60
     def __init__(self, config: DiagramConfiguration, widgets, datastore: UndoableDataStore, diagram_id: int):
         super().__init__(config, widgets, datastore, diagram_id)
         self.lanes = []
@@ -100,7 +103,7 @@ class LanedDiagram(ModeledDiagram):
         if details['category'] == ReprCategory.laned_block:
             if block_cls in self.vertical_lane:
                 details['y'] = 60
-                details['x'] = 75 + sum(b.width for b in self.lanes) + lane_margin * len(self.lanes) + details['width'] // 2
+                details['x'] = 75 + sum(b.width for b in self.lanes) + self.lane_margin * len(self.lanes) + details['width'] // 2
                 details['lane_length'] = 1000
             elif block_cls in self.horizontal_lane:
                 details['x'] = 60
@@ -123,6 +126,29 @@ class LanedDiagram(ModeledDiagram):
             connection.waypoints = [Point(max_offset + 30, max_offset + 30)]
         result = super().addConnection(connection)
         return result
+
+    def updateLanedBlock(self, _element):
+        # Just re-order all blocks and locate them in their proper positions.
+        # When in doubt, use brute force.
+        keyfunc = (lambda b: b.x) if self.vertical_lane else (lambda b: b.y)
+        order: List[LanedShape] = sorted((b for b in self.children if b.category==ReprCategory.laned_block), key=keyfunc)
+        position = self.lane_offset
+        for i, b in enumerate(order):
+            b.order = i+1
+            if self.vertical_lane:
+                b.x = position
+                position += b.width
+            else:
+                b.y = position
+                position += b.height
+            position += self.lane_margin
+            # Update them all, the data_store will detect any real changes.
+            self.datastore.update(b)
+
+    def updateElement(self, element) -> None:
+        if isinstance(element, LanedShape):
+            self.updateLanedBlock(element)
+        super().updateElement(element)
 
 
 class SequenceMessageRouter(RoutingStrategy):
