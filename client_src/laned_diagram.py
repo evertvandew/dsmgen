@@ -32,7 +32,7 @@ Development strategy:
 ✔ Loading the diagram from the database -- especially taking the waypoints into account.
 ✔ Implement deleting lane objects -- and shifting the others
 * Render the name of a message.
-* Implement message to self routing
+✔ Implement message to self routing
 ✔ Implement deleting connections.
 
 """

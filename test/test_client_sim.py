@@ -4,6 +4,7 @@ Tests where the Brython client is run against a simulated Brython - browser.
 
 import json
 from copy import copy
+import re
 
 import data_store
 import modeled_shape
@@ -1503,6 +1504,9 @@ def integration_tests():
         context.diagrams.connect(2, 2, client.SequencedMessage)
         assert len(context.diagrams.connections()) == 3
         check_expected_response()
+        c3 = context.diagrams.connections()[2]
+        assert re.match(r"M \d+ \d+ h \d+ v \d+ h -\d+", c3.path.attrs['d'])
+
 
     @test
     def load_laned_diagram():
