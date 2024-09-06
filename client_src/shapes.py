@@ -400,13 +400,15 @@ class CP:
 class RoutingStrategy:
     name: str = ""
     def decorate(self, connection, canvas):
-        raise NotImplementedError
+        raise NotImplementedError()
     def clear_decorations(self):
-        raise NotImplementedError
+        raise NotImplementedError()
+    def deleteWaypoint(self):
+        raise NotImplementedError()
     def route(self, shape, all_blocks):
-        raise NotImplementedError
+        raise NotImplementedError()
     def dragHandle(self, pos):
-        raise NotImplementedError
+        raise NotImplementedError()
     def dragEnd(self, canvas):
         pass
     @staticmethod

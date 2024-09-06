@@ -10,6 +10,7 @@ These differences are handled by giving the LanedDiagram different event handler
 
 """
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import override, List
 
 from browser import svg, window, bind
@@ -35,6 +36,12 @@ Development strategy:
 ✔ Implement deleting connections.
 
 """
+
+
+class LaneOrientation(StrEnum):
+    Horizontal = 'H'
+    Vertical = 'V'
+
 
 
 @dataclass
@@ -157,10 +164,11 @@ class SequenceMessageRouter(RoutingStrategy):
         The router creates the handle necessary to manipulate this offset.
     """
     name = 'sequence_msg'
+    self_msg_step = 30
 
     def __init__(self):
         self.drag_start = None
-        self.orientation = 'V'
+        self.orientation: LaneOrientation = LaneOrientation.Vertical
         self.initial_pos = None
         self.widget = None
         self.decorator = None
@@ -176,19 +184,35 @@ class SequenceMessageRouter(RoutingStrategy):
         ev.preventDefault()
 
     def sequenceMessagePoints(self, shape):
-        if self.orientation == 'V':
-            n = Point(0,1)
-            start_x = shape.start.getPos().x + shape.start.getSize().x//2
-            start_y = max([shape.start.getPos().y+shape.start.getSize().y, shape.finish.getPos().y+shape.finish.getSize().y])
-            delta_x = shape.finish.getPos().x + shape.finish.getSize().x//2 - shape.start.getPos().x - shape.start.getSize().x//2
-            delta_y = 0
+        # Check for message to self
+        if shape.start == shape.finish:
+            if self.orientation == LaneOrientation.Vertical:
+                n = Point(0, 1)
+                start_x = shape.start.getPos().x + shape.start.getSize().x // 2
+                start_y = shape.start.getPos().y+shape.start.getSize().y
+                delta_x = self.self_msg_step
+                delta_y = self.self_msg_step
+            else:
+                n = Point(1, 0)
+                start_y = shape.start.getPos().y + shape.start.getSize().y // 2
+                start_x = shape.start.getPos().x+shape.start.getSize().x
+                delta_y = self.self_msg_step
+                delta_x = self.self_msg_step
+
         else:
-            n = Point(1,0)
-            start_y = shape.start.getPos().y + shape.start.getSize().y // 2
-            start_x = min(
-                [shape.start.getPos().x + shape.start.getSize().x, shape.finish.getPos().x + shape.finish.getSize().x])
-            delta_y = shape.finish.getPos().y + shape.finish.getSize().y // 2
-            delta_x = 0
+            if self.orientation == LaneOrientation.Vertical:
+                n = Point(0,1)
+                start_x = shape.start.getPos().x + shape.start.getSize().x//2
+                start_y = max([shape.start.getPos().y+shape.start.getSize().y, shape.finish.getPos().y+shape.finish.getSize().y])
+                delta_x = shape.finish.getPos().x + shape.finish.getSize().x//2 - shape.start.getPos().x - shape.start.getSize().x//2
+                delta_y = 0
+            else:
+                n = Point(1,0)
+                start_y = shape.start.getPos().y + shape.start.getSize().y // 2
+                start_x = min(
+                    [shape.start.getPos().x + shape.start.getSize().x, shape.finish.getPos().x + shape.finish.getSize().x])
+                delta_y = shape.finish.getPos().y + shape.finish.getSize().y // 2
+                delta_x = 0
         start = Point(start_x, start_y) + Point(shape.waypoints[0].x*n.x, shape.waypoints[0].y*n.y)
         delta = Point(delta_x, delta_y)
         return start, delta, n
@@ -221,7 +245,7 @@ class SequenceMessageRouter(RoutingStrategy):
         delta = pos - self.drag_start
         new_pos = self.initial_pos + delta
         h = self.decorator
-        if self.orientation == 'V':
+        if self.orientation == LaneOrientation.Vertical:
             new_pos = Point(new_pos.y, new_pos.y)
             h['y1'] = int(self.original_handle_pos.y + delta.y)
             h['y2'] = int(self.original_handle_pos.y + delta.y)
@@ -236,9 +260,23 @@ class SequenceMessageRouter(RoutingStrategy):
 
     def route(self, shape, all_blocks):
         start, delta, n = self.sequenceMessagePoints(shape)
-        shape.path['d'] = f"M {start.x} {start.y} l {delta.x} {delta.y}"
-        shape.selector['d'] = f"M {start.x} {start.y} l {delta.x} {delta.y}"
-        shape.terminations = (start, start + delta)
+        if shape.start == shape.finish:
+            if self.orientation == LaneOrientation.Vertical:
+                shape.path['d'] = f"M {start.x} {start.y} h {delta.x} v {delta.y} h -{delta.x}"
+                shape.selector['d'] = f"M {start.x} {start.y} h {delta.x} v {delta.y} h -{delta.x}"
+                shape.terminations = (start, start + Point(0, delta.y))
+            else:
+                shape.path['d'] = f"M {start.x} {start.y} v {-delta.y} h {delta.x} v {delta.y}"
+                shape.selector['d'] = f"M {start.x} {start.y} v {-delta.y} h {delta.x} v {delta.y}"
+                shape.terminations = (start, start + Point(delta.x, 0))
+        else:
+            shape.path['d'] = f"M {start.x} {start.y} l {delta.x} {delta.y}"
+            shape.selector['d'] = f"M {start.x} {start.y} l {delta.x} {delta.y}"
+            shape.terminations = (start, start + delta)
+
+    def deleteWaypoint(self):
+        # Ignore: sequence messages have no user-editable waypoints that can be added or deleted.
+        pass
 
 @dataclass
 class LanedMessage(ModeledRelationship):

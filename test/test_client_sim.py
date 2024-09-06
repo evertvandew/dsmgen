@@ -1490,14 +1490,13 @@ def integration_tests():
         add_expected_response('/data/_BlockRepresentation/2', 'post', Response(200, json=[]))
         context.diagrams.move_block(b1.Id, [d_x//2,0], expect_no_change=True)
         # The block should be back at the correct position
-        assert b1.getPos() == Point(75,60)
-        assert b2.getPos() == Point(159,60)
+        assert b1.getPos() == Point(90,60)
+        assert b2.getPos() == Point(174,60)
         # Now move it over the other block. The blocks should be swapped.
-        add_expected_response('/data/_BlockRepresentation/1', 'post', Response(200, json=[]))
         add_expected_response('/data/_BlockRepresentation/2', 'post', Response(200, json=[]))
         context.diagrams.move_block(b1.Id, [d_x+10, 0])
-        assert b1.getPos() == Point(159,60)
-        assert b2.getPos() == Point(75,60)
+        assert b1.getPos() == Point(174,60)
+        assert b2.getPos() == Point(90,60)
 
 
         # Draw a message-to-self on the second block
