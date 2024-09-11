@@ -261,18 +261,20 @@ class SequenceMessageRouter(RoutingStrategy):
     def route(self, shape, all_blocks):
         start, delta, n = self.sequenceMessagePoints(shape)
         if shape.start == shape.finish:
+            # Messages to self
             if self.orientation == LaneOrientation.Vertical:
                 shape.path['d'] = f"M {start.x} {start.y} h {delta.x} v {delta.y} h -{delta.x}"
                 shape.selector['d'] = f"M {start.x} {start.y} h {delta.x} v {delta.y} h -{delta.x}"
-                shape.terminations = (start, start + Point(0, delta.y))
+                shape.terminations = (start, start + Point(0, delta.y), start + Point(delta.x, delta.y/2))
             else:
                 shape.path['d'] = f"M {start.x} {start.y} v {-delta.y} h {delta.x} v {delta.y}"
                 shape.selector['d'] = f"M {start.x} {start.y} v {-delta.y} h {delta.x} v {delta.y}"
-                shape.terminations = (start, start + Point(delta.x, 0))
+                shape.terminations = (start, start + Point(delta.x, 0), start + Point(delta.x/2, delta.y))
         else:
+            # Messages across lanes
             shape.path['d'] = f"M {start.x} {start.y} l {delta.x} {delta.y}"
             shape.selector['d'] = f"M {start.x} {start.y} l {delta.x} {delta.y}"
-            shape.terminations = (start, start + delta)
+            shape.terminations = (start, start + delta, start+delta/2)
 
     def deleteWaypoint(self):
         # Ignore: sequence messages have no user-editable waypoints that can be added or deleted.

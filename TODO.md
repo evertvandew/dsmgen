@@ -40,7 +40,6 @@
 * When a user adds a connection that already exists, that should be reused.
 * Allow conversion of one type element to another
 * Allow conversion of one relationship to another
-* Support for "laned" diagrams (sequence diagrams, gantt charts)
 * Support for "puzzle" plug-in diagrams (scratch, Nassi–Shneiderman)
   * Puzzle piece = statement
   * Ellipse / block with rounded corners = value
@@ -70,6 +69,7 @@
 
 
 # Done:
+* Support for "laned" diagrams (sequence diagrams, gantt charts)
 * Allow the server to switch databases, as directed by the client.
 * Support selecting multiple elements and moving them.
 * Implement selection by drawing a rectangle with the mouse.

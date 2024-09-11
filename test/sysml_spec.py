@@ -179,7 +179,7 @@ class ObjectSequenceInstance:
     name: str
 
 
-@md.Relationship(styling='')
+@md.Relationship(styling='', anchors={md.Anchor.Center: 0})
 class SequencedMessage:
     source: XRef('a', Actor, ObjectSequenceInstance, hidden)
     target: XRef('b', Actor, ObjectSequenceInstance, hidden)

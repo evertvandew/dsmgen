@@ -17,13 +17,14 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
-from typing import Any, Self, List, Dict, Optional, cast, override
+from typing import Any, Self, List, Dict, Optional, cast, override, Callable
 from dataclasses import dataclass, field
+from enum import StrEnum
 import json
 from browser import svg, document, console
 from diagrams import Shape, Relationship, CP, Point, Orientations
 import shapes
-from svg_shapes import MsgShape
+from svg_shapes import MsgShape, HAlign
 from context_menu import mk_context_menu
 from storable_element import StorableElement, Collection, ReprCategory, from_dict
 from data_store import ExtendibleJsonEncoder, DataStore
@@ -31,6 +32,12 @@ from point import load_waypoints
 from copy import deepcopy, copy
 from property_editor import getDetailsPopup
 from model_interface import ModelEntity
+
+
+class RelationAnchor(StrEnum):
+    Center = 'C'
+    Start = 'S'
+    End = 'E'
 
 ###############################################################################
 @dataclass
@@ -327,10 +334,38 @@ class ModeledRelationship(Relationship, ModelRepresentation):
     finish: ModeledShape = None
     category: ReprCategory = ReprCategory.relationship
 
+    def __post_init__(self):
+        super().__post_init__()
+        self.text_widgets = None
+        self.text_shapes = {}
+
     @property
     def relationship(self):
         storable_entity = cast(StorableElement, self.model_entity)
         return storable_entity.Id
+
+    def create(self, owner, all_blocks):
+        # Add the text boxes to the diagram
+        # The text shape objects are cached, check if they need to be created.
+        def mk_getter(index: int) -> Callable[[], str]:
+            return lambda: self.model_entity.get_text(index)
+        if self.model_entity:
+            self.text_widgets = {}
+            for anchor, text_nr in self.model_entity.get_anchor_descriptor().items():
+                tw = shapes.TextBox(text_getter = mk_getter(text_nr))
+                tw.default_style['halign'] = {
+                    RelationAnchor.Center: HAlign.CENTER,
+                    RelationAnchor.Start: HAlign.LEFT,
+                    RelationAnchor.End: HAlign.RIGHT
+                }[anchor]
+                self.text_widgets[anchor] = tw
+        if self.text_widgets and not self.text_shapes:
+            self.text_shapes = {anchor: tw.getShape() for anchor, tw in self.text_widgets.items()}
+            for anchor, widget in self.text_widgets.items():
+                widget.shape = self.text_shapes[anchor]
+                _ = owner.getCanvas() <= widget.shape
+
+        super().create(owner, all_blocks)
 
     def getDefaultStyle(self):
         style = {}
@@ -408,6 +443,19 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         storable_entity = cast(StorableElement, self.model_entity)
         self.path.attrs['data-mid'] = storable_entity.Id
 
+    def reroute(self, all_blocks):
+        super().reroute(all_blocks)
+        # Update the positions of the various texts according to their anchors.
+        anchor_positions = {
+            RelationAnchor.Start: self.terminations[0],
+            RelationAnchor.Center: self.terminations[2],
+            RelationAnchor.End: self.terminations[1]
+        }
+        for anchor, widget in self.text_widgets.items():
+            widget.setPos(anchor_positions[anchor])
+            shape = self.text_shapes[anchor]
+            widget.updateShape(shape)
+
     def get_db_table(cls):
         return '_RelationshipRepresentation'
 
@@ -415,7 +463,6 @@ class ModeledRelationship(Relationship, ModelRepresentation):
     def getStyle(self, key, default=None):
         """ Allow model definitions to override styling """
         return getModeledStyle(self, key, default)
-
 
 @dataclass
 class Message(ModeledShape):

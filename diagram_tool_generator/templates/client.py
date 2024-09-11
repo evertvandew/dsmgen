@@ -33,11 +33,17 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
+import inspect
 from enum import EnumType
 import inspect
 import model_definition as mdef
 from model_definition import fields, is_dataclass, parameter_spec
 
+def render_anchor_description(anchors):
+    if not anchors:
+        return "{}"
+    anchor_contents = ", ".join(f"{a.value}: {b}" for a,b  in anchors.items())
+    return "{" + anchor_contents + "}"
 %>
 
 from browser import document, console, html, svg, bind, ajax
@@ -244,6 +250,16 @@ ${inspect.getsource(entity.getStyle)}
             return self.${f}
         % endfor
         return ''
+
+    %if generator.md.is_relationship(entity):
+    @classmethod
+    def get_anchor_descriptor(cls):
+        % if entity._anchors:
+        return ${render_anchor_description(entity._anchors)}
+        % else:
+        return {}
+        % endif
+    %endif
 
     def get_parameter_spec_fields(self) -> List[str]:
         return "${generator.get_spec_fields(entity)}"

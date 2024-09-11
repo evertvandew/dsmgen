@@ -74,7 +74,6 @@ class EventDispatcher:
     def add_data(self, item):
         self.create_event('add', type(item).__name__, item)
     def update_data(self, item):
-        console.log(f"CREATING UPDATE EVENT {item}")
         self.create_event('update', type(item).__name__, item, getattr(item, 'Id', False))
     def delete_data(self, item):
         self.create_event('delete', type(item).__name__, item, getattr(item, 'Id', False))

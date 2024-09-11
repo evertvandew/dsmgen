@@ -115,9 +115,7 @@ class ModeledDiagram(Diagram):
                     r.updateShape(r.shape)
             elif source.get_collection() in Collection.representations():
                 # Support for the undo & redo actions.
-                console.log("UPDATE UPDATE UPDATE")
                 if source in self.children:
-                    console.log("SOURCE Updating the shape")
                     source.updateShape(source.shape)
                     self.rerouteConnections(source)
                 else:
@@ -269,7 +267,6 @@ class ModeledDiagram(Diagram):
 
     def trigger_event(self, widget, event_name, event_detail):
         super().trigger_event(widget, event_name, event_detail)
-        console.log(f"TRIGGERING event: {event_name}, {widget}, {event_detail}")
         self.datastore and self.datastore.trigger_event(event_name, widget, **event_detail)
 
     def dblclickChild(self, widget, ev):
@@ -277,7 +274,6 @@ class ModeledDiagram(Diagram):
                                      target_type=type(widget.model_entity).__name__)
 
     def onKeyDown(self, ev) -> None:
-        console.log("ModelDiagram Key down")
         if ev.key == 'z' and ev.ctrlKey:
             if ev.shiftKey:
                 # Redo

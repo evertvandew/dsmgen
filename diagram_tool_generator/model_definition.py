@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 
 from datetime import datetime, time
-from enum import IntEnum, auto, EnumType
+from enum import IntEnum, auto, EnumType, StrEnum
 from typing import List, Any, Optional, Dict
 from dataclasses import dataclass, field, is_dataclass, fields
 
@@ -50,7 +50,6 @@ class LaneDirection(IntEnum):
     Right =auto(),
     Down  =auto(),
     Left  =auto()
-
 
 @dataclass
 class TypeDefault:
@@ -79,6 +78,9 @@ def split_styling(styling):
     return {k:v for k, v in [l.split(':') for l in styling.strip('; ').split(';')]}
 
 
+# Define the prefix that translates anchors in the definition to those in the client.
+anchor_prefix = 'ms.RelationAnchor.'
+
 @dataclass
 class ModelDefinition:
     model_elements: List[Any] = field(default_factory=list)
@@ -88,6 +90,10 @@ class ModelDefinition:
     styling_definition: Dict[str, Any] = field(default_factory=dict)
     custom_types: List[type] = field(default_factory=list)
 
+    class Anchor(StrEnum):
+        Center = anchor_prefix+'Center'
+        End = anchor_prefix+'End'
+        Start = anchor_prefix+'Start'
 
     def __post_init__(self):
         self.add_type_conversion(longstr, TypeDefault('String', '""'), TypeDefault('str', '""'), TypeDefault('str', '""'))
@@ -142,7 +148,7 @@ class ModelDefinition:
         return decorate
 
 
-    def Relationship(self, styling='', parents=None, source=None, target=None):
+    def Relationship(self, styling='', parents=None, source=None, target=None, anchors=None):
         """ Definition of a connection between entities. """
         def decorate(cls):
             nonlocal parents, source, target
@@ -156,6 +162,7 @@ class ModelDefinition:
             target = target or []
             if target or 'target' not in cls.__annotations__:
                 cls.__annotations__['target'] = XRef('relations', *target, hidden)
+            cls._anchors = anchors
             cls = dataclass(cls)
             self.model_elements.append(cls)
             self.styling_definition[cls.__name__] = split_styling(styling)

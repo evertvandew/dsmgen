@@ -24,10 +24,10 @@ import math
 from math import inf
 from dataclasses import dataclass, field
 import json
-from typing import List, Dict, Self, Optional, Type
+from typing import List, Dict, Self, Optional, Type, Callable
 from square_routing import routeSquare
 from point import Point
-from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns, path_ending, path_origin)
+from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns, path_ending, path_origin, Box)
 from storable_element import StorableElement
 from copy import copy
 
@@ -226,6 +226,8 @@ class Shape(Stylable, StorableElement):
     def __post_init__(self):
         self.shape = None
         self.highlight_shape = None
+        self.subscribers = {}
+
         if not isinstance(self.styling, dict):
             if not self.styling:
                 self.styling = {}
@@ -382,6 +384,32 @@ class Shape(Stylable, StorableElement):
             self.highlight_shape.remove()
             self.highlight_shape = None
 
+
+@dataclass
+class TextBox(Shape):
+    TextWidget = Text('text')
+    default_style = {'offset': '0', 'bordercolor': 'none', 'bordersize': '0', 'blockcolor': 'none',
+                     'fontsize': 12, 'font': 'Arial', 'xmargin': 0, 'ymargin': 0, 'linespace': 1.5, 'textcolor': 'black'}
+    text_getter: Callable[[], str] = lambda: ""
+
+    @property
+    def text(self):
+        txt = self.text_getter()
+        return txt
+
+    def getShape(self):
+        # This shape consists of two parts: the text and the outline.
+        g = svg.g()
+        _ = g <= Box.getShape(self)
+        _ = g <= self.TextWidget.getShape(self)
+        return g
+
+    def updateShape(self, shape=None):
+        shape = shape or self.shape
+        Box.updateShape(shape.children[0], self)
+        self.TextWidget.updateShape(shape.children[1], self)
+
+
 @dataclass
 class CP:
     orientation: BlockOrientations = BlockOrientations.RIGHT
@@ -483,7 +511,7 @@ class RouteCenterToCenter(RoutingStrategy):
         shape.selector['d'] = f"M {i_a.x} {i_a.y} {waypoints}L {i_b.x} {i_b.y}"
 
         # Store the actual intersection points
-        shape.terminations = (i_a, i_b)
+        shape.terminations = (i_a, i_b, (i_a + i_b) / 2)
 
 
 class RouteSquare(RoutingStrategy):
@@ -607,7 +635,7 @@ class RouteSquare(RoutingStrategy):
         start, end = shape.points[0], shape.points[-1]
         shape.path['d'] = f"M {start.x} {start.y} {waypoints}"
         shape.selector['d'] = f"M {start.x} {start.y} {waypoints}"
-        shape.terminations = (start, end)
+        shape.terminations = (start, end, (start+end)/2)
 
 
 @dataclass
