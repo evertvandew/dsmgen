@@ -676,6 +676,7 @@ class Diagram(OwnerInterface):
 
     def clickChild(self, widget, ev) -> None:
         # Check if the ownership of the block has changed
+        print("Click Child")
         pos = getMousePos(ev)
         self.takeOwnership(widget, pos, self)
 
@@ -683,28 +684,11 @@ class Diagram(OwnerInterface):
         # To be overloaded by child classes
         pass
 
-    def mouseDownChild(self, widget, ev, update_func=None) -> None:
+    def mouseDownChild(self, widget, ev) -> None:
+        print("Mousedown Child")
         if not self.mouse_events_fsm:
             self.mouse_events_fsm = ResizeFSM(self)
         self.mouse_events_fsm.mouseDownShape(self, widget, ev)
-
-        def uf(new_data):
-            # Store the existing values to see if anything actually changed.
-            old_values = asdict(widget)
-            widget.update(new_data)
-
-        if update_func is None:
-            update_func = uf
-
-
-        # Also notify any listeners that an object was selected
-        details = json.dumps(widget, cls=ExtendibleJsonEncoder)
-        event_detail = {
-            "values": details,
-            "update": update_func,
-            "object": widget
-        }
-        self.trigger_event(widget, 'shape_selected', event_detail)
 
     def trigger_event(self, widget, event_name, event_detail) -> None:
         self.canvas.dispatchEvent(window.CustomEvent.new(event_name, {
@@ -769,10 +753,6 @@ class Diagram(OwnerInterface):
         details = {'blocks': self.children,
                    'connections': self.connections}
         return json.dumps(details, cls=ExtendibleJsonEncoder)
-
-    def updateElement(self, element) -> None:
-        if is_dataclass(element):
-            self.datastore and self.datastore.update(element)
 
     def selectConnectionClass(self, clss, cb) -> None:
         """ Function that builds a dialog for selecting a specific connection type.

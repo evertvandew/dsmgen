@@ -337,7 +337,6 @@ class ModeledRelationship(Relationship, ModelRepresentation):
     def __post_init__(self):
         super().__post_init__()
         self.text_widgets = None
-        self.text_shapes = {}
 
     @property
     def relationship(self):
@@ -359,11 +358,9 @@ class ModeledRelationship(Relationship, ModelRepresentation):
                     RelationAnchor.End: HAlign.RIGHT
                 }[anchor]
                 self.text_widgets[anchor] = tw
-        if self.text_widgets and not self.text_shapes:
-            self.text_shapes = {anchor: tw.getShape() for anchor, tw in self.text_widgets.items()}
-            for anchor, widget in self.text_widgets.items():
-                widget.shape = self.text_shapes[anchor]
-                _ = owner.getCanvas() <= widget.shape
+                tw.width = 64
+                tw.height = 24
+                tw.create(owner)
 
         super().create(owner, all_blocks)
 
@@ -453,8 +450,7 @@ class ModeledRelationship(Relationship, ModelRepresentation):
         }
         for anchor, widget in self.text_widgets.items():
             widget.setPos(anchor_positions[anchor])
-            shape = self.text_shapes[anchor]
-            widget.updateShape(shape)
+            widget.updateShape()
 
     def get_db_table(cls):
         return '_RelationshipRepresentation'

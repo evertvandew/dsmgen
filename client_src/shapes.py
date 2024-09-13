@@ -27,7 +27,8 @@ import json
 from typing import List, Dict, Self, Optional, Type, Callable
 from square_routing import routeSquare
 from point import Point
-from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns, path_ending, path_origin, Box)
+from svg_shapes import (BasicShape, renderText, VAlign, HAlign, line_patterns, path_ending, path_origin, Box, Square,
+                        Rect)
 from storable_element import StorableElement
 from copy import copy
 
@@ -279,6 +280,7 @@ class Shape(Stylable, StorableElement):
         pass
 
     def onClick(self, ev):
+        print("onclick")
         if owner := self.owner():
             owner.clickChild(self, ev)
 
@@ -287,6 +289,7 @@ class Shape(Stylable, StorableElement):
             owner.dblclickChild(self, ev)
 
     def onMouseDown(self, ev):
+        print("onmousedown")
         match ev.button:
             case 0:
                 if owner := self.owner():
@@ -397,16 +400,22 @@ class TextBox(Shape):
         txt = self.text_getter()
         return txt
 
+    def create(self, owner: OwnerInterface):
+        super().create(owner)
+        self.shape.children[0].bind('click', self.onClick)
+        self.shape.children[0].bind('mousedown', self.onMouseDown)
+        self.shape.children[0].bind('dblclick', self.onDblClick)
+
     def getShape(self):
         # This shape consists of two parts: the text and the outline.
         g = svg.g()
-        _ = g <= Box.getShape(self)
+        _ = g <= Rect.getShape(self)
         _ = g <= self.TextWidget.getShape(self)
         return g
 
     def updateShape(self, shape=None):
         shape = shape or self.shape
-        Box.updateShape(shape.children[0], self)
+        Rect.updateShape(shape.children[0], self)
         self.TextWidget.updateShape(shape.children[1], self)
 
 

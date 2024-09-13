@@ -316,25 +316,26 @@ class IntegrationContext:
             def move_block(self, rid: int, cood: Tuple[float, float] | Point, expect_no_change=False):
                 """ Move the block by manipulating it through mouse events
                 """
-                if isinstance(cood, Point):
-                    cood = cood.astuple()
                 # Expect an update of the representation to be sent to the server.
                 if not expect_no_change:
                     add_expected_response(f'/data/_BlockRepresentation/{rid}', 'post', Response(200, json=None))
                 # Find the shape involved.
                 shape = self.resolve(rid).shape
                 # Move it.
+                self.move_shape(shape, cood)
+                check_expected_response()
+
+            def move_shape(self, shape, cood: Tuple[float, float] | Point):
+                if isinstance(cood, Point):
+                    cood = cood.astuple()
                 shape.dispatchEvent(events.MouseDown(offsetX=0, offsetY=0))
                 shape.dispatchEvent(events.MouseMove(offsetX=cood[0], offsetY=cood[1]))
                 shape.dispatchEvent(events.MouseUp(offsetX=cood[0], offsetY=cood[1]))
-                check_expected_response()
 
-            def drag_relation_handle(self, index: int, delta: Tuple[float, float]):
+            def drag_relation_handle(self, index: int, delta: Tuple[float, float] | Point):
                 diagram = self.current_diagram()
                 handle = diagram.canvas.select_one(f'.{handle_class}[data-index="{index}"]')
-                handle.dispatchEvent(events.MouseDown(offsetX=0, offsetY=0))
-                handle.dispatchEvent(events.MouseMove(offsetX=delta[0], offsetY=delta[1]))
-                handle.dispatchEvent(events.MouseUp(offsetX=delta[0], offsetY=delta[1]))
+                self.move_shape(handle, delta)
 
             def delete_block(self, rid: int):
                 """ Delete a block """

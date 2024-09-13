@@ -1473,6 +1473,7 @@ def integration_tests():
         add_expected_response('/data/_RelationshipRepresentation/2', 'post', Response(200, json=[]),
                               expect_values={'routing': '[[60.0, 60.0]]'})
         context.diagrams.click_relation(2)
+        check_expected_response()
         add_expected_response('/data/_RelationshipRepresentation/2', 'post', Response(200, json=[]),
                               expect_values={'routing': '[[100.0, 100.0]]'})
         context.diagrams.drag_relation_handle(0, (0, 40))
@@ -1529,10 +1530,38 @@ def integration_tests():
         assert c2.waypoints == [Point(90,90)]
         check_expected_response()
 
+    @test
+    def laned_diagram_with_msg_text():
+        json_data = """[{"Id": 37, "diagram": 45, "block": 55, "parent": null, "x": 161.0, "y": 96.0, "z": 0.0, "width": 42.0, "height": 64.0, "order": 2, "orientation": null, "styling": "", "category": 6, "lane_length": 1000.0, "_entity": {"order": 0, "Id": 55, "name": "", "description": "", "parent": 45, "__classname__": "Actor"}, "__classname__": "_BlockRepresentation"}, {"Id": 38, "diagram": 45, "block": 56, "parent": null, "x": 90.0, "y": 99.0, "z": 0.0, "width": 51.0, "height": 64.0, "order": 1, "orientation": null, "styling": "", "category": 6, "lane_length": 1000.0, "_entity": {"order": 0, "Id": 56, "name": "", "description": "", "parent": 45, "__classname__": "Actor"}, "__classname__": "_BlockRepresentation"}, {"Id": 34, "diagram": 45, "relationship": 34, "source_repr_id": 37, "target_repr_id": 38, "routing": "[[50.0, 50.0]]", "z": 0.0, "styling": {}, "category": 7, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 34, "source": 55, "target": 56, "name": "answer", "kind": 1, "parent": 45, "__classname__": "SequencedMessage"}}, {"Id": 35, "diagram": 45, "relationship": 35, "source_repr_id": 37, "target_repr_id": 38, "routing": "[[13.0, 13.0]]", "z": 0.0, "styling": {}, "category": 7, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 35, "source": 55, "target": 56, "name": "Request", "kind": 1, "parent": 45, "__classname__": "SequencedMessage"}}, {"Id": 36, "diagram": 45, "relationship": 36, "source_repr_id": 37, "target_repr_id": 37, "routing": "[[80.0, 80.0]]", "z": 0.0, "styling": {}, "category": 7, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 36, "source": 55, "target": 55, "name": "Dit is een TEST", "kind": 1, "parent": 45, "__classname__": "SequencedMessage"}}]"""
+        data = json.loads(json_data)
+        context = intergration_context(hierarchy=[
+            client.FunctionalModel(Id=1).asdict(),
+            client.StructuralModel(Id=2).asdict(),
+            client.SequenceDiagram(Id=45, parent=1).asdict()
+        ])
+        # Open the sequence diagram
+        add_expected_response('/data/diagram_contents/45', 'get', Response(200, json=data))
+        context.explorer.dblclick_element(mid=45)
+
+        # Check the message names are rendered
+        tag = [t for t in context.diagrams.parent.select('text') if t.text == 'Dit is een'][0]
+        assert len(tag.parent.children) == 2
+        assert tag.parent.children[1].text == 'TEST'
+
+        # Try to drag a TextBox
+        tb = context.diagrams.current_diagram().connections[2].text_widgets['C']
+        p1 = tb.getPos()
+        context.diagrams.move_shape(tb.shape.children[0], Point(20, 20))
+        p2 = tb.getPos()
+        assert p2 - p1 == Point(20,20)
+
+        # Check the new position is stored in the data
+        data = context.diagrams.current_diagram().connections[2].asdict()
+        assert data
 
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.laned_diagram')
+    run_tests('*.laned_diagram_with_msg_text')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')

@@ -27,7 +27,7 @@ from browser.widgets.dialog import InfoDialog
 from diagrams import Diagram, getMousePos, DiagramConfiguration
 import shapes
 from data_store import UndoableDataStore, ReprCategory, StorableElement, Collection, ReprCategory
-from modeled_shape import ModeledRelationship, ModelEntity, ModeledShape, Port
+from modeled_shape import ModeledRelationship, ModelEntity, ModeledShape, Port, ModelRepresentation
 
 
 class ModeledDiagram(Diagram):
@@ -238,6 +238,12 @@ class ModeledDiagram(Diagram):
             self.connect_specific(a, b, clss[0])
 
     def mouseDownChild(self, widget: ModeledShape, ev, update_func=None):
+        super().mouseDownChild(widget, ev)
+
+        if not isinstance(widget, ModelRepresentation):
+            return
+
+        # Also notify any listeners that an object was selected
         def uf(new_data: str):
             # Store the existing values to see if anything actually changed.
             new_values = json.loads(new_data)
@@ -251,7 +257,14 @@ class ModeledDiagram(Diagram):
             if 'styling' in new_values:
                 self.datastore.update(widget)
 
-        super().mouseDownChild(widget, ev, uf)
+        details = json.dumps(widget, cls=data_store.ExtendibleJsonEncoder)
+        event_detail = {
+            "values": details,
+            "update": update_func or uf,
+            "object": widget
+        }
+        self.trigger_event(widget, 'shape_selected', event_detail)
+
 
     def mouseDownConnection(self, connection: ModeledRelationship, ev, update_function=None) -> None:
         def uf(new_data):
@@ -283,3 +296,7 @@ class ModeledDiagram(Diagram):
                 self.datastore.undo_one_action()
         else:
             super().onKeyDown(ev)
+
+    def updateElement(self, element) -> None:
+        if isinstance(element, ModelRepresentation):
+            self.datastore and self.datastore.update(element)

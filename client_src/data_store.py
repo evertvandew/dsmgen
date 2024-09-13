@@ -631,7 +631,6 @@ class UndoableDataStore(DataStore):
         return result
 
     def undo_one_action(self):
-        console.log(f"UNDOING -- queue: {self.undo_queue}")
         self.record_level = 1       # Capture actions, do NOT create a new undo action.
         if not self.undo_queue:
             return
@@ -644,7 +643,6 @@ class UndoableDataStore(DataStore):
 
 
     def redo_one_action(self):
-        console.log(f"REDOING -- queue: {self.undo_queue}")
         self.record_level = 1       # Capture actions, do NOT create a new undo action.
         if not self.redo_queue:
             return
