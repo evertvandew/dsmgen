@@ -1532,7 +1532,7 @@ def integration_tests():
 
     @test
     def laned_diagram_with_msg_text():
-        json_data = """[{"Id": 37, "diagram": 45, "block": 55, "parent": null, "x": 161.0, "y": 96.0, "z": 0.0, "width": 42.0, "height": 64.0, "order": 2, "orientation": null, "styling": "", "category": 6, "lane_length": 1000.0, "_entity": {"order": 0, "Id": 55, "name": "", "description": "", "parent": 45, "__classname__": "Actor"}, "__classname__": "_BlockRepresentation"}, {"Id": 38, "diagram": 45, "block": 56, "parent": null, "x": 90.0, "y": 99.0, "z": 0.0, "width": 51.0, "height": 64.0, "order": 1, "orientation": null, "styling": "", "category": 6, "lane_length": 1000.0, "_entity": {"order": 0, "Id": 56, "name": "", "description": "", "parent": 45, "__classname__": "Actor"}, "__classname__": "_BlockRepresentation"}, {"Id": 34, "diagram": 45, "relationship": 34, "source_repr_id": 37, "target_repr_id": 38, "routing": "[[50.0, 50.0]]", "z": 0.0, "styling": {}, "category": 7, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 34, "source": 55, "target": 56, "name": "answer", "kind": 1, "parent": 45, "__classname__": "SequencedMessage"}}, {"Id": 35, "diagram": 45, "relationship": 35, "source_repr_id": 37, "target_repr_id": 38, "routing": "[[13.0, 13.0]]", "z": 0.0, "styling": {}, "category": 7, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 35, "source": 55, "target": 56, "name": "Request", "kind": 1, "parent": 45, "__classname__": "SequencedMessage"}}, {"Id": 36, "diagram": 45, "relationship": 36, "source_repr_id": 37, "target_repr_id": 37, "routing": "[[80.0, 80.0]]", "z": 0.0, "styling": {}, "category": 7, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 36, "source": 55, "target": 55, "name": "Dit is een TEST", "kind": 1, "parent": 45, "__classname__": "SequencedMessage"}}]"""
+        json_data = """[{"Id": 37, "diagram": 45, "block": 55, "parent": null, "x": 161.0, "y": 96.0, "z": 0.0, "width": 42.0, "height": 64.0, "order": 2, "orientation": null, "styling": "", "category": 6, "lane_length": 1000.0, "_entity": {"order": 0, "Id": 55, "name": "", "description": "", "parent": 45, "__classname__": "Actor"}, "__classname__": "_BlockRepresentation"}, {"Id": 38, "diagram": 45, "block": 56, "parent": null, "x": 90.0, "y": 99.0, "z": 0.0, "width": 51.0, "height": 64.0, "order": 1, "orientation": null, "styling": "", "category": 6, "lane_length": 1000.0, "_entity": {"order": 0, "Id": 56, "name": "", "description": "", "parent": 45, "__classname__": "Actor"}, "__classname__": "_BlockRepresentation"}, {"Id": 34, "diagram": 45, "relationship": 34, "source_repr_id": 37, "target_repr_id": 38, "routing": "[[50.0, 50.0]]", "z": 0.0, "styling": {}, "category": 7, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 34, "source": 55, "target": 56, "name": "answer", "kind": 1, "parent": 45, "__classname__": "SequencedMessage"}}, {"Id": 35, "diagram": 45, "relationship": 35, "source_repr_id": 37, "target_repr_id": 38, "routing": "[[13.0, 13.0]]", "z": 0.0, "styling": {}, "category": 7, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 35, "source": 55, "target": 56, "name": "Request", "kind": 1, "parent": 45, "__classname__": "SequencedMessage"}}, {"Id": 36, "diagram": 45, "relationship": 36, "source_repr_id": 37, "target_repr_id": 37, "routing": "[[80.0, 80.0]]", "z": 0.0, "styling": {}, "anchor_offsets": {"C": [20.0, 30.0]}, "anchor_sizes": {"C": [80.0,20.0]}, "category": 7, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 36, "source": 55, "target": 55, "name": "Dit is een TEST", "kind": 1, "parent": 45, "__classname__": "SequencedMessage"}}]"""
         data = json.loads(json_data)
         context = intergration_context(hierarchy=[
             client.FunctionalModel(Id=1).asdict(),
@@ -1549,15 +1549,20 @@ def integration_tests():
         assert tag.parent.children[1].text == 'TEST'
 
         # Try to drag a TextBox
-        tb = context.diagrams.current_diagram().connections[2].text_widgets['C']
+        connection = context.diagrams.current_diagram().connections[2]
+        tb = connection.text_widgets['C']
         p1 = tb.getPos()
+        assert p1 == Point(20.0, 30.0) + context.diagrams.current_diagram().connections[2].previous_anchor_positions['C']
+        add_expected_response('/data/_RelationshipRepresentation/36', 'post', Response(200, json={}))
         context.diagrams.move_shape(tb.shape.children[0], Point(20, 20))
+        check_expected_response()
         p2 = tb.getPos()
         assert p2 - p1 == Point(20,20)
 
         # Check the new position is stored in the data
         data = context.diagrams.current_diagram().connections[2].asdict()
-        assert data
+        assert data['anchor_offsets'] == {'C': (40.0, 50.0)}
+        assert data['anchor_sizes'] == {'C': (80.0, 20.0)}
 
 
 if __name__ == '__main__':

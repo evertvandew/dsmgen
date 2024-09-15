@@ -125,6 +125,7 @@ class OwnerInterface:
     def __le__(self, svg_widget):
         raise NotImplementedError()
     def evaluateOwnership(self, widget: Type[Self], pos: Point, ex_owner: Type[Self]):
+        """ Check if a widget's owner has changed, i.e. moved in or out of a group. """
         # Check this widget is dropped on me
         if hasattr(self, 'owner'):
             my_pos = self.getPos()

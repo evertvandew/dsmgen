@@ -64,7 +64,7 @@ from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.sql import text
 
 
-GEN_VERSION = "0.3"
+GEN_VERSION = "0.5"
 
 parts = urlparse("${config.dbase_url}")
 if parts.scheme == 'sqlite':
@@ -201,6 +201,16 @@ def update_db_v0_2(session):
     session.execute(text(f'ALTER TABLE _blockrepresentation ADD COLUMN "lane_length" FLOAT DEFAULT 0.0;'))
     return "0.3"
 
+def update_db_v0_3(session):
+    """ Update from v0.3 (to 0.4.) """
+    # Add the anchor_positions and anchor_sizes field to the BlockRepresentation.
+    session.execute(text(f'ALTER TABLE _relationshiprepresentation ADD COLUMN "anchor_positions" STRING DEFAULT "";'))
+    session.execute(text(f'ALTER TABLE _relationshiprepresentation ADD COLUMN "anchor_sizes" STRING DEFAULT "";'))
+    return "0.4"
+def update_db_v0_4(session):
+    session.execute(text(f'ALTER TABLE _relationshiprepresentation RENAME COLUMN "anchor_positions" TO "anchor_offsets";'))
+    return "0.5"
+
 def init_db(e=None):
     global engine
     e = e or engine
@@ -334,16 +344,23 @@ class _RelationshipRepresentation(Base):
     z: float = Column(Float)                   # For ensuring the line goes over the right blocks.
     styling: str = Column(String)
     category: int = Column(Integer)
+    anchor_offsets: str = Column(String)
+    anchor_sizes: str = Column(String)
 
     def post_init(self):
         """ In the database, styling is stored as a string. """
         if isinstance(self.styling, dict):
             self.styling = json.dumps(self.styling) if self.styling else ''
+        if isinstance(self.anchor_offsets, dict):
+            self.anchor_offsets = json.dumps(self.anchor_offsets) if self.anchor_offsets else ''
+            self.anchor_sizes = json.dumps(self.anchor_sizes) if self.anchor_sizes else ''
 
     def asdict(self):
         """ When converting to json, format the styling as a string """
         result = super().asdict()
         result['styling'] = json.loads(self.styling) if result['styling'] else {}
+        result['anchor_offsets'] = json.loads(self.anchor_offsets) if result['anchor_offsets'] else {}
+        result['anchor_sizes'] = json.loads(self.anchor_sizes) if result['anchor_sizes'] else {}
         result['__classname__'] = type(self).__name__
         return result
 

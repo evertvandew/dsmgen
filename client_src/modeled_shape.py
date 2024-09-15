@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
-from typing import Any, Self, List, Dict, Optional, cast, override, Callable
+from typing import Any, Self, List, Dict, Optional, cast, override, Callable, Tuple
 from dataclasses import dataclass, field
 from enum import StrEnum
 import json
@@ -333,10 +333,13 @@ class ModeledRelationship(Relationship, ModelRepresentation):
     start: ModeledShape = None
     finish: ModeledShape = None
     category: ReprCategory = ReprCategory.relationship
+    anchor_offsets: Dict[RelationAnchor, Tuple[float, float]] = field(default_factory=dict)
+    anchor_sizes: Dict[RelationAnchor, Tuple[float, float]] = field(default_factory=dict)
 
     def __post_init__(self):
         super().__post_init__()
         self.text_widgets = None
+        self.previous_anchor_positions = {}
 
     @property
     def relationship(self):
@@ -345,21 +348,30 @@ class ModeledRelationship(Relationship, ModelRepresentation):
 
     def create(self, owner, all_blocks):
         # Add the text boxes to the diagram
-        # The text shape objects are cached, check if they need to be created.
         def mk_getter(index: int) -> Callable[[], str]:
             return lambda: self.model_entity.get_text(index)
         if self.model_entity:
             self.text_widgets = {}
             for anchor, text_nr in self.model_entity.get_anchor_descriptor().items():
-                tw = shapes.TextBox(text_getter = mk_getter(text_nr))
+                tw = shapes.TextBox(text_getter = mk_getter(text_nr), parent=self)
                 tw.default_style['halign'] = {
                     RelationAnchor.Center: HAlign.CENTER,
                     RelationAnchor.Start: HAlign.LEFT,
                     RelationAnchor.End: HAlign.RIGHT
                 }[anchor]
                 self.text_widgets[anchor] = tw
-                tw.width = 64
-                tw.height = 24
+
+                if p := self.anchor_offsets.get(anchor, None):
+                    # For now, only set the anchor offset to the text box position.
+                    # The anchor position will be added during routing.
+                    tw.x = p[0]
+                    tw.y = p[1]
+                if s := self.anchor_sizes.get(anchor, None):
+                    tw.width = s[0]
+                    tw.height = s[1]
+                else:
+                    tw.width = 64
+                    tw.height = 24
                 tw.create(owner)
 
         super().create(owner, all_blocks)
@@ -417,6 +429,9 @@ class ModeledRelationship(Relationship, ModelRepresentation):
 
     def asdict(self, ignore:Optional[List[str]]=None) -> Dict[str, Any]:
         ignore = (ignore or []) + ['model_entity', 'start', 'finish', 'waypoints', 'id']
+        if self.text_widgets:
+            self.anchor_offsets = {anchor:(tw.getPos() - self.previous_anchor_positions[anchor]).astuple() for anchor, tw in self.text_widgets.items()}
+            self.anchor_sizes = {anchor:tw.getSize().astuple() for anchor, tw in self.text_widgets.items()}
         storable_entity = cast(StorableElement, self.model_entity)
         details = StorableElement.asdict(self, ignore=ignore)
         details['relationship'] = storable_entity.Id
@@ -449,8 +464,9 @@ class ModeledRelationship(Relationship, ModelRepresentation):
             RelationAnchor.End: self.terminations[1]
         }
         for anchor, widget in self.text_widgets.items():
-            widget.setPos(anchor_positions[anchor])
+            widget.setPos(widget.getPos() - self.previous_anchor_positions.get(anchor, Point(0,0)) + anchor_positions[anchor])
             widget.updateShape()
+        self.previous_anchor_positions = anchor_positions
 
     def get_db_table(cls):
         return '_RelationshipRepresentation'

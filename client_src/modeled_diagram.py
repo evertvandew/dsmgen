@@ -300,3 +300,6 @@ class ModeledDiagram(Diagram):
     def updateElement(self, element) -> None:
         if isinstance(element, ModelRepresentation):
             self.datastore and self.datastore.update(element)
+        else:
+            if parent := element.parent:
+                self.updateElement(parent)
