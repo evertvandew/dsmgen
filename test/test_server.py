@@ -5,33 +5,48 @@ import json
 import requests
 import time
 from dataclasses import is_dataclass
+import threading
+import sys
 
 import data_store
 from test_frame import prepare, test, run_tests, cleanup
 import generate_project     # Ensures the client is built up to date
 
-
+from build.sysml_data import GEN_VERSION
 START_SERVER = True
+START_THREADED_SERVER = False
 
 def run_server():
-    """ Start the server in a seperate process. Return the URL to access it.
+    """ Start the server in a separate process. Return the URL to access it.
         The framework will automatically stop the server when the test is finished.
     """
-    local_url = 'http://localhost:5200'
+    port = '5200'
+    local_url = f'http://localhost:{port}'
     if START_SERVER:
-        server = subprocess.Popen(['/usr/local/bin/python3.11', 'sysml_run.py', '5200'], cwd=os.getcwd()+'/build')
-        # Wait until the server is up
-        while True:
-            try:
-                r = requests.get(local_url+'/current_database')
-                if r.status_code == 200:
-                    break
-            except:
-                time.sleep(0.1)
+        server = subprocess.Popen(['/usr/local/bin/python3.12', 'sysml_run.py', port], cwd=os.getcwd()+'/build')
         @cleanup
         def stop_server():
             server.terminate()
             server.wait()
+    elif START_THREADED_SERVER:
+        sys.path.append(os.getcwd()+'/build')
+        from build import sysml_run
+        sysml_run.dm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
+
+        def run_threaded():
+            sysml_run.run(port, 'client_src')
+        th = threading.Thread(target = run_threaded)
+        th.setDaemon(True)
+        th.start()
+
+    # Wait until the server is up
+    while True:
+        try:
+            r = requests.get(local_url + '/current_database')
+            if r.status_code == 200:
+                break
+        except:
+            time.sleep(0.1)
     return local_url
 
 
@@ -69,7 +84,7 @@ def test_server():
         assert r.status_code == 200
         records = json.loads(r.content)
         assert len(records) >= 2
-        assert records[0]['versionnr'] == '0.3'
+        assert records[0]['versionnr'] == GEN_VERSION
         assert records[0]['category'] == 'generator'
         assert records[1]['versionnr'] == '0.1'
         assert records[1]['category'] == 'model'
@@ -420,7 +435,29 @@ def test_server():
         )
         assert r.status_code == 201
 
+    @test
+    def store_parameter_specification():
+        sm.changeDbase("sqlite:///build/data/diagrams.sqlite3")
+        clear_db()
+        load_db([
+            sm.Block(Id=1, description="Don't mind me", parameters="type:PinType"),
+            sm.BlockDefinitionDiagram(Id=2, name="Test diagram"),
+        ])
+
+        # Create an instance
+        r = requests.post(
+            base_url+'/data/BlockInstance/1/create_representation',
+            data=json.dumps({'diagram': 2, 'x': 400, 'y': 500, 'z': 0, 'width': 64, 'height': 40,
+                             'category': int(data_store.ReprCategory.block)}),
+            headers={'Content-Type': 'application/json'}
+        )
+        assert r.status_code == 201
+        results = json.loads(r.content)
+        assert results['diagram'] == 2
+        assert results['block'] == 3
+        assert results['_entity']['parameters']['parameters']['type'] == 1
+
 
 if __name__ == '__main__':
-    run_tests('*.test_version')
+    run_tests('*.store_parameter_specification')
     run_tests()

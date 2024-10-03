@@ -178,6 +178,7 @@ class ModeledDiagram(Diagram):
             This function does some checks the block is valid and allowed to be dropped, then lets the
             `addBlock` function do the rest of the work.
         """
+        print("DROPPED!")
         assert ev.dataTransfer
         json_string = ev.dataTransfer.getData('entity')
         if not json_string:
@@ -192,6 +193,7 @@ class ModeledDiagram(Diagram):
         if cls_name not in allowed_blocks:
             InfoDialog("Not allowed", f"A {cls_name} can not be used in this diagram.", ok="Got it")
             return
+        print("ALLOWED")
 
         block_cls = allowed_blocks[data['__classname__']]
         default_style = block_cls.getDefaultStyle()
@@ -204,13 +206,18 @@ class ModeledDiagram(Diagram):
         # Determine the initial order
         order = len(self.children) + 1
         drop_details.update(category=category, order=order)
+        print("ABOUT TO PLACE")
         self.place_block(block_cls, drop_details)
+        print("ABOUT TO STORE")
         block = self.datastore.create_representation(block_cls.__name__, data['Id'], drop_details)
         if not block:
+            print("NO BLOCK RETURNED")
             return
+        print("PREPARED")
 
         # Add the block to the diagram
         self.addBlock(block)
+        print("ADDED")
 
     def createNewBlock(self, template) -> ModeledShape:
         instance = super().createNewBlock(template)

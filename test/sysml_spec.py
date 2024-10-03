@@ -1,4 +1,4 @@
-
+from enum import IntEnum, auto
 from typing import Self, Any
 from model_definition import (ModelDefinition, required,
                               optional, selection, detail, longstr, XRef,
@@ -7,6 +7,14 @@ from model_definition import (ModelDefinition, required,
 # The tooling expects an ModelDifinition object named `md`
 md = ModelDefinition()
 md.ModelVersion('0.1')
+
+
+@md.register_enum
+class PinType(IntEnum):
+    two_state = auto()
+    pull_up = auto()
+    pull_down = auto()
+    tri_state = auto()
 
 
 ###############################################################################
@@ -57,6 +65,7 @@ class Block:
     parent: XRef('children', Self, StructuralModel, hidden)
     name: str
     description: (longstr, detail)
+    parameters: (parameter_spec, detail)
 
 @md.Entity(styling="shape:stickman")
 class Actor:

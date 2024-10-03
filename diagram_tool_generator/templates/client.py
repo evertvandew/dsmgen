@@ -85,6 +85,12 @@ class ${cls.__name__}(IntEnum):
 %endfor
 %endfor
 
+
+# Extend the known parameter types with the definitions from the model.
+%for cls in [c for c in generator.md.custom_types if isinstance(c, EnumType)]:
+parameter_types["${cls.__name__}"] = ${cls.__name__}
+%endfor
+
 # Modelling 'Entities:'
 % for entity in generator.ordered_items:
 @dataclass

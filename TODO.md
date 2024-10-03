@@ -26,7 +26,6 @@
 # Future enhancements
 * When dropping a block into a diagram, use the location it was dropped as initial X and Y.
 * Add a list of port shapes
-* Place texts with an offset, and allow that offset to be edited. Perhaps also the bounding box of the text.
 * When opening a diagram for the second time, open the existing diagram instead.
 * Highlight the currently active editing mode (block mode or connection mode).
 * Honour the `pattern` style for blocks and relationships. Perhaps rename to `linepattern`.
@@ -35,8 +34,6 @@
   Probably in the function `addAction` in `modeled_diagram.py`.
 * Make transactions of what happens in an event handler, so that if an exception occurs, the system stays in a known 
   state.
-* Allow extra details (texts) to be shown around a relationship.
-  A mechanism already exists to obtain several texts from a block.
 * When a user adds a connection that already exists, that should be reused.
 * Allow conversion of one type element to another
 * Allow conversion of one relationship to another
@@ -69,6 +66,9 @@
 
 
 # Done:
+* Allow extra details (texts) to be shown around a relationship.
+  A mechanism already exists to obtain several texts from a block.
+* Place texts with an offset, and allow that offset to be edited. Perhaps also the bounding box of the text.
 * Support for "laned" diagrams (sequence diagrams, gantt charts)
 * Allow the server to switch databases, as directed by the client.
 * Support selecting multiple elements and moving them.

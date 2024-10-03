@@ -56,17 +56,6 @@ class Port:
     order: int = 0
     parameters: Dict[str, Parameter] = field(default_factory=dict)
 
-class PinType(IntEnum):
-    two_state = auto()
-    pull_up = auto()
-    pull_down = auto()
-    tri_state = auto()
-
-class PinInterrupt(IntEnum):
-    rising_edge = auto()
-    falling_edge = auto()
-    either_edge = auto()
-
 @dataclass
 class BlockDefinition:
     description: str = ''
@@ -235,10 +224,10 @@ def read_pinconfigs(p: pathlib.Path, wanted_mcus: List[str]):
 
 
 mcus = read_pinconfigs(
-    '/opt/st/stm32cubeide_1.15.1/plugins/com.st.stm32cube.common.mx_6.11.1.202404110753/db/mcu',
+    '/opt/st/stm32cubeide_1.16.1/plugins/com.st.stm32cube.common.mx_6.12.1.202409122256/db/mcu',
     ['STM32F446R*', 'STM32H743ZIT*']
 )
-stdlib['Micro Controllers'] = mcus
+#stdlib['Micro Controllers'] = mcus
 
 
 def create_instances(lib: Dict, parent: dm.LibraryFolder) -> Generator[dm.LibraryFolder | dm.BlockDefinition, None, None]:

@@ -33,7 +33,7 @@ from typing import Any, Dict
 from dataclasses import is_dataclass
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql import text
-import ${generator.module_name}data as dm
+import ${generator.module_name}_data as dm
 
 
 
@@ -42,6 +42,7 @@ app = flask.Flask(__name__)
 # Instance representations are treated (slightly) different than other representations,
 # so we need to know which they are
 <%
+    from dataclasses import Field
     import model_definition as mdef
     from model_definition import fields, is_dataclass, parameter_spec
 
@@ -95,7 +96,12 @@ def my_get_mime(path):
 
 def get_parameters_defaults(spec: dm.parameter_spec):
     """ Parse a parameter specification string into default parameters values string. """
-    parameter_defaults = {'int': 0, 'float': 0.0, 'str': ''}
+    parameter_defaults = {
+        'int': 0,
+        'float': 0.0,
+        'str': '',
+        ${",\n        ".join([f"'{k}': {c.server.default}" for k, c in generator.md.type_conversions.items() if not (isinstance(c.server.default, str) and c.server.default.startswith('field('))])}
+    }
     print("Determining the defaults for parameters:", repr(spec))
     if not spec:
         return {}
@@ -347,6 +353,7 @@ def add_entity_data(path):
     if accept_id:
         data['Id'] = data_id
     elif data_id:
+        print("An ID was already set")
         return flask.make_response('Illegal request', 400)
     if issubclass(table, dm.Base):
         with dm.session_context() as session:
@@ -575,7 +582,7 @@ def send_static(path):
 
 @app.route('/')
 def send_index():
-    return flask.redirect("${generator.module_name}client.html", 302)
+    return flask.redirect("${generator.module_name}_client.html", 302)
     #return flask.send_from_directory("${config.client_dir}", 'index.html', mimetype='text/html')
 
 

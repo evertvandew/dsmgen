@@ -45,6 +45,17 @@ import model_definition as mdef
 from config import Configuration
 
 
+def load_specification(specification):
+    # Find and import the specified model
+    module_name = os.path.splitext(os.path.basename(specification))[0]
+    if module_name.endswith('spec'):
+        module_name = module_name[:-4].strip('_')
+    spec = importlib.util.spec_from_file_location(module_name, specification)
+    new_mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(new_mod)
+    return new_mod, module_name, spec
+
+
 class Generator:
     def __init__(self, config, module_name):
         self.config = config
@@ -329,13 +340,8 @@ class Generator:
     @staticmethod
     def load_from_config(config: Configuration):
         # Find and import the specified model
-        module_name = os.path.splitext(os.path.basename(config.model_def))[0]
-        if module_name.endswith('spec'):
-            module_name = module_name[:-4]
-        spec = importlib.util.spec_from_file_location(module_name, config.model_def)
-        new_mod = importlib.util.module_from_spec(spec)
+        new_mod, module_name, spec = load_specification(config.model_def)
         sys.modules[module_name] = new_mod
-        spec.loader.exec_module(new_mod)
         generator = Generator(config, module_name)
         return generator, module_name
 
@@ -374,10 +380,10 @@ def generate_tool(config: Configuration):
     #        print(f'{cls.__name__}.{f.name}: {get_type(f.type)} = {get_default(f.type)}')
 
     for tmpl, target in [
-        ('templates/client.html', f'{config.client_dir}/{module_name}client.html'),
-        ('templates/client.py', f'{config.client_dir}/{module_name}client.py'),
-        ('templates/data_model.py', f'{config.server_dir}/{module_name}data.py'),
-        ('templates/server.py', f'{config.server_dir}/{module_name}run.py'),
+        ('templates/client.html', f'{config.client_dir}/{module_name}_client.html'),
+        ('templates/client.py', f'{config.client_dir}/{module_name}_client.py'),
+        ('templates/data_model.py', f'{config.server_dir}/{module_name}_data.py'),
+        ('templates/server.py', f'{config.server_dir}/{module_name}_run.py'),
     ]:
         print(f'Rendering {tmpl} to {target}')
         template = Template(open(hdir(tooldir, tmpl)).read())

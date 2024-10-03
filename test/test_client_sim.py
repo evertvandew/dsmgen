@@ -696,7 +696,8 @@ def simulated_explorer_tests():
         ok_btn = [b for b in btns if b.text.lower() == 'ok'][0]
 
         def get_response(url, method, kwargs):
-            data = json.loads(kwargs['data'])
+            #data = json.loads(kwargs['data'])
+            data = kwargs
             assert data['parent'] == 1
             return Response(200, json=data)
 
@@ -1567,6 +1568,6 @@ def integration_tests():
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.laned_diagram_with_msg_text')
+    run_tests('*.edit_ports')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')

@@ -36,12 +36,21 @@ from contextlib import contextmanager
 from storable_element import StorableElement, Collection, ReprCategory
 from browser import ajax, alert
 
-class parameter_spec(str):
+class parameter_spec(dict):
     """ A parameter spec is represented in the REST api as a string with this structure:
         "key1: type1, key2: type2".
         When live in the application, the spec is represented as a dict of str:type pairs.
     """
-    pass
+    def __init__(self, values):
+        if isinstance(values, dict):
+            super().__init__(values)
+        elif isinstance(values, str):
+            if values.startswith('{'):
+                super().__init__(json.loads(values))
+            elif ':' in values:
+                super().__init__(part.split(':') for part in values.split(','))
+            else:
+                super().__init__()
 
 class parameter_values(str):
     """ A set of parameter values is represented in the REST api as a string with this structure:
@@ -393,7 +402,9 @@ class DataStore(EventDispatcher):
                 if hasattr(result, 'children'):
                     result.ports = [ch for ch in result.children if ch.repr_category() == ReprCategory.port]
 
-        data = json.dumps(drop_details)
+        print("Dumping to json", drop_details)
+        data = json.dumps(drop_details, cls=ExtendibleJsonEncoder)
+        print("POSTING")
         ajax.post(f'{self.configuration.base_url}/{block_cls}/{block_id}/create_representation', blocking=True,
                         data=data, oncomplete=on_complete, mode='json', headers={"Content-Type": "application/json"})
         return result

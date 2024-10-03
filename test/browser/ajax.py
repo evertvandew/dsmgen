@@ -55,7 +55,7 @@ def check_expected_response():
 def determine_response(url, method, kwargs):
     if DO_NOT_SIMULATE:
         func = {'get': requests.get, 'post': requests.post, 'delete': requests.delete, 'put': requests.put}[method.lower()]
-        r = func(server_base+url, data=kwargs)
+        r = func(server_base+url, json=kwargs)
         response = Response(r.status_code, r.text)
         if r.status_code < 300:
             response.json = r.json()
@@ -78,26 +78,38 @@ def determine_response(url, method, kwargs):
                 response = expected.get_response(url, method, kwargs)
             else:
                 response = expected.response
-    if cb := kwargs.get('oncomplete'):
-        cb(response)
+    return response
 
-def get(url, **kwargs):
-    return determine_response(url, 'get', kwargs)
-def post(url, **kwargs):
-    return determine_response(url, 'post', kwargs)
+def get(url, mode='text', oncomplete=None, blocking=False, **kwargs):
+    response = determine_response(url, 'get', kwargs)
+    if oncomplete:
+        oncomplete(response)
+    return response
 
-def put(url, **kwargs):
-    return determine_response(url, 'put', kwargs)
-
-def delete(url, **kwargs):
-    return determine_response(url, 'delete', kwargs)
-
+def post(url, mode='text', oncomplete=None, blocking=False, data=None, **kwargs):
+    if data and isinstance(data, str):
+        data = json.loads(data)
+    response = determine_response(url, 'post', data)
+    if oncomplete:
+        oncomplete(response)
+    return response
+def put(url, mode='text', oncomplete=None, blocking=False, data=None, **kwargs):
+    response = determine_response(url, 'put', **data)
+    if oncomplete:
+        oncomplete(response)
+    return response
+def delete(url, mode='text', oncomplete=None, blocking=False, **kwargs):
+    response = determine_response(url, 'delete', kwargs)
+    if oncomplete:
+        oncomplete(response)
+    return response
 
 def add_expected_response(url, method, response: Optional[Response]=None, get_response: Optional[Callable]=None,
                           reuse=False, check_request: Optional[Callable]=None, expect_values=None):
     if expect_values:
         def check_func(url, method, kwargs):
-            data = json.loads(kwargs['data'])
+            #data = json.loads(kwargs['data'])
+            data = kwargs
             for k, v in expect_values.items():
                 assert data.get(k, None) == v, f"Expected {v} for key {k}, got {kwargs.get(k, None)}"
         check_request = check_func

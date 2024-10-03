@@ -15,7 +15,23 @@ class PeripheralClass(IntEnum):
     Timer = auto()
     Uart = auto()
     Can = auto()
+    Adc = auto()
+    I2c = auto()
+    Spi = auto()
+    Watchdog = auto()
 
+@md.register_enum
+class PinType(IntEnum):
+    two_state = auto()
+    pull_up = auto()
+    pull_down = auto()
+    tri_state = auto()
+
+@md.register_enum
+class PinInterrupt(IntEnum):
+    rising_edge = auto()
+    falling_edge = auto()
+    either_edge = auto()
 
 
 @md.LogicalModel(styling='icon:folder')
@@ -48,7 +64,7 @@ class Anchor:
 ## Definition of blocks in the Library
 @md.Entity(styling = "shape:rect;structure:Block;icon:square-full")
 class BlockDefinition:
-    parent: XRef('children', Self, LibraryFolder, hidden)
+    parent: XRef('children', LibraryFolder, hidden)
     name: str
     implementation: (longstr, detail)
     parameters: (parameter_spec, detail)

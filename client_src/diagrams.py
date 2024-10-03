@@ -107,13 +107,6 @@ def mk_scrollable(canvas: DOMNode):
             values[1] += factor
         canvas.attrs['viewBox'] = ' '.join(str(v) for v in values)
 
-class FSMEnvironment:
-    """ The FSM needs to talk back to its "environment", the Diagram object. """
-    def updateElement(self, element) -> None:
-        """ Called whenever an element has been updated without informing the Environment
-            in another way.
-        """
-        pass
 
 class BehaviourFSM:
     # FIXME: Remove the diagrams from all these functions.
@@ -532,32 +525,47 @@ class DiagramConfiguration:
         return self.connections_from.get(blocka_cls, {}).get(blockb_cls, [])
 
 
+
 class Diagram(OwnerInterface):
+    """ Base Class that holds and manages the elements of a diagram. Child classes expose definitions for a
+        specific type of diagram, like the blocks allowed in it.
+        The class queries the classes of these elements to see how they should be treated.
+        The actual interactions with elements are controlled through state machines.
+
+    """
     ModifiedEvent = 'modified'
     ConnectionModeEvent = 'ConnectionMode'
     NormalModeEvent = 'NormalMode'
     default_block_details = dict(x=300, y=300, height=64, width=40)
 
-    def __init__(self, config: DiagramConfiguration, widgets):
-        self.selection = None
-        self.mouse_events_fsm = ResizeFSM(self)
+    class Widget:
+        """ Base class of "widgets", things that can be placed in a diagram to trigger various actions.
+            Like creating new blocks, or switch between different editing states.
+        """
+        def __init__(self, diagram: 'Diagram'):
+            pass
+
+    def __init__(self, config: DiagramConfiguration, widgets: List[Widget]):
+        self.mouse_events_fsm: Optional[BehaviourFSM] = ResizeFSM(self)
         self.children: List[Shape] = []
         self.connections: List[Relationship] = []
-        self.widgets = widgets
-        self.config = config
+        self.widgets: List[Diagram.Widget] = widgets
+        self.config: DiagramConfiguration = config
         self.diagram_id: int = 0
+        self.canvas: Optional[DOMNode] = None  # The SVG element in which the diagram is drawn.
 
     def get_representation_category(self, block_cls) -> ReprCategory:
         return ReprCategory.block
 
-    def close(self) -> None:
+    def close(self):
+        """ Close the diagram """
         # Release the resources of this diagram and delete references to it.
         self.children = []
         self.connections = []
         if self in diagrams:
             diagrams.remove(self)
 
-    def getCanvas(self):        # Sadly, Brython does not export their Tag type.
+    def getCanvas(self) -> DOMNode:
         return self.canvas
 
     def onChange(self) -> None:
@@ -565,12 +573,15 @@ class Diagram(OwnerInterface):
             "bubbles": True
         }))
 
+    @classmethod
     def get_allowed_blocks(cls, block_cls_name: str, for_drop=False) -> Dict[str, Type[Shape]]:
         raise NotImplementedError()
 
     def createNewBlock(self, template: Shape) -> Shape:
         """ Function to create a totally new block from a template.
             Called by e.g. the BlockCreateWidget.
+            The template is already a shape (the one in the create widget) that was clicked on.
+            Some of its elements need to be copied to the new shape.
         """
         # Simply create a new block at the default position.
         block_cls = template.logical_class
@@ -586,11 +597,11 @@ class Diagram(OwnerInterface):
         self.addBlock(instance)
         return instance
 
-    def place_block(self, block_cls, details):
+    def place_block(self, block_cls: Type[Shape], details):
         """ Called to allow a new block to be located by the diagram. For example snapping. """
         pass
 
-    def addBlock(self, block) -> None:
+    def addBlock(self, block: Shape) -> None:
         if self.mouse_events_fsm is not None:
             self.mouse_events_fsm.delete(self)
 
@@ -602,7 +613,7 @@ class Diagram(OwnerInterface):
         self.connections.append(connection)
         connection.create(self, self.children)
 
-    def deleteConnection(self, connection) -> None:
+    def deleteConnection(self, connection: Relationship) -> None:
         if connection in self.connections:
             connection.delete()
             self.connections.remove(connection)
@@ -797,10 +808,10 @@ def createSvgButtonBar(canvas, icons, callbacks, hover_texts=None, x=0, y=0):
         g.bind('click', cb)
 
 
-class EditingModeWidget:
+class EditingModeWidget(Diagram.Widget):
     btn_size = 20
 
-    def __init__(self, diagram):
+    def __init__(self, diagram: Diagram):
         self.diagram = ref(diagram)
         createSvgButtonBar(diagram.canvas, [svg_shapes.pointer_icon, svg_shapes.chain_icon],
                            [self.onBlockMode, self.onConnectMode], x=100, y=5)
@@ -811,10 +822,10 @@ class EditingModeWidget:
         self.diagram().changeFSM(ConnectionEditor())
 
 
-class BlockCreateWidget:
+class BlockCreateWidget(Diagram.Widget):
     height = 40
     margin = 10
-    def __init__(self, diagram):
+    def __init__(self, diagram: Diagram):
         def bindFunc(index, representation):
             """ Create a lambda function for creating a specific block type """
             return lambda ev: self.onMouseDown(ev, index, representation)
@@ -849,7 +860,7 @@ class BlockCreateWidget:
         diagram.createNewBlock(representation)
 
 
-def load_diagram(diagram_id, diagram_cls, config: DiagramConfiguration, datastore, canvas):
+def load_diagram(diagram_id: int, diagram_cls: Diagram, config: DiagramConfiguration, datastore, canvas):
     diagram: Diagram = diagram_cls(config, [BlockCreateWidget, EditingModeWidget], datastore, diagram_id)
     diagrams.append(diagram)
     diagram.bind(canvas)
