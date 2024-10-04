@@ -387,7 +387,8 @@ def test_server():
             sm.Note(Id=1, description="Don't mind me"),
             sm.BlockDefinitionDiagram(Id=2, name="Test diagram"),
             sm.SubProgramDefinition(Id=3, name="Block 1", description="Dit is een test", parent=2, order=1,
-                                    parameters='')
+                                    parameters=''),
+            sm.FlowPort(Id=4, name="Input", parent=3, order=1)
         ])
 
         # Create an instance
@@ -402,9 +403,14 @@ def test_server():
         assert results['Id'] == 1
         assert results['diagram'] == 2
         assert results['parent'] == None
-        assert len(results['children']) == 0
+        assert len(results['children']) == 1
+        p = results['children'][0]
+        assert p['Id'] == 2
+        assert p['__classname__'] == '_BlockRepresentation'
+        assert p['_entity']['Id'] == 4
+        assert p['_entity']['__classname__'] == 'FlowPort'
         assert results['_entity']['__classname__'] == 'BlockInstance'
-        assert results['_entity']['Id'] == 4
+        assert results['_entity']['Id'] == 5
         assert results['_entity']['parent'] == 2    # The Instance block is created under the diagram
         assert results['_entity']['definition'] == 3
         assert results['_entity']['parameters'] == {'parameters': {}}
@@ -459,5 +465,5 @@ def test_server():
 
 
 if __name__ == '__main__':
-    run_tests('*.store_parameter_specification')
+    run_tests('*.test_create_instance_no_parameters')
     run_tests()

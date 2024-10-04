@@ -141,6 +141,7 @@ def create_block_representation(index, table, data, session, dm):
         If necessary, this also creates representations of ports and other additional information
         useful for rendering the new element in a diagram.
     """
+    # Check if the direct representation of a block or a new instance of a block (i.e. with its own parameters)
     if issubclass(table, dm.AInstance):
         # ensure the index actually exists, for safety
         definition_records = session.query(dm._Entity).filter(dm._Entity.Id == index).all()
@@ -393,7 +394,7 @@ def create_representation(path, index):
         if not issubclass(diagram_cls, dm.ADiagram):
             return flask.make_response("Can not create a representation", 405)
 
-        # Create the Representation for representations
+        # Create the Representation for relationships
         if issubclass(table, dm.ARelationship):
             return create_relation_representation(index, table, data, session, dm)
 

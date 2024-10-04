@@ -9,7 +9,7 @@ from typing import List, Any, Tuple, Optional, Dict, Generator
 from xml.etree import ElementTree as ET
 
 from build import block_programming_data as dm
-
+from build.block_programming_data import PinType, PinInterrupt
 
 
 class byte:
@@ -247,13 +247,13 @@ def create_instances(lib: Dict, parent: dm.LibraryFolder) -> Generator[dm.Librar
             for n, i in value.inputs.items():
                 match i.port_type:
                     case PortType.IOConfig:
-                        yield dm.ConfigInput(name=n, peripheral_class=i.data_type, parent=new_block.Id)
+                        yield dm.ConfigInput(name=n, peripheral_class=i.data_type, parent=new_block.Id, orientation=Orientation.LEFT)
                     case PortType.Sync:
-                        yield dm.Input(name=n, parent=new_block.Id, data_type=i.data_type.__name__)
+                        yield dm.Input(name=n, parent=new_block.Id, data_type=i.data_type.__name__, orientation=Orientation.LEFT)
                     case PortType.Async:
-                        yield dm.AsyncInput(name=n, parent=new_block.Id, data_type=i.data_type.__name__)
+                        yield dm.AsyncInput(name=n, parent=new_block.Id, data_type=i.data_type.__name__, orientation=Orientation.LEFT)
                     case PortType.Buffered:
-                        yield dm.BufferedIn(name=n, parent=new_block.Id, data_type=i.data_type.__name__)
+                        yield dm.BufferedIn(name=n, parent=new_block.Id, data_type=i.data_type.__name__, orientation=Orientation.LEFT)
             for n, i in value.outputs.items():
                 match i.port_type:
                     case PortType.IOConfig:
@@ -262,11 +262,11 @@ def create_instances(lib: Dict, parent: dm.LibraryFolder) -> Generator[dm.Librar
                                               orientation=i.orientation, order=i.order,
                                               )
                     case PortType.Sync:
-                        yield dm.Output(name=n, parent=new_block.Id, data_type=i.data_type.__name__)
+                        yield dm.Output(name=n, parent=new_block.Id, data_type=i.data_type.__name__, orientation=Orientation.RIGHT)
                     case PortType.Async:
-                        yield dm.AsyncOutput(name=n, parent=new_block.Id, data_type=i.data_type.__name__)
+                        yield dm.AsyncOutput(name=n, parent=new_block.Id, data_type=i.data_type.__name__, orientation=Orientation.RIGHT)
                     case PortType.Buffered:
-                        yield dm.BufferedOut(name=n, parent=new_block.Id, data_type=i.data_type.__name__)
+                        yield dm.BufferedOut(name=n, parent=new_block.Id, data_type=i.data_type.__name__, orientation=Orientation.RIGHT)
 
 def store_library(name: str, library):
     dm.init_db()

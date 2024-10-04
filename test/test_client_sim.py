@@ -1565,9 +1565,29 @@ def integration_tests():
         assert data['anchor_offsets'] == {'C': (40.0, 50.0)}
         assert data['anchor_sizes'] == {'C': (80.0, 20.0)}
 
+    @test
+    def drag_and_drop_instance_with_ports():
+        context = intergration_context(hierarchy=[
+            o.asdict() for o in [
+                client.FunctionalModel(Id=1),
+                client.StructuralModel(Id=2),
+                client.SubProgramDefinition(Id=3, parent=2),
+                client.FlowPort(Id=4, parent=3),
+                client.FlowPort(Id=5, parent=3),
+                client.BlockDefinitionDiagram(Id=45, parent=2)
+            ]
+        ])
+        # Open the BlockDefinition diagram
+        add_expected_response('/data/diagram_contents/45', 'get', Response(200, json=[]))
+        context.explorer.dblclick_element(mid=45)
+        # Drag and drop the SubProgram into the diagram.
+        context.explorer.drag_to_diagram(3, client.BlockInstance)
+
+        # Check that the ports have been created as well.
+        assert len(context.diagrams.ports(1)) == 2
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.edit_ports')
+    run_tests('*.drag_and_drop_instance_with_ports')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')

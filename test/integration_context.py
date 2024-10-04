@@ -127,7 +127,7 @@ class ExplorerApi(HtmlApi):
                 parent=rid,
                 _entity=p.asdict(),
                 category=ReprCategory.port,
-                __classname__=p.get_representation_cls(modeled_shape.ReprCategory.port).__name__
+                __classname__='_BlockRepresentation'
             ) for i, p in enumerate(ports)]
             if request_cls.is_instance_of():
                 definition: StorableElement = self.context.data_store.get(Collection.block, mid)
