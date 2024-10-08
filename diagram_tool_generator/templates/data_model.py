@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Self, Optional, Dict, Any
 <%
 """
     Template for generating the data model for the visual modelling environment.
@@ -254,115 +254,205 @@ class ReprCategory(IntEnum):
 
 class EntityType(IntEnum):
     Block = auto()
+    Relationship = auto()
     Diagram = auto()
     LogicalElement = auto()
     Port = auto()
     Message = auto()
     Instance = auto()
 
+class SpecialRepresentation:
+    """ Add a function to a Data Class that extracts a dictionary from it from which the dataclass
+        can be reconstructed.
+    """
+    def asdict(self) -> Dict[str, Any]:
+        d = asdict(self)
+        d['__classname__'] = type(self).__name__
+        return d
+
 class _Entity(Base):
     Id: int = Column(Integer, primary_key=True)
     type: int = Column(Enum(EntityType))
     subtype: str = Column(String)
     parent: str = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'), nullable=True)  # For subblocks and ports
-    definition: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'), nullable=True)  # For instances
-    association: int = Column(Integer, ForeignKey("_relationship.Id", ondelete='CASCADE'), nullable=True)  # For messages & association class.
     order: str = Column(Integer)
     details: str = Column("details", LargeBinary)
 
-class _Relationship(Base):
+@dataclass
+class _Representation(Base):
     Id: int = Column(Integer, primary_key=True)
-    subtype: str = Column(String)
-    source_id: int  = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
-    target_id: int  = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
-    associate_id: int = Column(Integer, ForeignKey("_entity.Id"))
+    diagram: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
+    entity: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
+    parent: int = Column(Integer, ForeignKey("_representation.Id", ondelete='CASCADE'))
+    link1: int = Column(Integer, ForeignKey("_representation.Id", ondelete='SET NULL'))
+    link2: int = Column(Integer, ForeignKey("_representation.Id", ondelete='SET NULL'))
+    link3: int = Column(Integer, ForeignKey("_representation.Id", ondelete='SET NULL'))
+    order: int = Column(Integer)
+    category: int = Column(Enum(ReprCategory))
     details: bytes = Column("details", LargeBinary)
 
-class _BlockRepresentation(Base):
-    Id: int = Column(Integer, primary_key=True)
-    diagram: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
-    block: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
-    parent: int = Column(Integer, ForeignKey("_blockrepresentation.Id", ondelete='CASCADE'))
-    x: float = Column(Float)
-    y: float = Column(Float)
-    z: float = Column(Float)  # For placing blocks etc on top of each other
-    lane_length: float = Column(Float)
-    width: float = Column(Float)
-    height: float = Column(Float)
-    order: int = Column(Integer)
-    orientation: int = Column(Integer)
-    styling: str = Column(String)
-    category: int = Column(Integer)
-
-    def post_init(self):
-        """ In the database, styling is stored as a string. """
-        if isinstance(self.styling, dict):
-            # Using `eval` is insecure, parse the string directly.
-            self.styling = json.dumps(self.styling) if self.styling else ''
-
     def asdict(self):
-        """ When converting to json, format the styling as a string """
-        result = Base.asdict(self)
-        result['styling'] = json.loads(self.styling) if self.styling else {}
-        result['__classname__'] = type(self).__name__
-        return result
+        raise NotImplementedError()
 
-class _MessageRepresentation(Base):
-    Id: int = Column(Integer, primary_key=True)
-    diagram: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
-    message: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
-    parent: int = Column(Integer, ForeignKey("_relationshiprepresentation.Id", ondelete='CASCADE'))
-    x: float = Column(Float)
-    y: float = Column(Float)
-    z: float = Column(Float)  # For placing blocks etc on top of each other
-    order: int = Column(Integer)
-    orientation: float = Column(Float)
-    direction: int = Column(Integer)
-    styling: str = Column(String)
-    category: int = Column(Integer)
+@dataclass
+class _BlockRepresentation(SpecialRepresentation):
+    Id: Optional[int] = None
+    diagram: Optional[int] = None
+    block: Optional[int] = None
+    parent: Optional[int] = None
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+    lane_length: float = 0.0
+    width: float = 0.0
+    height: float = 0.0
+    order: int = 0
+    orientation: int = 0
+    styling: str = ""
+    category: ReprCategory = ReprCategory.block
 
-    def post_init(self):
-        """ In the database, styling is stored as a string. """
-        if isinstance(self.styling, dict):
-            # Using `eval` is insecure, parse the string directly.
-            self.styling = json.dumps(self.styling) if self.styling else ''
+    @classmethod
+    def db_to_dict(cls, repr: _Representation) -> Dict:
+        details = json.loads(repr.details)
+        return dict(
+            Id = repr.Id,
+            diagram = repr.diagram,
+            block = repr.entity,
+            parent = repr.parent,
+            x = details['x'],
+            y = details['y'],
+            z = details['z'],
+            lane_length = details['lane_length'],
+            width = details['width'],
+            height = details['height'],
+            order = repr.order,
+            styling = details['styling'],
+            category = repr.category,
+            __classname__ = cls.__name__
+        )
 
-    def asdict(self):
-        """ When converting to json, format the styling as a string """
-        result = Base.asdict(self)
-        result['styling'] = json.loads(self.styling) if self.styling else {}
-        result['__classname__'] = type(self).__name__
-        return result
+    def to_db(self) -> _Representation:
+        details = dict(
+            x = self.x,
+            y = self.y,
+            z = self.z,
+            lane_length = self.lane_length,
+            width = self.width,
+            height = self.height,
+            styling = self.styling
+        )
+        return _Representation(
+            Id = self.Id,
+            diagram = self.diagram,
+            entity = self.block,
+            parent = self.parent,
+            order = self.order,
+            category = self.category,
+            details = json.dumps(details).encode('utf8')
+        )
 
-class _RelationshipRepresentation(Base):
-    Id: int = Column(Integer, primary_key=True)
-    diagram: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
-    relationship: int = Column(Integer, ForeignKey("_relationship.Id", ondelete='CASCADE'))
-    source_repr_id: int = Column(Integer, ForeignKey("_blockrepresentation.Id", ondelete='CASCADE'))
-    target_repr_id: int = Column(Integer, ForeignKey("_blockrepresentation.Id", ondelete='CASCADE'))
-    routing: bytes = Column(String)       # JSON list of Co-ordinates of nodes
-    z: float = Column(Float)                   # For ensuring the line goes over the right blocks.
-    styling: str = Column(String)
-    category: int = Column(Integer)
-    anchor_offsets: str = Column(String)
-    anchor_sizes: str = Column(String)
+@dataclass
+class _MessageRepresentation(SpecialRepresentation):
+    Id: Optional[int] = None
+    diagram: Optional[int] = None
+    message: Optional[int] = None
+    parent: Optional[int] = None
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+    order: int = 0
+    orientation: float = 0.0
+    direction: int = 0
+    styling: str = ''
+    category: ReprCategory = ReprCategory.message
 
-    def post_init(self):
-        """ In the database, styling is stored as a string. """
-        if isinstance(self.styling, dict):
-            self.styling = json.dumps(self.styling) if self.styling else ''
-        if isinstance(self.anchor_offsets, dict):
-            self.anchor_offsets = json.dumps(self.anchor_offsets) if self.anchor_offsets else ''
-            self.anchor_sizes = json.dumps(self.anchor_sizes) if self.anchor_sizes else ''
+    @classmethod
+    def db_to_dict(cls, repr: _Representation) -> Dict:
+        details = json.loads(repr.details)
+        return dict(
+            Id = repr.Id,
+            diagram = repr.diagram,
+            message = repr.entity,
+            parent = repr.parent,
+            x = details['x'],
+            y = details['y'],
+            z = details['z'],
+            order = repr.order,
+            orientation = details['orientation'],
+            direction = details['direction'],
+            styling = details['styling'],
+            category = repr.category,
+            __classname__= cls.__name__
 
-    def asdict(self):
-        """ When converting to json, format the styling as a string """
-        result = super().asdict()
-        result['styling'] = json.loads(self.styling) if result['styling'] else {}
-        result['anchor_offsets'] = json.loads(self.anchor_offsets) if result['anchor_offsets'] else {}
-        result['anchor_sizes'] = json.loads(self.anchor_sizes) if result['anchor_sizes'] else {}
-        result['__classname__'] = type(self).__name__
-        return result
+        )
+
+    def to_db(self) -> _Representation:
+        details = dict(
+            x = self.x,
+            y = self.y,
+            z = self.z,
+            orientation = self.orientation,
+            direction = self.direction,
+            styling = self.styling
+        )
+        return _Representation(
+            Id = self.Id,
+            diagram = self.diagram,
+            entity = self.message,
+            parent = self.parent,
+            order = self.order,
+            category = self.category,
+            details = json.dumps(details).encode('utf8')
+        )
+
+
+@dataclass
+class _RelationshipRepresentation(SpecialRepresentation):
+    Id: Optional[int] = None
+    diagram: Optional[int] = None
+    relationship: Optional[int] = None
+    source_repr_id: Optional[int] = None
+    target_repr_id: Optional[int] = None
+    routing: str = ''    # JSON list of Co-ordinates of nodes
+    z: float = 0.0       # For ensuring the line goes over the right blocks.
+    styling: str = ""
+    category: ReprCategory = ReprCategory.relationship
+    anchor_offsets: str = ""
+    anchor_sizes: str = ""
+
+    @classmethod
+    def db_to_dict(cls, repr: _Representation) -> Dict:
+        details = json.loads(repr.details)
+        return dict(
+            Id = repr.Id,
+            diagram = repr.diagram,
+            relationship=repr.entity,
+            source_repr_id=details['source_repr_id'],
+            target_repr_id=details['target_repr_id'],
+            routing=details['routing'],
+            styling = details['styling'],
+            category = repr.category,
+            anchor_offsets=details['anchor_offsets'],
+            anchor_sizes=details['anchor_sizes'],
+            __classname__= cls.__name__
+        )
+
+    def to_db(self) -> _Representation:
+        details = dict(
+            source_repr_id = self.source_repr_id,
+            target_repr_id = self.target_repr_id,
+            routing = self.routing,
+            styling = self.styling,
+            anchor_offsets = self.anchor_offsets,
+            anchor_sizes = self.anchor_sizes
+        )
+        return _Representation(
+            Id = self.Id,
+            diagram = self.diagram,
+            entity = self.relationship,
+            category = self.category,
+            details = json.dumps(details).encode('utf8')
+        )
 
 
 # ##############################################################################
@@ -405,6 +495,9 @@ class parameter_spec(str): pass
 class parameter_values(str): pass
 
 class AWrapper:
+    @staticmethod
+    def get_db_table():
+        return _Entity
     def store(self, session=None, accept_id=False):
         """
 
@@ -500,9 +593,6 @@ class AWrapper:
 @dataclass
 class ABlock(AWrapper):
     order: int = 0
-    @staticmethod
-    def get_db_table():
-        return _Entity
     @classmethod
     def get_entity_type(cls):
         return EntityType.Block
@@ -511,8 +601,6 @@ class ABlock(AWrapper):
             'type': self.get_entity_type(),
             'subtype': self.__class__.__name__,
             'parent': getattr(self, 'parent', None),
-            'association': getattr(self, 'association', None),
-            'definition': None,
             'order': self.order
         }
 
@@ -527,20 +615,16 @@ class AInstance(ABlock):
             'type': self.get_entity_type(),
             'subtype': self.__class__.__name__,
             'parent': getattr(self, 'parent', None),
-            'definition': self.definition,
             'order': self.order
         }
 
-class ARelationship(AWrapper):
-    @staticmethod
-    def get_db_table():
-        return _Relationship
+class ARelationship(ABlock):
     def extract_record_values(self):
         return {
+            'type': EntityType.Relationship,
             'subtype':       self.__class__.__name__,
-            'source_id':     self.source,
-            'target_id':     self.target,
-            'associate_id':  getattr(self, 'association', None)
+            'parent': None,
+            'order': self.order
         }
 
 @dataclass

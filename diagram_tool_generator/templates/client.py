@@ -334,8 +334,6 @@ ${inspect.getsource(entity.getStyle)}
     @classmethod
     def from_dict(cls, data_store: UndoableDataStore, **details) -> Self:
         self = from_dict(cls, **details)
-        if self.definition:
-            self.definition = data_store.get(Collection.block, self.definition)
         if self.parameters:
             if isinstance(self.parameters, str):
                 self.parameters = json.loads(self.parameters)

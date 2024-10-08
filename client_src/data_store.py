@@ -320,12 +320,6 @@ class DataStore(EventDispatcher):
                     model_cls = self.all_classes[model_details['__classname__']]
                     model_item = dc_from_dict(model_cls, model_details)
                     self.update_cache(model_item)
-                    if model_cls.is_instance_of():
-                        # For Instance representations, handle the definition.
-                        definition_details = e['_definition']
-                        definition_cls = self.all_classes[definition_details['__classname__']]
-                        definition_item = dc_from_dict(definition_cls, definition_details)
-                        self.update_cache(definition_item)
 
                 representations = []
                 # Reconstruct all representations and cache them.

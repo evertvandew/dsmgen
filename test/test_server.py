@@ -61,14 +61,14 @@ def test_server():
     def clear_db():
         with sm.session_context() as session:
             session.query(sm._Entity).delete()
-            session.query(sm._Relationship).delete()
-            session.query(sm._BlockRepresentation).delete()
-            session.query(sm._RelationshipRepresentation).delete()
+            session.query(sm._Representation).delete()
 
     def load_db(records):
         with sm.session_context() as session:
             for r in records:
-                if is_dataclass(r):
+                if isinstance(r, sm.SpecialRepresentation):
+                    session.add(r.to_db())
+                elif is_dataclass(r):
                     r.store(session, accept_id=True)
                 else:
                     session.add(r)
@@ -218,19 +218,19 @@ def test_server():
         load_db([
             # Create a model, with one recursive block with a port,
             # and three connected blocks inside. Including the instance of another block
-            sm.SubProgramDefinition(Id=2, name="Test diagram"),
-            sm.FlowPort(Id=1, name='in', parent=2),
+            sm.SubProgramDefinition(Id=1, name="Test diagram"),
+            sm.FlowPort(Id=2, name='in', parent=2),
             sm.SubProgramDefinition(Id=3),
             sm.FlowPort(Id=4, parent=3),
             sm.BlockInstance(Id=5, definition=3),
             sm.Block(Id=6, name="Block 1", description="Dit is een test"),
             sm.Note(Id=7, description="Don't mind me"),
-            sm.FlowPortConnection(Id=1, source=1, target=4),
-            sm.Anchor(Id=2, source=7, target=6),
+            sm.FlowPortConnection(Id=8, source=2, target=4),
+            sm.Anchor(Id=9, source=7, target=6),
 
             # Put the representations in diagram #1
             # First the "blocks"
-            sm._BlockRepresentation(Id=1, block=1, diagram=2, category=2),  # Port Label!
+            sm._BlockRepresentation(Id=1, block=2, diagram=2, category=2),  # Port Label!
             sm._BlockRepresentation(Id=2, block=5, diagram=2, category=2),  # BlockInstance
             sm._BlockRepresentation(Id=3, block=6, diagram=2, category=2),  # Block
             sm._BlockRepresentation(Id=4, block=7, diagram=2, category=2),  # Note
@@ -238,16 +238,16 @@ def test_server():
             sm._BlockRepresentation(Id=5, block=4, diagram=2, parent=2, category=3), # Port linked to block instance
             # Relationships
             sm._RelationshipRepresentation(
-                Id=1,
+                Id=6,
                 diagram=2,
-                relationship=1,
+                relationship=8,
                 source_repr_id=1,
                 target_repr_id=5
             ),  # From PortLabel to BlockInstance port
             sm._RelationshipRepresentation(
-                Id=2,
+                Id=7,
                 diagram=2,
-                relationship=2,
+                relationship=9,
                 source_repr_id=4,
                 target_repr_id=3
             )  # From Note to Block
@@ -260,10 +260,9 @@ def test_server():
 
         ds.get_diagram_data(2, check_data)
         assert len(ds.live_instances[Collection.block_repr]) == 5
-        assert len(ds.live_instances[Collection.block]) == 6
+        assert len(ds.live_instances[Collection.block]) == 5
         assert len(ds.live_instances[Collection.relation_repr]) == 2
         assert len(ds.live_instances[Collection.relation]) == 2
-        assert ds.live_instances[Collection.block_repr][2].model_entity.definition.Id == 3
 
     @test
     def test_create_block_representation():
@@ -297,28 +296,28 @@ def test_server():
             sm.Note(Id=1, description="Don't mind me"),
             sm.BlockDefinitionDiagram(Id=2, name="Test diagram"),
             sm.Block(Id=3, name="Block 1", description="Dit is een test", parent=2, order=1),
-            sm._Relationship(Id=1, subtype='Anchor', source_id=3, target_id=1),
+            sm.Anchor(Id=4, source=3, target=1),
             sm._BlockRepresentation(Id=1, block=1, diagram=2),
             sm._BlockRepresentation(Id=2, block=3, diagram=2),
-            sm._RelationshipRepresentation(Id=1, diagram=2, relationship=1, source_repr_id=1, target_repr_id=2),
-            sm.BlockDefinitionDiagram(Id=4, name="Test diagram"),
-            sm._BlockRepresentation(Id=3, block=1, diagram=4),
-            sm._BlockRepresentation(Id=4, block=3, diagram=4),
-            sm._RelationshipRepresentation(Id=2, diagram=4, relationship=1, source_repr_id=3, target_repr_id=4)
+            sm._RelationshipRepresentation(Id=3, diagram=2, relationship=4, source_repr_id=1, target_repr_id=2),
+            sm.BlockDefinitionDiagram(Id=5, name="Test diagram"),
+            sm._BlockRepresentation(Id=4, block=1, diagram=5),
+            sm._BlockRepresentation(Id=5, block=3, diagram=5),
+            sm._RelationshipRepresentation(Id=6, diagram=5, relationship=4, source_repr_id=4, target_repr_id=5)
         ])
 
         # Delete the first representation
-        r = requests.delete(base_url+'/data/_RelationshipRepresentation/1')
+        r = requests.delete(base_url+'/data/_RelationshipRepresentation/3')
         assert r.status_code == 204
         # Ensure the relationship still exists
-        r = requests.get(base_url+'/data/_Relationship/1')
+        r = requests.get(base_url+'/data/_Entity/4')
         assert r.status_code == 200
         # Delete the second representation
-        r = requests.delete(base_url+'/data/_RelationshipRepresentation/2')
+        r = requests.delete(base_url+'/data/_RelationshipRepresentation/6')
         assert r.status_code == 204
-        # Ensure the relationship has been deleted as well.
-        r = requests.get(base_url+'/data/_Relationship/1')
-        assert r.status_code == 404
+        # Ensure the relationship is still there.
+        r = requests.get(base_url+'/data/_Entity/4')
+        assert r.status_code == 200
 
     @test
     def test_create_delete_instance():
@@ -370,9 +369,6 @@ def test_server():
         # Now delete the Instance Representation and check that the underlying Instance is deleted as well
         r = requests.delete(base_url+'/data/_BlockRepresentation/1')
         assert r.status_code == 204
-        # Check the underlying Instance is gone
-        r = requests.get(base_url + '/data/BlockInstance/6')
-        assert r.status_code == 404
         # Check the port representations are gone
         r = requests.get(base_url+'/data/_BlockRepresentation/2')
         assert r.status_code == 404
@@ -465,5 +461,5 @@ def test_server():
 
 
 if __name__ == '__main__':
-    run_tests('*.test_create_instance_no_parameters')
+    run_tests('*.test_create_delete_instance')
     run_tests()

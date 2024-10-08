@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from demos.block_programming.build.block_programming_data import ReprCategory
 <%
 """
 Copyright© 2024 Evert van de Waal
@@ -131,7 +132,7 @@ def create_port_representations(definition_id, representation_id, diagram, sessi
             height=0,
             styling='',
             category=dm.ReprCategory.port,
-        ) for ch in port_entities]
+        ).to_db() for ch in port_entities]
     for p in port_reprs:
         session.add(p)
     return port_entities, port_reprs
@@ -174,8 +175,7 @@ def create_block_representation(index, table, data, session, dm):
         height=data['height'],
         styling='',
         category = data.get('category', dm.ReprCategory.block)
-    )
-    record.post_init()
+    ).to_db()
     session.add(record)
     session.commit()
 
@@ -186,11 +186,11 @@ def create_block_representation(index, table, data, session, dm):
         # Represent the ports belonging to the block being represented.
         port_entities, port_reprs = create_port_representations(entity.Id, record.Id, data['diagram'], session, dm)
     session.commit()
-    record_dict = record.asdict()
+    record_dict = dm._BlockRepresentation.db_to_dict(record)
     record_dict['_entity'] = entity.asdict()
     if issubclass(table, dm.AInstance):
         record_dict['_definition'] = definition.asdict()
-    record_dict['children'] = [p.asdict() for p in port_reprs]
+    record_dict['children'] = [dm._BlockRepresentation.db_to_dict(p) for p in port_reprs]
     for e, p in zip(port_entities, record_dict['children']):
         p['_entity'] = e.asdict()
     return flask.make_response(json.dumps(record_dict, cls=dm.ExtendibleJsonEncoder), 201)
@@ -299,7 +299,16 @@ def get_entity_data(path, index):
             record = session.query(table).filter(table.Id==index).first()
             if not record:
                 return flask.make_response('Not found', 404)
-            data = json.dumps(record.asdict())
+            data = json.dumps(record.asdict(), cls=dm.ExtendibleJsonEncoder)
+            result = flask.make_response(data, 200)
+            result.headers['Content-Type'] = 'application/json'
+            return result
+    elif issubclass(table, dm.SpecialRepresentation):
+        with dm.session_context() as session:
+            record = session.query(dm._Representation).filter(dm._Representation.Id==index).first()
+            if not record:
+                return flask.make_response('Not found', 404)
+            data = json.dumps(table.db_to_dict(record), cls=dm.ExtendibleJsonEncoder)
             result = flask.make_response(data, 200)
             result.headers['Content-Type'] = 'application/json'
             return result
@@ -356,6 +365,12 @@ def add_entity_data(path):
     elif data_id:
         print("An ID was already set")
         return flask.make_response('Illegal request', 400)
+    if issubclass(table, dm.SpecialRepresentation):
+        with dm.session_context() as session:
+            record = table(**data).to_db()
+            session.add(record)
+            session.commit()
+            return flask.make_response(json.dumps(table.db_to_dict(record)), 201)
     if issubclass(table, dm.Base):
         with dm.session_context() as session:
             record = table(**data)
@@ -405,29 +420,14 @@ def create_representation(path, index):
 def delete_entity_data(path, index):
     if not (table := dm.__dict__.get(path, '')):
         return flask.make_response('Not found', 404)
-    if issubclass(table, dm.Base):
+    if issubclass(table, dm.Base) or issubclass(table, dm.SpecialRepresentation):
+        if issubclass(table, dm.SpecialRepresentation):
+            table = dm._Representation
         with dm.session_context() as session:
-            record = session.query(table).filter(table.Id==index).all()
-            if record:
-                record = record[0]
+            records = session.query(table).filter(table.Id == index).all()
+            if records:
+                record = records[0]
                 session.delete(record)
-
-                # If the last representation of a connection or instance is deleted, delete it from the model.
-                if table is dm._RelationshipRepresentation:
-                    count = session.query(table).filter(table.relationship==record.relationship).count()
-                    if count == 0:
-                        # Delete the relationship from the model.
-                        session.query(dm._Relationship).filter(dm._Relationship.Id==record.relationship).delete()
-                elif table is dm._BlockRepresentation:
-                    # Find the model entity and optional definition
-                    entity = session.query(dm._Entity).filter(dm._Entity.Id == record.block).first()
-                    if entity.definition:
-                        # Check if there are any more representation of this instance
-                        count = session.query(table).filter(table.block == entity.Id).count()
-                        if count == 0:
-                            # Delete the underlying Instance from the model.
-                            session.query(dm._Entity).filter(dm._Entity.Id == record.block).delete()
-
                 return flask.make_response('Deleted', 204)
             else:
                 return flask.make_response('Not found', 404)
@@ -463,40 +463,20 @@ def get_hierarchy():
 def diagram_contents(index):
     with dm.session_context() as session:
         # Get the representations shown in the diagram.
-        # Using a pure SQL query is easier to get the blocks than tickeling SQLAlchemy and massaging what its returns.
-        result = session.execute(text('''
-            SELECT _blockrepresentation.*, _entity.details as _entity, definition.details as _definition
-            FROM _blockrepresentation 
-            LEFT JOIN _entity ON _blockrepresentation.block = _entity.Id 
-            LEFT JOIN _entity as definition ON _entity.definition = definition.Id
-            WHERE _blockrepresentation.diagram = :index;
-        '''), {'index': index})
+        result = session.query(dm._Representation, dm._Entity).filter(dm._Representation.diagram == index)                             .join(dm._Entity, onclause=dm._Entity.Id == dm._Representation.entity).all()
 
-        data = [{k:v for k, v in zip(r._fields, r._data)} for r in result]
-        for d in data:
-            d['__classname__'] = '_BlockRepresentation'
+        data = []
 
-        for r in data:
-            details = json.loads(r['_entity'])
-            r['_entity'] = details
-            if details['__classname__'] in INSTANCE_ENTITIES:
-                definition = json.loads(r['_definition'])
-                r['_definition'] = definition
-            else:
-                del r['_definition']
-
-        # Relationships are more straight-forward.
-        for relat_rep in session.query(dm._RelationshipRepresentation, dm._Relationship).filter(dm._RelationshipRepresentation.diagram==index).join(dm._Relationship).all():
-            r = relat_rep[0].asdict()
-            r['_entity'] = json.loads(relat_rep[1].details)
-            data.append(r)
-
-        # Same for the messages
-        for message_rep in session.query(dm._MessageRepresentation, dm._Entity).filter(dm._MessageRepresentation.diagram==index).\
-                join(dm._Entity, dm._MessageRepresentation.message == dm._Entity.Id).all():
-            m = message_rep[0].asdict()
-            m['_entity'] = json.loads(message_rep[1].details)
-            data.append(m)
+        for repr, entity in result:
+            match repr.category:
+                case ReprCategory.relationship:
+                    d = dm._RelationshipRepresentation.db_to_dict(repr)
+                case ReprCategory.message:
+                    d = dm._MessageRepresentation.db_to_dict(repr)
+                case _:
+                    d = dm._BlockRepresentation.db_to_dict(repr)
+            d['_entity'] = dm.AWrapper.load_from_db(entity).asdict()
+            data.append(d)
 
     response = flask.make_response(
         json.dumps(data, cls=dm.ExtendibleJsonEncoder).encode('utf8'),
