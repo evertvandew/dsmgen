@@ -63,6 +63,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker, backref, relationship, 
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.sql import text
 
+from client_src.storable_element import ReprCategory
 
 GEN_VERSION = "0.5"
 
@@ -243,14 +244,6 @@ def init_db(e=None):
 # #
 # # The contents of a diagram are stored in separate structures.
 
-class ReprCategory(IntEnum):
-    no_repr = auto()
-    block = auto()
-    port = auto()
-    relationship = auto()
-    message = auto()
-    laned_block = auto()
-
 
 class EntityType(IntEnum):
     Block = auto()
@@ -350,6 +343,10 @@ class _BlockRepresentation(SpecialRepresentation):
             category = self.category,
             details = json.dumps(details).encode('utf8')
         )
+
+@dataclass
+class _InstanceRepresentation(_BlockRepresentation):
+    category: ReprCategory = ReprCategory.block_instance
 
 @dataclass
 class _MessageRepresentation(SpecialRepresentation):

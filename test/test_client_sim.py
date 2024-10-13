@@ -133,10 +133,8 @@ port2port = [
 diagram_w_instance = [
     {"Id": 1, "diagram": 3, "block": 7, "parent": None, "x": 358.0, "y": 235.0, "z": 0.0, "width": 64.0, "height": 40.0,
      "styling": {}, "block_cls": "BlockInstanceRepresentation", "__classname__": "_BlockRepresentation",
-     "category": int(data_store.ReprCategory.block),
-     "_entity": {"order": 0, "parameters": {"parameters": {"factor": 41, "gain": 3.1415}}, "Id": 7, "parent": 3,
-                 "definition": 4, "__classname__": "BlockInstance"},
-     "_definition": {"order": 0, "Id": 4, "parent": 1, "name": "test block", "implementation": "",
+     "parameters": {"parameters": {"factor": 41, "gain": 3.1415}}, "category": int(data_store.ReprCategory.block_instance),
+     "_entity": {"order": 0, "Id": 4, "parent": 1, "name": "test block", "implementation": "",
                      "parameters": {"factor": "int", "gain": "float"}, "__classname__": "SubProgramDefinition"}},
     {"Id": 2, "diagram": 3, "block": 5, "parent": 1, "x": 0.0, "y": 0.0, "z": 0.0, "width": 64.0, "height": 40.0,
      "styling": {}, "block_cls": "FlowPortRepresentation", "__classname__": "_BlockRepresentation",
@@ -425,6 +423,7 @@ def simulated_diagram_tests():
         add_expected_response('/data/BlockInstance/123/create_representation', 'post', Response(201, json={
             'Id': 400,
             '__classname__': '_BlockInstanceRepresentation',
+            'category': 8,
             'block': 125,
             'parent': None,
             'diagram': 5,
@@ -445,8 +444,7 @@ def simulated_diagram_tests():
                 }
             ],
             'block_cls': 'BlockInstanceRepresentation',
-            '_entity': {'Id': 125, 'definition': 123, 'parameters': '', 'parent': 5, '__classname__': 'BlockInstance'},
-            '_definition': definition.asdict()
+            '_entity': definition.asdict()
         }))
 
         for cls in [events.DragEnter, events.DragOver, events.DragOver, events.Drop, events.DragEnd]:
@@ -455,9 +453,8 @@ def simulated_diagram_tests():
         assert diagram.children
         repr: client.ms.ModeledShapeAndPorts = diagram.children[0]
         assert repr.diagram == 5
-        assert repr.model_entity.Id == 125
-        assert repr.model_entity.parent == 5
-        assert repr.model_entity.definition == definition
+        assert repr.model_entity.Id == 123
+        assert repr.model_entity.parent == 1
         assert repr.Id == 400
         check_expected_response()
 
@@ -477,10 +474,10 @@ def simulated_diagram_tests():
         d.select('#edit_factor')[0].value = '123.456'
         d.select('#edit_limit')[0].value = '87654'
         btn = d.select_one('#details .btn-primary')
-        add_expected_response('/data/BlockInstance/125', 'post', Response(200, json={}))
+        add_expected_response('/data/_BlockRepresentation/400', 'post', Response(200, json={}))
         btn.dispatchEvent(events.Click())
 
-        assert repr.model_entity.parameters == {'factor': 123.456, 'limit': 87654}
+        assert repr.parameters == {'factor': 123.456, 'limit': 87654}
         check_expected_response()
 
     @test
@@ -714,28 +711,6 @@ def simulated_explorer_tests():
         ok_btn.dispatchEvent(events.Click())
         check_expected_response()
 
-    @test
-    def existing_instance_property_editer():
-        # Create an explorer showing one definition block and one instance.
-        ds = mk_ds()
-        add_expected_response('/data/hierarchy', 'get', Response(201, json=[
-            {'Id': 123, 'name': 'Block 1', 'parent': None, 'description': 'Dit is een test',
-             'parameters': 'limit:int,factor:float', '__classname__': 'SubProgramDefinition'},
-            {'Id': 125, 'definition': 123, 'parameters': '', 'parent': None, '__classname__': 'BlockInstance',
-             'parameters': {'factor': 123, 'limit': 456}}
-        ]))
-        make_explorer(d['explorer'], ds, client.allowed_children)
-        blank = d['explorer']
-        ds.subscribe('click', blank, client.on_explorer_click)
-
-        # Click on the Instance and check that the values in the edit fields are correct.
-        source = [i for i in d['explorer'].select('.eline [draggable="true"]') if 'BlockInstance' in str(i)][0]
-        source.dispatchEvent(events.Click())
-        assert d.select('#edit_factor')[0].value == 123
-        assert d.select('#edit_limit')[0].value == 456
-        check_expected_response()
-
-
 @prepare
 def integration_tests():
     """ Test high-level behaviour of the tool. """
@@ -865,7 +840,7 @@ def integration_tests():
         assert len(context.diagrams.blocks()) == 1
         assert len(context.diagrams.ports(1)) == 1
         # The model has been extended, with a new Model Instance. The explorer should reflect this.
-        assert context.explorer.count() == 4
+        assert context.explorer.count() == 3
         assert isinstance(context.data_store.live_instances[Collection.block][4], client.BlockInstance)
         # Create a new block with a port and connect them
         context.diagrams.create_block(client.Block)
@@ -1571,7 +1546,7 @@ def integration_tests():
             o.asdict() for o in [
                 client.FunctionalModel(Id=1),
                 client.StructuralModel(Id=2),
-                client.SubProgramDefinition(Id=3, parent=2),
+                client.SubProgramDefinition(Id=3, parent=2, parameters={'name': 'str'}),
                 client.FlowPort(Id=4, parent=3),
                 client.FlowPort(Id=5, parent=3),
                 client.BlockDefinitionDiagram(Id=45, parent=2)
@@ -1585,9 +1560,15 @@ def integration_tests():
 
         # Check that the ports have been created as well.
         assert len(context.diagrams.ports(1)) == 2
+        # No new Block should be created, only a representation.
+        assert len(context.data_store.live_instances[Collection.block]) == 3
+        assert len(context.data_store.live_instances[Collection.block_repr]) == 3
+
+        # Open the details editor
+        context.diagrams.click_block(1)
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.drag_and_drop_instance_with_ports')
+    run_tests('*.edit_ports')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')

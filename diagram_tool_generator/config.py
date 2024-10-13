@@ -14,3 +14,12 @@ class Configuration:
     dbase_pwd: str    = ''
     homedir: str      = os.getcwd()
     pub_dir: str      = ''
+    model_name: str   = ''
+
+
+    def __post_init__(self):
+        if not self.model_name:
+            self.model_name = os.path.splitext(os.path.basename(self.model_def))[0]
+
+        if self.model_name.endswith('spec'):
+            self.model_name = self.model_name[:-4].strip('_')

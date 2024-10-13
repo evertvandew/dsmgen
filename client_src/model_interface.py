@@ -22,7 +22,25 @@ class EditableParameterDetails:
     convertor: DataConvertor
 
 
-class ModelEntity:
+class PropertyEditable:
+    """ Interface for making an object editable by property editor. """
+    def get_editable_parameters(self) -> List[EditableParameterDetails]:
+        """ Return the details of all the parameters that can be edited. """
+        raise NotImplementedError()
+
+    @classmethod
+    def isStylable(cls) -> bool:
+        return False
+
+    def get_styling_parameters(self) -> List[EditableParameterDetails]:
+        """ Return the styling details that can be edited. """
+        return []
+
+    def getModelEntity(self) -> Optional["ModelEntity"]:
+        return None
+
+
+class ModelEntity(PropertyEditable):
     """ An interface class describing the behaviour of an item represented in a diagram. """
     default_styling = {}
     def get_text(self, index: int) -> str:
@@ -32,8 +50,6 @@ class ModelEntity:
         """ Ask how many texts this item wants to display """
         return 1
 
-    def get_editable_parameters(self) -> List[EditableParameterDetails]:
-        return []
     @classmethod
     def supports_ports(cls) -> bool:
         return False
@@ -60,3 +76,6 @@ class ModelEntity:
     @classmethod
     def getDefaultStyle(cls):
         return cls.default_styling.copy()
+
+    def getModelEntity(self) -> Optional[Self]:
+        return self

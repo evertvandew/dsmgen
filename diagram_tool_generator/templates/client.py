@@ -4,6 +4,7 @@ Visual Modelling client.
 import laned_diagram
 import svg_shapes
 from database_selector import database_selector
+from storable_element import ReprCategory
 
 <%
 """
@@ -189,6 +190,11 @@ ${inspect.getsource(entity.getStyle)}
                 return {k: resolve(v) for k, v in cls.allowed_drops_blocks.items()}
             else:
                 return {k: resolve(v) for k, v in cls.allowed_create_blocks.items()}
+
+        def get_representation_category(self, block_cls) -> ReprCategory:
+            if block_cls.is_instance_of():
+                return ReprCategory.block_instance
+            return ReprCategory.block
     % endif
 
     @classmethod
@@ -231,7 +237,7 @@ ${inspect.getsource(entity.getStyle)}
         elif category == ms.ReprCategory.port:
             return ms.Port
     %elif generator.get_allowed_ports().get(entity.__name__, []) or generator.md.is_instance_of(entity):
-        if category == ms.ReprCategory.block:
+        if category in [ms.ReprCategory.block, ms.ReprCategory.block_instance]:
             return ms.ModeledShapeAndPorts
         elif category == ms.ReprCategory.laned_block:
             return laned_diagram.LanedShape
@@ -284,21 +290,6 @@ ${inspect.getsource(entity.getStyle)}
             EditableParameterDetails("${name}", ${generator.get_html_type(type_)}, self.${name}, ${generator.get_html_type(type_)}),
         %endfor
         ]
-        %if generator.md.is_instance_of(entity):
-        if not self.definition:
-            return regular_parameters
-        parameter_specs = self.definition.get_parameter_spec_fields()
-        if not parameter_specs:
-            return regular_parameters
-        keys_types = self.definition.get_parameter_specs()
-        if keys_types:
-            regular_parameters += [
-                EditableParameterDetails(key, type_, self.parameters.get(key, ''), type_)
-                for key, type_ in keys_types.items()
-            ]
-        # Filter out the parameter collection field
-        regular_parameters = [p for p in regular_parameters if p.name not in parameter_specs]
-        %endif
         return regular_parameters
 
     def asdict(self) -> Dict[str, Any]:
@@ -454,13 +445,12 @@ def on_diagram_selection(_e_name, _e_source, data_store, details):
     values = details['values']
     update = details['update']
     repr: ms.ModeledShape = details['object']
-    model: ms.ModelEntity = repr.model_entity
 
     properties_div = document['details']
     for e in properties_div.children:
         e.remove()
     properties_div.children = []
-    _ = properties_div <= dataClassEditor(model, model.get_editable_parameters(), data_store, repr=repr, update=update)
+    _ = properties_div <= dataClassEditor(repr, data_store, update=update)
 
 
 def on_explorer_click(_event_name, _event_source, data_store, details):
@@ -478,7 +468,7 @@ def on_explorer_click(_event_name, _event_source, data_store, details):
     for e in properties_div.children:
         e.remove()
     properties_div.children = []
-    _ = properties_div <= dataClassEditor(data_element, data_element.get_editable_parameters(), data_store, update=update)
+    _ = properties_div <= dataClassEditor(data_element, data_store, update=update)
 
 
 def on_explorer_dblclick(data_store, details, tabview):

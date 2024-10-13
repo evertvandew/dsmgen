@@ -255,7 +255,7 @@ class ModeledDiagram(Diagram):
             # Store the existing values to see if anything actually changed.
             new_values = json.loads(new_data)
             old_values = widget.asdict()
-            widget.model_entity.update(new_values)
+            widget.updateParameters(new_values)
             # The styling of the widget can also be updated.
             if 'styling' in new_values:
                 widget.updateStyle(**new_values['styling'])

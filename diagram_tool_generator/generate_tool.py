@@ -45,15 +45,12 @@ import model_definition as mdef
 from config import Configuration
 
 
-def load_specification(specification):
+def load_specification(module_name: str, specification):
     # Find and import the specified model
-    module_name = os.path.splitext(os.path.basename(specification))[0]
-    if module_name.endswith('spec'):
-        module_name = module_name[:-4].strip('_')
     spec = importlib.util.spec_from_file_location(module_name, specification)
     new_mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(new_mod)
-    return new_mod, module_name, spec
+    return new_mod, spec
 
 
 class Generator:
@@ -340,7 +337,8 @@ class Generator:
     @staticmethod
     def load_from_config(config: Configuration):
         # Find and import the specified model
-        new_mod, module_name, spec = load_specification(config.model_def)
+        module_name = config.model_name
+        new_mod, spec = load_specification(module_name, config.model_def)
         sys.modules[module_name] = new_mod
         generator = Generator(config, module_name)
         return generator, module_name

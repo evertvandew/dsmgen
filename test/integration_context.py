@@ -129,16 +129,8 @@ class ExplorerApi(HtmlApi):
                 category=ReprCategory.port,
                 __classname__='_BlockRepresentation'
             ) for i, p in enumerate(ports)]
-            if request_cls.is_instance_of():
-                definition: StorableElement = self.context.data_store.get(Collection.block, mid)
-                # Create the new instance model item.
-                entity = request_cls(
-                    Id=self.context.get_new_id(Collection.block),
-                    definition=definition,
-                    parent=diagram.diagram_id
-                )
-            else:
-                entity: StorableElement = self.context.data_store.get(Collection.block, mid)
+
+            entity: StorableElement = self.context.data_store.get(Collection.block, mid)
 
             #data = json.loads(kwargs['data'])
             data = kwargs
@@ -150,10 +142,7 @@ class ExplorerApi(HtmlApi):
                 'category': category,
                 '__classname__': request_cls.get_representation_cls(category).__name__
             }
-            # Determine if the diagram is asking for an Instance.
-            if request_cls.is_instance_of():
-                # Instance representations also have a definition field.
-                content['_definition'] = definition.asdict()
+
             return Response(201, json=content)
 
         # We need to know what

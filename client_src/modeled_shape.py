@@ -24,14 +24,14 @@ import json
 from browser import svg, document, console
 from diagrams import Shape, Relationship, CP, Point, Orientations
 import shapes
-from svg_shapes import MsgShape, HAlign
+from svg_shapes import MsgShape, HAlign, VAlign
 from context_menu import mk_context_menu
 from storable_element import StorableElement, Collection, ReprCategory, from_dict
 from data_store import ExtendibleJsonEncoder, DataStore
 from point import load_waypoints
 from copy import deepcopy, copy
-from property_editor import getDetailsPopup
-from model_interface import ModelEntity
+from property_editor import getDetailsPopup, Color
+from model_interface import ModelEntity, PropertyEditable, EditableParameterDetails
 
 
 class RelationAnchor(StrEnum):
@@ -41,7 +41,7 @@ class RelationAnchor(StrEnum):
 
 ###############################################################################
 @dataclass
-class ModelRepresentation(StorableElement):
+class ModelRepresentation(StorableElement, PropertyEditable):
     Id: int = 0
     model_entity: ModelEntity = None
     diagram: int = 0                    # Diagram in which this representation is displayed.
@@ -61,6 +61,41 @@ class ModelRepresentation(StorableElement):
 
     def get_model_details(self) -> Optional[Self]:
         return self.model_entity
+
+    def getModelEntity(self) -> Optional[ModelEntity]:
+        return self.model_entity
+
+    # The bits in the PropertyEditable interface
+    def get_editable_parameters(self) -> List[EditableParameterDetails]:
+        """ Return the details of all the parameters that can be edited. """
+        return self.model_entity.get_editable_parameters()
+
+    @classmethod
+    def isStylable(cls) -> bool:
+        return True
+
+    @override
+    def get_styling_parameters(self) -> List[EditableParameterDetails]:
+        """ Return the styling details that can be edited. """
+        def determine_style_type(key) -> type:
+            if 'color' in key:
+                return Color
+            if 'halign' in key:
+                return HAlign
+            if 'valign' in key:
+                return VAlign
+            return str
+
+        return [EditableParameterDetails(
+            name = key,
+            type = determine_style_type(key),
+            current_value = self.getStyle(key),
+            convertor = str
+        ) for key in self.getStyleKeys()]
+
+    def updateParameters(self, new_values: Dict):
+        self.model_entity.update(new_values)
+
 
 
 def getModeledStyle(modeled_item, key, default=None) -> Optional[str]:
@@ -83,6 +118,7 @@ class ModeledShape(Shape, ModelRepresentation):
     default_style = dict(blockcolor='#ffffff')
     TextWidget = shapes.Text('text')
     category: ReprCategory = ReprCategory.block
+    parameters: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def text(self):
@@ -143,16 +179,51 @@ class ModeledShape(Shape, ModelRepresentation):
     def get_collection(cls) -> Collection:
         return Collection.block_repr
 
-    def get_editable_parameters(self):
-        return self.model_entity.get_editable_parameters()
-
     def get_db_table(cls):
         return '_BlockRepresentation'
+
+    def get_allowed_ports(self) -> List[Self]:
+        # Instances can NOT edit the port configuration of their definition object.
+        if self.category != ReprCategory.block_instance and self.model_entity:
+            return self.model_entity.get_allowed_ports()
+        return []
 
     @override                                           # From Stylable
     def getStyle(self, key, default=None):
         """ Allow model definitions to override styling """
         return getModeledStyle(self, key, default)
+
+    @override
+    def get_editable_parameters(self) -> List[EditableParameterDetails]:
+        """ For instances of blocks, there can be parameters set by the definition. """
+        if self.category != ReprCategory.block_instance:
+            return self.model_entity.get_editable_parameters()
+
+        # An instance presents other parameters to edit.
+        parameter_specs = self.model_entity.get_parameter_spec_fields()
+        if not parameter_specs:
+            return []
+
+        keys_types = self.model_entity.get_parameter_specs()
+        if keys_types:
+            current_values = getattr(self, 'parameters', {})
+            parameters = [
+                EditableParameterDetails(key, type_, current_values.get(key, ''), type_)
+                for key, type_ in keys_types.items()
+            ]
+        # Filter out the parameter collection field
+        parameters = [p for p in parameters if p.name not in parameter_specs]
+        return parameters
+
+    def updateParameters(self, new_values: Dict):
+        # For instances, update the parameterized values first.
+        if self.category == ReprCategory.block_instance:
+            parameter_specs = self.model_entity.get_parameter_spec_fields()
+            if parameter_specs:
+                keys_types = self.model_entity.get_parameter_specs()
+                self.parameters = {k: new_values[k] for k in keys_types.keys()}
+
+        self.model_entity.update(new_values)
 
 
 @dataclass
@@ -323,10 +394,6 @@ class ModeledShapeAndPorts(ModeledShape):
     @classmethod
     def is_instance_of(cls):
         return False
-
-    def get_allowed_ports(self):
-        return self.model_entity.get_allowed_ports()
-
 
 @dataclass
 class ModeledRelationship(Relationship, ModelRepresentation):

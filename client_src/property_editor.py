@@ -25,7 +25,7 @@ from dataclasses import fields, MISSING
 from typing import Hashable, Dict, Any, List, Optional, Type, Callable
 import json
 from svg_shapes import HAlign, VAlign
-from model_interface import ModelEntity, EditableParameterDetails
+from model_interface import ModelEntity, EditableParameterDetails, PropertyEditable
 from shapes import HIDDEN, Stylable
 from data_store import DataStore, ExtendibleJsonEncoder, parameter_spec
 
@@ -79,7 +79,9 @@ def mk_collapsable(heading: str|DOMNode, contents: List[DOMNode], line_id: Optio
 
     return de
 
+# Define types that the property editor gives special treatment
 class longstr(str): pass
+class Color(str): pass
 
 class OptionalRef:
     def __init__(self, t):
@@ -160,9 +162,6 @@ def isPortCollection(field):
         return False
     return any(isinstance(t, type) and issubclass(t, diagrams.CP) for t in field.type)
 
-def isStylable(objecttype):
-    return hasattr(objecttype, 'getStyleKeys')
-
 def getInputForValue(name: str, field_type: type, value: Any):
     if isinstance(field_type, type) and issubclass(field_type, enum.IntEnum):
         input = html.SELECT(id=f"edit_{name}", name=name)
@@ -177,6 +176,18 @@ def getInputForValue(name: str, field_type: type, value: Any):
         input = html.TEXTAREA(id=f"edit_{name}", name=name)
         input <= v
         input.className = 'form-control'
+        return input
+    if field_type == Color:
+        return html.INPUT(id=f"styling_{name}", name=name, value=value, type='color')
+    if field_type in [HAlign, VAlign]:
+        input = html.SELECT(id=f"styling_{name}", name=name)
+        value = value.value
+        for option in field_type:
+            if value == option:
+                input <= html.OPTION(option.name, value=option.value, selected=1)
+                input.value = option.value
+            else:
+                input <= html.OPTION(option.name, value=option.value)
         return input
     if field_type in type2HtmlInput:
         stored_value = value if value is not None else type2default[field_type]
@@ -341,6 +352,7 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
         def ok(ev):
             # Determine what type the user selected
             index = int(port_selector.value)
+            # Obtain the ID of the model entity this port is being added to.
             data_store.add_complex(port_types[index](parent=o.Id))
             d.close()
             fillTable()
@@ -353,7 +365,7 @@ def createPortEditor(o: ModelEntity, field, port_types, data_store: DataStore):
     return div
 
 
-def dataClassEditorForm(o: ModelEntity, editable_fields: List[EditableParameterDetails], data_store: DataStore=None):
+def dataClassEditorForm(o: PropertyEditable, editable_fields: List[EditableParameterDetails], data_store: DataStore=None):
     """ Return a form for editing the values in a data object, without buttons. """
     # Use the annotations to create the properties editor
     form = html.FORM()
@@ -373,28 +385,29 @@ def dataClassEditorForm(o: ModelEntity, editable_fields: List[EditableParameterD
             _ = de <= dc
             _ = form <= de
 
-    port_types = o.get_allowed_ports() if o else []
+    port_types = o.getModelEntity().get_allowed_ports() if o else []
     if port_types and data_store:
         f = [f for f in fields(o) if f.name == 'ports'][0]
-        _ = form <= createPortEditor(o, f, port_types, data_store)
+        _ = form <= createPortEditor(o.getModelEntity(), f, port_types, data_store)
     return form
 
-def stylingEditorForm(o: Stylable):
+def stylingEditorForm(o: PropertyEditable):
     # Add an editor for style elements
 
-    if isStylable(o):
-        form = html.FORM()
-        style_keys = o.getStyleKeys()
-        for key in style_keys:
-            label = html.LABEL(key)
-            label.className = "col-sm-3 col-form-label"
-            _ = form <= label
-            _ = form <= getInputForStyle(o, key, o.getStyle(key, ''))
-            _ = form <= html.BR()
-        return mk_collapsable('Styling', form)
+    parameters = o.get_styling_parameters()
+    if not parameters:
+        return
 
-def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[EditableParameterDetails],
-                  repr: Optional[Stylable]=None):
+    form = html.FORM()
+    for field in parameters:
+        label = html.LABEL(field.name)
+        label.className = "col-sm-3 col-form-label"
+        _ = form <= label
+        _ = form <= getInputForField(field)
+        _ = form <= html.BR()
+    return mk_collapsable('Styling', form)
+
+def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[EditableParameterDetails]):
     """ Returns a dictionary with the current values in the form edits. """
     update_data = {}
     for field in editable_fields:
@@ -402,8 +415,8 @@ def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[Editable
         constructor = type2Constructor(field.type)
         update_data[field.name] = constructor(form.select_one(f'#edit_{field.name}').value)
 
-    if repr and isStylable(repr):
-        defaults = repr.getDefaultStyle()
+    if o.isStylable():
+        defaults = o.getDefaultStyle()
         fields = {key: document.select( f'#styling_{key}') for key in defaults.keys()}
         fields = {k: v[0].value for k, v in fields.items() if v}
         new_style = {key: createFromValue(type(default))(fields.get(key, default))
@@ -415,24 +428,24 @@ def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[Editable
 
 # Add the logic to edit parameters
 # When a block is selected, the canvas throws an event with the details
-def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameterDetails], data_store: DataStore,
-                    repr: Optional[Stylable]=None, update=None):
+def dataClassEditor(o: PropertyEditable, data_store: DataStore, update=None):
     """ Create a detail-editor, with a save button for the user to click..
-        o: Optional object with the current values of the fields.
+        o: object with the current values of the fields.
         parameters: List of descriptors of all the fields.
         data_store: REST api client that persists the object being edited / created.
-        repr: A representation of the model Entity that
+        update: A function to be called when the user clicks on "save".
     """
+    parameters = o.get_editable_parameters()
     editor = html.DIV()
     _ = editor <= mk_collapsable(f'{type(o).__name__}: {getattr(o, "name", "")}',
                                  dataClassEditorForm(o, parameters, data_store), start_visible=True)
-    if repr and isStylable(repr):
-        _ = editor <= stylingEditorForm(repr)
+    if o.isStylable():
+        _ = editor <= stylingEditorForm(o)
     # Add a SAVE button
     def onSave(_):
         # Because this is a Closure, we can use the captured variables
         # Get the new values for the editable fields
-        update_data = getFormValues(editor, o, parameters, repr)
+        update_data = getFormValues(editor, o, parameters)
         if callable(update):
             update(json.dumps(update_data, cls=ExtendibleJsonEncoder))
 
@@ -443,11 +456,11 @@ def dataClassEditor(o: Optional[ModelEntity], parameters: List[EditableParameter
     return editor
 
 
-def getDetailsPopup(cls: Type[ModelEntity], cb: Callable):
+def getDetailsPopup(cls: Type[PropertyEditable], cb: Callable):
     default_obj = cls()
     d = Dialog(f'Add {cls.__name__}', ok_cancel=True)
     parameters = default_obj.get_editable_parameters()
-    _ = d.panel <= dataClassEditorForm(None, parameters)
+    _ = d.panel <= dataClassEditorForm(default_obj, parameters)
 
     @bind(d.ok_button, 'click')
     def on_ok(ev):

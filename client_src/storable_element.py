@@ -31,6 +31,9 @@ class Collection(Enum):
             cls.message_repr: cls.message
         }[c]
 
+
+# The following structure is shared between the server and the client.
+# For that purpose, the server will import it as well as the client.
 class ReprCategory(IntEnum):
     no_repr = auto()
     block = auto()
@@ -39,6 +42,7 @@ class ReprCategory(IntEnum):
     message = auto()
     laned_block = auto()
     laned_connection = auto()
+    block_instance = auto()
 
 
 def from_dict(cls, **details) -> Self:
