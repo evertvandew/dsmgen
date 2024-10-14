@@ -24,10 +24,11 @@ import diagrams
 from dataclasses import fields, MISSING
 from typing import Hashable, Dict, Any, List, Optional, Type, Callable
 import json
+
 from svg_shapes import HAlign, VAlign
 from model_interface import ModelEntity, EditableParameterDetails, PropertyEditable
 from shapes import HIDDEN, Stylable
-from data_store import DataStore, ExtendibleJsonEncoder, parameter_spec
+from data_store import DataStore, ExtendibleJsonEncoder, parameter_spec, ReprCategory
 
 
 line_cls = 'eline'
@@ -386,7 +387,7 @@ def dataClassEditorForm(o: PropertyEditable, editable_fields: List[EditableParam
             _ = form <= de
 
     port_types = o.getModelEntity().get_allowed_ports() if o else []
-    if port_types and data_store:
+    if port_types and data_store and ((not o.isStylable()) or o.category != ReprCategory.block_instance):
         f = [f for f in fields(o) if f.name == 'ports'][0]
         _ = form <= createPortEditor(o.getModelEntity(), f, port_types, data_store)
     return form

@@ -9,13 +9,12 @@ from shapes import Point, handle_class
 import diagrams
 from modeled_diagram import ModeledDiagram
 import explorer
-from data_store import ReprCategory
 from browser.ajax import add_expected_response, Response, check_expected_response
 from browser import events, html, document as d
 import tab_view as tv
 from typing import List, Dict, Any, Type, Tuple, Optional, Generator
 
-from storable_element import StorableElement, Collection
+from storable_element import StorableElement, Collection, ReprCategory
 from modeled_shape import ModelRepresentation, Port
 
 

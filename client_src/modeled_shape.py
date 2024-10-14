@@ -211,9 +211,11 @@ class ModeledShape(Shape, ModelRepresentation):
                 EditableParameterDetails(key, type_, current_values.get(key, ''), type_)
                 for key, type_ in keys_types.items()
             ]
-        # Filter out the parameter collection field
-        parameters = [p for p in parameters if p.name not in parameter_specs]
-        return parameters
+            # Filter out the parameter collection field
+            parameters = [p for p in parameters if p.name not in parameter_specs]
+            return parameters
+        else:
+            return []
 
     def updateParameters(self, new_values: Dict):
         # For instances, update the parameterized values first.

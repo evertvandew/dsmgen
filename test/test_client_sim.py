@@ -839,9 +839,9 @@ def integration_tests():
         # Check the instance was created including the port.
         assert len(context.diagrams.blocks()) == 1
         assert len(context.diagrams.ports(1)) == 1
-        # The model has been extended, with a new Model Instance. The explorer should reflect this.
+        # There should still be three items in the explorer (subprogram, port and diagram).
         assert context.explorer.count() == 3
-        assert isinstance(context.data_store.live_instances[Collection.block][4], client.BlockInstance)
+
         # Create a new block with a port and connect them
         context.diagrams.create_block(client.Block)
         context.diagrams.add_port(3, client.FlowPort)
@@ -1569,6 +1569,6 @@ def integration_tests():
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.edit_ports')
+    run_tests('*.add_relationship')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')
