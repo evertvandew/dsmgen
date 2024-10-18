@@ -156,6 +156,10 @@ class OwnerInterface:
         self.get_children().append(widget)
         widget.create(self)
 
+    def load_diagram(self):
+        """ Some diagrams can load data from a data source. """
+        pass
+
 
 class Stylable:
     """ Implement the styling interface.

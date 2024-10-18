@@ -237,8 +237,10 @@ ${inspect.getsource(entity.getStyle)}
         elif category == ms.ReprCategory.port:
             return ms.Port
     %elif generator.get_allowed_ports().get(entity.__name__, []) or generator.md.is_instance_of(entity):
-        if category in [ms.ReprCategory.block, ms.ReprCategory.block_instance]:
+        if category == ms.ReprCategory.block:
             return ms.ModeledShapeAndPorts
+        elif category == ms.ReprCategory.block_instance:
+            return ms.ModeledBlockInstance
         elif category == ms.ReprCategory.laned_block:
             return laned_diagram.LanedShape
     %elif generator.md.is_message(entity):
@@ -419,6 +421,9 @@ connections_from = {
 
 opposite_ports = ${generator.get_opposite_ports()}
 
+all_entities = dict(explorer_classes)
+all_entities.update(relation_classes)
+
 
 class DiagramConfig(diagrams.DiagramConfiguration):
     def get_repr_for_create(self, cls) -> type:
@@ -483,7 +488,7 @@ def on_explorer_dblclick(data_store, details, tabview):
         svg_tag = html.SVG(id=target_dbid)
         svg_tag.classList.add('diagram')
 
-        config = DiagramConfig(connections_from)
+        config = DiagramConfig(connections_from, all_entities)
         diagram = diagrams.load_diagram(target_dbid, diagram_definitions[target_type], config, data_store, svg_tag)
         diagram_details = data_store.get(target_type, target_dbid)
         tabview.add_page(diagram_details.name, svg_tag, diagram)

@@ -324,61 +324,46 @@ class DataStore(EventDispatcher):
                 representations = []
                 # Reconstruct all representations and cache them.
                 # Do blocks first, then ports, then represations.
-                class repr_class(IntEnum):
-                    block = auto()
-                    port = auto()
-                    rel = auto()
-                    mesg = auto()
+                repr_class = [
+                    ReprCategory.block,
+                    ReprCategory.laned_block,
+                    ReprCategory.block_instance,
+                    ReprCategory.port,
+                    ReprCategory.relationship,
+                    ReprCategory.laned_connection,
+                    ReprCategory.message
+                ]
+                # Check the order up objects doesn't miss one.
+                assert len(repr_class) == len(ReprCategory) - 1
 
-                def classify_representation(data: Dict[str, Any]) -> repr_class:
-                    if data['__classname__'] == '_MessageRepresentation':
-                        return repr_class.mesg
-                    if 'category' in data:
-                        r = {
-                            ReprCategory.block: repr_class.block,
-                            ReprCategory.port: repr_class.port,
-                            ReprCategory.relationship: repr_class.rel
-                        }.get(data['category'], None)
-                        if r:
-                            return r
-                    if 'relationship' in data:
-                        return repr_class.rel
-                    elif data.get('block_cls', '') == 'Port':
-                        return repr_class.port
-                    return repr_class.block
                 def filter_reprs(reprs, c: repr_class):
                     for r in reprs:
-                        if classify_representation(r) == c:
+                        if r['category'] == c:
                             yield r
 
                 # Sort the received entities by their order number.
                 response.json.sort(key=lambda e: e.get('order', None) or 1000000)
 
                 # Now handle the different types of representations
-                for filter in [repr_class.block, repr_class.port, repr_class.rel, repr_class.mesg]:
+                for filter in repr_class:
                     for d in filter_reprs(response.json, filter):
                         entity = self.decode_representation(d)
                         representations.append(entity)
 
-                # All blocks are yielded to the diagram
-                records.extend(r for r in representations if r.repr_category() in [ReprCategory.block, ReprCategory.laned_block])
-
-                # Ports are not yielded directly to the diagram, they are added to the block that owns them.
-                for p in [r for r in representations if r.repr_category() == ReprCategory.port]:
-                    block = self.get(Collection.block_repr, p.parent)
-                    block.get_ports().append(p)
-                    block.get_model_details().get_ports().append(p.model_entity)
-                    self.update_cache([block, block.get_model_details()])
-
-                # Then handle the relationships
-                for d in [r for r in representations if r.repr_category() in [ReprCategory.relationship, ReprCategory.laned_connection]]:
-                    records.append(d)
-
-                # Like the ports, messages are yielded through representations.
-                for p in [r for r in representations if r.repr_category() == ReprCategory.message]:
-                    relation = self.get(Collection.relation_repr, p.parent)
-                    relation.get_messages().append(p)
-                    self.update_cache(relation)
+                        if filter == ReprCategory.port:
+                            # Ports are not yielded through records, but attached to their owners.
+                            block = self.get(Collection.block_repr, entity.parent)
+                            block.get_ports().append(entity)
+                            block.get_model_details().get_ports().append(entity.model_entity)
+                            self.update_cache([block, block.get_model_details()])
+                        elif filter == ReprCategory.message:
+                            # Like the ports, messages are yielded through representations.
+                            relation = self.get(Collection.relation_repr, entity.parent)
+                            relation.get_messages().append(entity)
+                            self.update_cache(relation)
+                        else:
+                            # All blocks are yielded to the diagram
+                            records.append(entity)
 
                 cb(records)
 
@@ -426,7 +411,7 @@ class DataStore(EventDispatcher):
             repr_category = {
                 '_RelationshipRepresentation': ReprCategory.relationship,
                 '_MessageRepresentation': ReprCategory.message,
-                '_BlockInstanceRepresentation': ReprCategory.block,
+                '_BlockInstanceRepresentation': ReprCategory.block_instance,
                 '_BlockRepresentation': ReprCategory.block
             }[data['__classname__']]
         representation_cls = model_instance.get_representation_cls(repr_category)

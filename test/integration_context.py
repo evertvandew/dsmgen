@@ -126,7 +126,8 @@ class ExplorerApi(HtmlApi):
                 parent=rid,
                 _entity=p.asdict(),
                 category=ReprCategory.port,
-                __classname__='_BlockRepresentation'
+                __classname__='_BlockRepresentation',
+                model_class=type(p).__name__
             ) for i, p in enumerate(ports)]
 
             entity: StorableElement = self.context.data_store.get(Collection.block, mid)
@@ -139,7 +140,8 @@ class ExplorerApi(HtmlApi):
                 '_entity': entity.asdict(),
                 'children': children,
                 'category': category,
-                '__classname__': request_cls.get_representation_cls(category).__name__
+                '__classname__': request_cls.get_representation_cls(category).__name__,
+                'model_class': request_cls.__name__
             }
 
             return Response(201, json=content)
@@ -484,7 +486,7 @@ class PropertyEditorApi(HtmlApi):
     def set_style(self, **kwargs):
         """ Set the value of one or more style items """
         for key, value in kwargs.items():
-            self.find_element(f'#styling_{key}').value = str(value)
+            self.find_element(f'#edit_{key}').value = str(value)
 
 class DataStoreApi:
     def __init__(self, context, ds: data_store.UndoableDataStore):

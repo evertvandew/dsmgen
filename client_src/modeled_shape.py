@@ -45,6 +45,7 @@ class ModelRepresentation(StorableElement, PropertyEditable):
     Id: int = 0
     model_entity: ModelEntity = None
     diagram: int = 0                    # Diagram in which this representation is displayed.
+    model_class: str = ''
 
     @classmethod
     def repr_category(cls) -> ReprCategory:
@@ -118,7 +119,6 @@ class ModeledShape(Shape, ModelRepresentation):
     default_style = dict(blockcolor='#ffffff')
     TextWidget = shapes.Text('text')
     category: ReprCategory = ReprCategory.block
-    parameters: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def text(self):
@@ -184,7 +184,7 @@ class ModeledShape(Shape, ModelRepresentation):
 
     def get_allowed_ports(self) -> List[Self]:
         # Instances can NOT edit the port configuration of their definition object.
-        if self.category != ReprCategory.block_instance and self.model_entity:
+        if self.model_entity:
             return self.model_entity.get_allowed_ports()
         return []
 
@@ -196,35 +196,9 @@ class ModeledShape(Shape, ModelRepresentation):
     @override
     def get_editable_parameters(self) -> List[EditableParameterDetails]:
         """ For instances of blocks, there can be parameters set by the definition. """
-        if self.category != ReprCategory.block_instance:
-            return self.model_entity.get_editable_parameters()
-
-        # An instance presents other parameters to edit.
-        parameter_specs = self.model_entity.get_parameter_spec_fields()
-        if not parameter_specs:
-            return []
-
-        keys_types = self.model_entity.get_parameter_specs()
-        if keys_types:
-            current_values = getattr(self, 'parameters', {})
-            parameters = [
-                EditableParameterDetails(key, type_, current_values.get(key, ''), type_)
-                for key, type_ in keys_types.items()
-            ]
-            # Filter out the parameter collection field
-            parameters = [p for p in parameters if p.name not in parameter_specs]
-            return parameters
-        else:
-            return []
+        return self.model_entity.get_editable_parameters()
 
     def updateParameters(self, new_values: Dict):
-        # For instances, update the parameterized values first.
-        if self.category == ReprCategory.block_instance:
-            parameter_specs = self.model_entity.get_parameter_spec_fields()
-            if parameter_specs:
-                keys_types = self.model_entity.get_parameter_specs()
-                self.parameters = {k: new_values[k] for k in keys_types.keys()}
-
         self.model_entity.update(new_values)
 
 
@@ -396,6 +370,55 @@ class ModeledShapeAndPorts(ModeledShape):
     @classmethod
     def is_instance_of(cls):
         return False
+
+
+@dataclass
+class ModeledBlockInstance(ModeledShapeAndPorts):
+    parameters: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def is_instance_of(cls):
+        return True
+
+    @classmethod
+    def repr_category(cls) -> ReprCategory:
+        return ReprCategory.block_instance
+
+    def get_db_table(cls):
+        return "_BlockInstanceRepresentation"
+
+    def get_allowed_ports(self) -> List[Self]:
+        """ A block instance inherits its ports from its parent, and can not edit them directly. """
+        return []
+
+    @override
+    def get_editable_parameters(self) -> List[EditableParameterDetails]:
+        """ For instances of blocks, there can be parameters set by the definition. """
+        # An instance presents other parameters to edit.
+        parameter_specs = self.model_entity.get_parameter_spec_fields()
+        if not parameter_specs:
+            return []
+
+        keys_types = self.model_entity.get_parameter_specs()
+        if keys_types:
+            current_values = getattr(self, 'parameters', {})
+            parameters = [
+                EditableParameterDetails(key, type_, current_values.get(key, ''), type_)
+                for key, type_ in keys_types.items()
+            ]
+            # Filter out the parameter collection field
+            parameters = [p for p in parameters if p.name not in parameter_specs]
+            return parameters
+        else:
+            return []
+
+    def updateParameters(self, new_values: Dict):
+        # For instances, update the parameterized values first.
+        parameter_specs = self.model_entity.get_parameter_spec_fields()
+        if parameter_specs:
+            keys_types = self.model_entity.get_parameter_specs()
+            self.parameters = {k: new_values[k] for k in keys_types.keys()}
+
 
 @dataclass
 class ModeledRelationship(Relationship, ModelRepresentation):

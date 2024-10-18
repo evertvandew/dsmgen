@@ -282,6 +282,7 @@ class _Representation(Base):
     link3: int = Column(Integer, ForeignKey("_representation.Id", ondelete='SET NULL'))
     order: int = Column(Integer)
     category: int = Column(Enum(ReprCategory))
+    model_class: str = Column(String)       # Holds the role this representation has in the model.
     details: bytes = Column("details", LargeBinary)
 
     def asdict(self):
@@ -303,6 +304,7 @@ class _BlockRepresentation(SpecialRepresentation):
     orientation: int = 0
     styling: str = ""
     category: ReprCategory = ReprCategory.block
+    model_class: str = Column(String)  # Holds the role this representation has in the model.
 
     @classmethod
     def db_to_dict(cls, repr: _Representation) -> Dict:
@@ -362,6 +364,7 @@ class _MessageRepresentation(SpecialRepresentation):
     direction: int = 0
     styling: str = ''
     category: ReprCategory = ReprCategory.message
+    model_class: str = Column(String)  # Holds the role this representation has in the model.
 
     @classmethod
     def db_to_dict(cls, repr: _Representation) -> Dict:
@@ -416,6 +419,7 @@ class _RelationshipRepresentation(SpecialRepresentation):
     category: ReprCategory = ReprCategory.relationship
     anchor_offsets: str = ""
     anchor_sizes: str = ""
+    model_class: str = Column(String)  # Holds the role this representation has in the model.
 
     @classmethod
     def db_to_dict(cls, repr: _Representation) -> Dict:

@@ -74,7 +74,7 @@ example_diagram = [
      "category": int(data_store.ReprCategory.block),
      "_entity": {"order": 0, "Id": 7, "description": "Dit is een commentaar", "parent": 3,
                  "__classname__": "Note"}},
-    {"Id": 1, "diagram": 3, "relationship": 1, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]",
+    {"Id": 4, "diagram": 3, "category": 4, "relationship": 1, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]",
      "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation",
      "__classname__": '_RelationshipRepresentation',
      "_entity": {"Id": 1, "stereotype": 1, "source": 4, "target": 5, "source_multiplicity": 1,
@@ -84,8 +84,8 @@ example_diagram = [
      "category": int(data_store.ReprCategory.port),
      "_entity": {"Id": 10, "parent": 5, "__classname__": "FlowPort"}
      }, {
-        "Id": 2, "diagram": 3, "relationship": 2, "source_repr_id": 3, "target_repr_id": 2, "routing": "[]",
-        "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation",
+        "Id": 5, "diagram": 3, "relationship": 2, "source_repr_id": 3, "target_repr_id": 2, "routing": "[]",
+        "category": 4, "z": 0.0, "styling": {}, "rel_cls": "BlockReferenceRepresentation",
         "__classname__": '_RelationshipRepresentation',
         "_entity": {"Id": 2, "source": 7, "target": 5, "__classname__": "Anchor"}
     }
@@ -132,7 +132,7 @@ port2port = [
 
 diagram_w_instance = [
     {"Id": 1, "diagram": 3, "block": 7, "parent": None, "x": 358.0, "y": 235.0, "z": 0.0, "width": 64.0, "height": 40.0,
-     "styling": {}, "block_cls": "BlockInstanceRepresentation", "__classname__": "_BlockRepresentation",
+     "styling": {}, "block_cls": "BlockInstanceRepresentation", "__classname__": "_BlockInstanceRepresentation",
      "parameters": {"parameters": {"factor": 41, "gain": 3.1415}}, "category": int(data_store.ReprCategory.block_instance),
      "_entity": {"order": 0, "Id": 4, "parent": 1, "name": "test block", "implementation": "",
                      "parameters": {"factor": "int", "gain": "float"}, "__classname__": "SubProgramDefinition"}},
@@ -165,7 +165,8 @@ def simulated_diagram_tests():
         svg.classList.add('diagram')
         container <= svg
         config = diagrams.DiagramConfiguration(
-            client.connections_from
+            client.connections_from,
+            client.all_entities
         )
         diagram = diagrams.load_diagram(
             diagram_id,
@@ -211,8 +212,8 @@ def simulated_diagram_tests():
         entity = client.Block(Id=1, name='block')
         p1 = client.FlowPort(Id=2, parent=1, name='Input')
         p2 = client.FlowPort(Id=3, parent=1, name='Output')
-        input = client.PortLabel(model_entity=p1, x=100, y=300, height=64, width=100, Id=10)
-        output = client.PortLabel(model_entity=p2, x=400, y=300, height=64, width=100, Id=11)
+        input = client.PortLabel(model_entity=p1, x=100, y=300, height=64, width=100, Id=10, model_class='FlowPort')
+        output = client.PortLabel(model_entity=p2, x=400, y=300, height=64, width=100, Id=11, model_class='FlowPort')
 
         diagram.addBlock(input)
         diagram.addBlock(output)
@@ -360,7 +361,7 @@ def simulated_diagram_tests():
         assert len(form) == 2
         html_form = str(form)
         assert d.select('#edit_name')
-        assert d.select('#styling_linecolor')
+        assert d.select('#edit_linecolor')
         edit = d.select_one('form #edit_name')
         edit.value = 'Connection'
         btn = d.select_one('#details .btn-primary')
@@ -393,7 +394,7 @@ def simulated_diagram_tests():
         assert d.select('#edit_description')
         assert d.select('.porttable TR')  # the editor for the port
         # There should be a style editor in the second form.
-        assert d.select('#styling_blockcolor')
+        assert d.select('#edit_blockcolor')
         check_expected_response()
 
     @test
@@ -474,7 +475,7 @@ def simulated_diagram_tests():
         d.select('#edit_factor')[0].value = '123.456'
         d.select('#edit_limit')[0].value = '87654'
         btn = d.select_one('#details .btn-primary')
-        add_expected_response('/data/_BlockRepresentation/400', 'post', Response(200, json={}))
+        add_expected_response('/data/_BlockInstanceRepresentation/400', 'post', Response(200, json={}))
         btn.dispatchEvent(events.Click())
 
         assert repr.parameters == {'factor': 123.456, 'limit': 87654}
@@ -491,9 +492,10 @@ def simulated_diagram_tests():
             200,
             json=diagram_w_instance))
         diagram, rest = new_diagram(3, ds)
-        ds.subscribe('shape_selected', diagram, client.on_diagram_selection)
+        assert len(diagram.children) == 2
 
-        block = diagram.children[0]
+        ds.subscribe('shape_selected', diagram, client.on_diagram_selection)
+        block = diagram.children[1]
         block.shape.dispatchEvent(events.MouseDown())
         block.shape.dispatchEvent(events.MouseUp())
         check_expected_response()
@@ -509,7 +511,7 @@ def simulated_diagram_tests():
         assert len(d.select('#edit_description')) == 0
         assert len(d.select('#edit_name')) == 0
         # It should be possible to edit the styling of the block.
-        assert d.select('#styling_blockcolor')
+        assert d.select('#edit_blockcolor')
         check_expected_response()
 
     @test
@@ -746,6 +748,7 @@ def integration_tests():
         context.diagrams.add_port(2, client.FlowPort, name='out')
         assert len(context.diagrams.ports(2)) == 2
         # Connect the three blocks
+        assert all(r.model_class for r in context.data_store.live_instances[Collection.block_repr].values())
         context.diagrams.connect(1, (2, 0), client.FlowPortConnection)
         context.diagrams.connect((2, 1), 3, client.FlowPortConnection)
         # Check the data in the data store
@@ -877,7 +880,9 @@ def integration_tests():
         context = intergration_context(hierarchy=[
             client.SubProgramDefinition(Id=5, name="Requirements").asdict(),
         ])
-        data = '''[{"Id": 1, "diagram": 5, "block": 6, "parent": null, "x": 347.0, "y": 188.0, "z": 0.0, "width": 64.0, "height": 40.0, "order": 0, "orientation": null, "styling": "", "category": 2, "_entity": {"order": 0, "orientation": 4, "Id": 6, "name": "", "parent": 5, "__classname__": "FlowPort"}, "__classname__": "_BlockRepresentation"}, {"Id": 2, "diagram": 5, "block": 7, "parent": null, "x": 253.0, "y": 531.0, "z": 0.0, "width": 64.0, "height": 40.0, "order": 0, "orientation": null, "styling": "", "category": 2, "_entity": {"order": 0, "Id": 7, "description": "", "parent": 5, "__classname__": "Note"}, "__classname__": "_BlockRepresentation"}, {"Id": 1, "diagram": 5, "relationship": 1, "source_repr_id": 2, "target_repr_id": 1, "routing": "[]", "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 1, "source": 7, "target": 6, "name": "", "__classname__": "Anchor"}}]'''
+        data = '''[{"Id": 1, "diagram": 5, "block": 6, "parent": null, "x": 347.0, "y": 188.0, "z": 0.0, "width": 64.0, "height": 40.0, "order": 0, "orientation": null, "styling": "", "category": 2, "_entity": {"order": 0, "orientation": 4, "Id": 6, "name": "", "parent": 5, "__classname__": "FlowPort"}, "__classname__": "_BlockRepresentation"}, 
+        {"Id": 2, "diagram": 5, "block": 7, "parent": null, "x": 253.0, "y": 531.0, "z": 0.0, "width": 64.0, "height": 40.0, "order": 0, "orientation": null, "styling": "", "category": 2, "_entity": {"order": 0, "Id": 7, "description": "", "parent": 5, "__classname__": "Note"}, "__classname__": "_BlockRepresentation"}, 
+        {"Id": 1, "diagram": 5, "relationship": 1, "category": 4, "source_repr_id": 2, "target_repr_id": 1, "routing": "[]", "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation", "_entity": {"Id": 1, "source": 7, "target": 6, "name": "", "__classname__": "Anchor"}}]'''
         add_expected_response('/data/diagram_contents/5', 'get', Response(200, json=json.loads(data)))
         context.explorer.dblclick_element(mid=5)
         # Check the diagram is properly displayed
@@ -937,6 +942,7 @@ def integration_tests():
             {"Id": 1, "diagram": 5, "block": 6, "parent": None, "x": 347.0, "y": 188.0, "z": 0.0, "width": 64.0,
              "height": 40.0, "order": 0, "orientation": 4, "styling": "", "category": 2,
              "__classname__": "_BlockRepresentation",
+             'model_class': 'Block',
              "_entity": {
                  "order": 0, "Id": 6, "name": "A", "parent": 5, "__classname__": "Block"
              }
@@ -945,6 +951,7 @@ def integration_tests():
                 "Id": 2, "diagram": 5, "block": 7, "parent": None, "x": 647.0, "y": 188.0, "z": 0.0, "width": 64.0,
                 "height": 40.0, "order": 0, "styling": "", "category": 2,
                 "__classname__": "_BlockRepresentation",
+                'model_class': 'Block',
                 "_entity": {
                     "order": 0, "Id": 7, "name": "A", "parent": 5, "__classname__": "Block"
                 }
@@ -1008,7 +1015,7 @@ def integration_tests():
             }, {
                 'Id': 1, 'diagram': 3, 'relationship': 1, 'source_repr_id': 2, 'target_repr_id': 3, 'routing': '[]',
                 'z': 0.0, 'styling': {'endmarker': 'square', 'startmarker': 'hat', 'routing_method': ''},
-                '__classname__': '_RelationshipRepresentation',
+                '__classname__': '_RelationshipRepresentation', "category": 4,
                 '_entity': {'Id': 1, 'source': 4, 'target': 5, '__classname__': 'BlockGeneralization'}
             }
         ]
@@ -1046,13 +1053,13 @@ def integration_tests():
         context.diagrams.enter_block_mode()
         context.diagrams.click_block(1)
         assert context.diagrams.nr_block_decorated() == 8
-        context.diagrams.click_relation(1)
+        context.diagrams.click_relation(4)
         assert context.diagrams.nr_block_decorated() == 1
         context.diagrams.click_block(2)
         assert context.diagrams.nr_block_decorated() == 8
-        context.diagrams.click_relation(2)
+        context.diagrams.click_relation(5)
         assert context.diagrams.nr_block_decorated() == 3
-        context.diagrams.click_relation(1)
+        context.diagrams.click_relation(4)
         assert context.diagrams.nr_block_decorated() == 1
         context.diagrams.enter_connection_mode()
         assert context.diagrams.nr_block_decorated() == 0
@@ -1110,46 +1117,46 @@ def integration_tests():
                  "category": 2, "_entity": {"order": 0, "Id": 17, "name": "description", "type": 3, "parent": 3,
                                             "__classname__": "Block"}, "__classname__": "_BlockRepresentation"},
                 {"Id": 1, "diagram": 3, "relationship": 1, "source_repr_id": 2, "target_repr_id": 3,
-                 "routing": "[[401.0, Infinity]]", "z": 0.0,
+                 "routing": "[[401.0, Infinity]]", "z": 0.0, "category": 4,
                  "styling": {"endmarker": "hat", "startmarker": "hat", "routing_method": "square"},
                  "__classname__": "_RelationshipRepresentation",
                  "_entity": {"Id": 1, "source": 4, "target": 5, "__classname__": "BlockGeneralization"}},
                 {"Id": 2, "diagram": 3, "relationship": 2, "source_repr_id": 3, "target_repr_id": 4, "routing": "[]",
-                 "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation",
+                 "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation", "category": 4,
                  "_entity": {"Id": 2, "parent": 3, "source": 5, "target": 6, "__classname__": "BlockGeneralization"}},
                 {"Id": 3, "diagram": 3, "relationship": 3, "source_repr_id": 4, "target_repr_id": 5, "routing": "[]",
-                 "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation",
+                 "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation", "category": 4,
                  "_entity": {"Id": 3, "parent": 3, "source": 6, "target": 7, "__classname__": "BlockGeneralization"}},
                 {"Id": 4, "diagram": 3, "relationship": 4, "source_repr_id": 4, "target_repr_id": 6,
                  "routing": "[[201.5, Infinity]]", "z": 0.0, "styling": {},
-                 "__classname__": "_RelationshipRepresentation",
+                 "__classname__": "_RelationshipRepresentation", "category": 4,
                  "_entity": {"Id": 4, "parent": 3, "source": 6, "target": 8, "__classname__": "BlockGeneralization"}},
                 {"Id": 5, "diagram": 3, "relationship": 5, "source_repr_id": 4, "target_repr_id": 7,
                  "routing": "[[226.5, Infinity]]", "z": 0.0, "styling": {},
-                 "__classname__": "_RelationshipRepresentation",
+                 "__classname__": "_RelationshipRepresentation", "category": 4,
                  "_entity": {"Id": 5, "parent": 3, "source": 6, "target": 9, "__classname__": "BlockGeneralization"}},
                 {"Id": 6, "diagram": 3, "relationship": 6, "source_repr_id": 4, "target_repr_id": 8,
                  "routing": "[[248.5, Infinity]]", "z": 0.0, "styling": {},
-                 "__classname__": "_RelationshipRepresentation",
+                 "__classname__": "_RelationshipRepresentation", "category": 4,
                  "_entity": {"Id": 6, "parent": 3, "source": 6, "target": 10, "__classname__": "BlockGeneralization"}},
                 {"Id": 7, "diagram": 3, "relationship": 7, "source_repr_id": 2, "target_repr_id": 13, "routing": "[]",
-                 "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation",
+                 "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation", "category": 4,
                  "_entity": {"Id": 7, "parent": 3, "source": 4, "target": 15, "__classname__": "BlockGeneralization"}},
                 {"Id": 8, "diagram": 3, "relationship": 8, "source_repr_id": 13, "target_repr_id": 14, "routing": "[]",
-                 "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation",
+                 "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation", "category": 4,
                  "_entity": {"Id": 8, "parent": 3, "source": 15, "target": 16, "__classname__": "BlockGeneralization"}},
                 {"Id": 9, "diagram": 3, "relationship": 9, "source_repr_id": 2, "target_repr_id": 14,
                  "routing": "[[437.0, Infinity]]", "z": 0.0, "styling": {},
-                 "__classname__": "_RelationshipRepresentation",
+                 "__classname__": "_RelationshipRepresentation", "category": 4,
                  "_entity": {"Id": 9, "parent": 3, "source": 4, "target": 16, "__classname__": "BlockGeneralization"}},
                 {"Id": 10, "diagram": 3, "relationship": 10, "source_repr_id": 13, "target_repr_id": 15,
                  "routing": "[[649.0, Infinity], [Infinity, 372.0], [556.5, Infinity]]", "z": 0.0, "styling": {},
-                 "__classname__": "_RelationshipRepresentation",
+                 "__classname__": "_RelationshipRepresentation", "category": 4,
                  "_entity": {"Id": 10, "parent": 3, "source": 15, "target": 17,
                              "__classname__": "BlockGeneralization"}},
                 {"Id": 11, "diagram": 3, "relationship": 11, "source_repr_id": 2, "target_repr_id": 15,
                  "routing": "[[Infinity, 518.5]]", "z": 0.0, "styling": {},
-                 "__classname__": "_RelationshipRepresentation",
+                 "__classname__": "_RelationshipRepresentation", "category": 4,
                  "_entity": {"Id": 11, "parent": 3, "source": 4, "target": 17, "__classname__": "BlockGeneralization"}}]
         context = intergration_context(hierarchy=[
             client.SubProgramDefinition(Id=3, name="Requirements").asdict()
@@ -1201,7 +1208,7 @@ def integration_tests():
                  'height': 40.0, 'category': 2, '__classname__': '_BlockRepresentation',
                  '_entity': t.asdict()},
                 {'Id': 1, 'diagram': 3, 'relationship': 1, 'source_repr_id': 2, 'target_repr_id': 3, 'routing': '[]',
-                 '__classname__': '_RelationshipRepresentation',
+                 '__classname__': '_RelationshipRepresentation', "category": 4,
                  '_entity': client.BlockReference(Id=1, source=s, target=t).asdict()}
             ]))
         context.explorer.dblclick_element(mid=3)
@@ -1239,12 +1246,12 @@ def integration_tests():
             "__classname__": "_BlockRepresentation"
         }, {
             "Id": 3, "diagram": 13, "relationship": 3, "source_repr_id": 6, "target_repr_id": 7, "routing": "[]",
-            "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation",
+            "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation", "category": 4,
             "_entity": {"Id": 3, "parent": 13, "source": 14, "target": 15, "__classname__": "BlockReference"}
         }, {
             "Id": 1, "diagram": 13, "message": 17, "parent": 3, "x": 235.0, "y": 313.5, "z": 0.0, "order": 0,
             "orientation": 0.0, "direction": 1, "styling": {},
-            "__classname__": "_MessageRepresentation",
+            "__classname__": "_MessageRepresentation", "category": 5,
             "_entity": {"order": 0, "Id": 17, "name": "test", "kind": 1, "arguments": "", "description": "",
                         "parent": 13, "association": 3, "__classname__": "ClassMessage"}
         }]
@@ -1424,6 +1431,8 @@ def integration_tests():
         context.explorer.drag_to_diagram(10, client.ObjectSequenceInstance)
 
         assert len(context.diagrams.blocks()) == 2
+        assert isinstance(context.diagrams.blocks()[0].model_entity, client.Class)
+        assert isinstance(context.diagrams.blocks()[1].model_entity, client.Class)
         for shape in context.diagrams.blocks():
             assert isinstance(shape, client.LanedShape)
 

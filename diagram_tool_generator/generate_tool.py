@@ -131,11 +131,19 @@ class Generator:
         """ Determine which items can be dropped on a diagram, and which items are the result. """
         # Allowed blocks are specified in the "entities".
         # One class of blocks needs special treatment: the "Instance" blocks.
+        # Also, some XREF attributes can be "droppable".
         allowed_blocks = {e: e.__name__ for e in cls.entities if not self.md.is_instance_of(e)}
         instance_blocks = [e for e in cls.entities if self.md.is_instance_of(e)]
         for e in instance_blocks:
             for p in self.get_inner_types(cls, e.__annotations__['definition']):
                 allowed_blocks[p] = e.__name__
+
+        # Find the droppable types
+        for b in cls.entities:
+            for droppable in [f for f in b.__annotations__.items()
+                         if isinstance(f[1], model_definition.XRef) and model_definition.droppable in f[1].options]:
+                for t in droppable[1].types:
+                    allowed_blocks[t] = b.__name__
 
         block_names = [f'"{e.__name__}": "{s}"' for e, s in allowed_blocks.items()]
         return block_names
@@ -188,8 +196,8 @@ class Generator:
         if isinstance(field_type, mdef.selection):
             return f'IntEnum("InstantEnum", "{" ".join(field_type.options)}")'
         if isinstance(field_type, mdef.XRef):
-            if mdef.optional in field_type.types:
-                return 'OptionalRef(int)'
+            if mdef.droppable in field_type.options:
+                return f'OptionalRef({', '.join(t.__name__ for t in field_type.types)})'
             return 'int'
         if isinstance(field_type, mdef.parameter_values):
             return 'str'

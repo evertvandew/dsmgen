@@ -169,6 +169,7 @@ def getInputForValue(name: str, field_type: type, value: Any):
         for option in field_type:
             if value == option:
                 input <= html.OPTION(option.name, value=option.value, selected=1)
+                input.value = option.value
             else:
                 input <= html.OPTION(option.name, value=option.value)
         return input
@@ -179,17 +180,7 @@ def getInputForValue(name: str, field_type: type, value: Any):
         input.className = 'form-control'
         return input
     if field_type == Color:
-        return html.INPUT(id=f"styling_{name}", name=name, value=value, type='color')
-    if field_type in [HAlign, VAlign]:
-        input = html.SELECT(id=f"styling_{name}", name=name)
-        value = value.value
-        for option in field_type:
-            if value == option:
-                input <= html.OPTION(option.name, value=option.value, selected=1)
-                input.value = option.value
-            else:
-                input <= html.OPTION(option.name, value=option.value)
-        return input
+        return html.INPUT(id=f"edit_{name}", name=name, value=value, type='color')
     if field_type in type2HtmlInput:
         stored_value = value if value is not None else type2default[field_type]
         if stored_value is None or value == '':
@@ -418,7 +409,7 @@ def getFormValues(form, o: Optional[ModelEntity], editable_fields: List[Editable
 
     if o.isStylable():
         defaults = o.getDefaultStyle()
-        fields = {key: document.select( f'#styling_{key}') for key in defaults.keys()}
+        fields = {key: document.select( f'#edit_{key}') for key in defaults.keys()}
         fields = {k: v[0].value for k, v in fields.items() if v}
         new_style = {key: createFromValue(type(default))(fields.get(key, default))
                      for key, default in defaults.items()}

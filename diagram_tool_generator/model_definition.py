@@ -384,6 +384,7 @@ class required(OptionalAnnotation): pass    # An instance must ALWAYS have this 
 class optional(OptionalAnnotation): pass    # An instance does not need this attribute filled in
 class detail(OptionalAnnotation): pass      # This attribute is a detail only shown in a detail editor.
 class hidden(OptionalAnnotation): pass      # This attribute is not to be seen or edited by the user.
+class droppable(OptionalAnnotation): pass   # This instance can be created by dropping an object in a diagram.
 
 class selection:
     """ Define an attribute that must be set to one of several options. """

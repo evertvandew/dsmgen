@@ -2,7 +2,7 @@ from enum import IntEnum, auto
 from typing import Self, Any
 from model_definition import (ModelDefinition, required,
                               optional, selection, detail, longstr, XRef,
-                              hidden, parameter_spec)
+                              hidden, droppable, parameter_spec)
 
 # The tooling expects an ModelDifinition object named `md`
 md = ModelDefinition()
@@ -139,8 +139,9 @@ class Class:
     name: str
     description: (longstr, detail)
 
-@md.BlockInstance(parents=[Any], definitions=[Class])
+@md.Entity(parents=[Any])
 class ObjectInstance:
+    defining_class: XRef('instances', Class, droppable)
     name: str
 
 @md.BlockDiagram(Block, Note, Constraint, BlockInstance, EndState, styling='icon:image')

@@ -282,6 +282,7 @@ def test_server():
         )
         assert r.status_code == 201
         results = json.loads(r.content)
+        assert results['model_class'] == 'Block'
         for i, p in enumerate(results['children']):
             assert p['category'] == int(data_store.ReprCategory.port)
             assert p['block'] == 3 + i
@@ -344,6 +345,7 @@ def test_server():
         assert results['Id'] == 1
         assert results['diagram'] == 2
         assert results['parent'] == None
+        assert results['model_class'] == 'BlockInstance'
         assert len(results['children']) == 2
         assert results['_entity']['__classname__'] == 'BlockInstance'
         assert results['_entity']['Id'] == 6
@@ -399,6 +401,7 @@ def test_server():
         assert results['Id'] == 1
         assert results['diagram'] == 2
         assert results['parent'] == None
+        assert results['model_class'] == 'BlockInstance'
         assert len(results['children']) == 1
         p = results['children'][0]
         assert p['Id'] == 2
@@ -457,6 +460,7 @@ def test_server():
         results = json.loads(r.content)
         assert results['diagram'] == 2
         assert results['block'] == 3
+        assert results['model_class'] == 'BlockInstance'
         assert results['_entity']['parameters']['parameters']['type'] == 1
 
 

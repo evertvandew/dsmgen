@@ -18,7 +18,8 @@ along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
 import json
-from typing import Dict, Type, Any
+from dataclasses import fields
+from typing import Dict, Type, Any, override
 from weakref import ref
 
 import data_store
@@ -28,6 +29,7 @@ from diagrams import Diagram, getMousePos, DiagramConfiguration
 import shapes
 from data_store import UndoableDataStore, ReprCategory, StorableElement, Collection, ReprCategory
 from modeled_shape import ModeledRelationship, ModelEntity, ModeledShape, Port, ModelRepresentation
+from property_editor import OptionalRef
 
 
 class ModeledDiagram(Diagram):
@@ -39,7 +41,8 @@ class ModeledDiagram(Diagram):
         def addAction(event, source: StorableElement, ds, details):
             """ Perform specific actions when a new record is created """
             ## If a new port is added to the model, check if it is added to any block shown here.
-            if type(source).__name__ in datastore.configuration.port_entities:
+            source_cls_name = type(source).__name__
+            if source_cls_name in datastore.configuration.port_entities:
                 # Check if it is owned by any block represented directly.
                 reprs = [c for c in self.children if c.model_entity.Id is source.parent]
                 for r in reprs:
@@ -49,7 +52,7 @@ class ModeledDiagram(Diagram):
                     #    r.model_entity.ports.append(source)
                     # Check it is represented in each representation
                     if not any(source.Id == p.model_entity.Id for p in r.ports):
-                        p = repr_cls(parent=r.Id, model_entity=source, diagram=self.diagram_id)
+                        p = repr_cls(parent=r.Id, model_entity=source, diagram=self.diagram_id, model_class=source_cls_name)
                         self.datastore.add_complex(p)
                         # Redraw the shape
                         r.updateShape(r.shape)
@@ -58,8 +61,10 @@ class ModeledDiagram(Diagram):
                 if source.parent == self.diagram_id:
                     # Now we need to create a PortLabel
                     repr_cls = source.get_representation_cls(ReprCategory.block)
-                    self.addBlock(repr_cls(model_entity=source, block=source.Id, diagram=self.diagram_id))
+                    self.addBlock(repr_cls(model_entity=source, block=source.Id, diagram=self.diagram_id, model_class=source_cls_name))
 
+
+                # TODO: This bit can probably be removed.
                 # Check if it is owned by a block that is instantiated here.
                 reprs = [c for c in self.children if getattr(getattr(c, '_definition', None), 'Id', -1) == source.parent]
                 for r in reprs:
@@ -140,6 +145,7 @@ class ModeledDiagram(Diagram):
     def get_allowed_blocks(cls, block_cls_name: str, for_drop=False) -> Dict[str, Type[ModelEntity]]:
         raise NotImplementedError()
 
+    @override
     def load_diagram(self):
         self.datastore.get_diagram_data(self.diagram_id, self.mass_update)
 
@@ -201,6 +207,7 @@ class ModeledDiagram(Diagram):
             x=loc.x, y=loc.y,
             width=int(default_style.get('width', 64)), height=int(default_style.get('height', 40)),
             diagram=self.diagram_id,
+            model_class = block_cls.__name__
         )
         category = self.get_representation_category(block_cls)
         # Determine the initial order
@@ -233,7 +240,7 @@ class ModeledDiagram(Diagram):
 
     def connect(self, a, b):
         """ Connect two blocks a and b. If necessary, the right connection type is selected by the User. """
-        ta, tb = type(a.model_entity), type(b.model_entity)
+        ta, tb = [self.config.all_entities[r.model_class] for r in [a, b]]
         clss = self.config.get_allowed_connections(ta, tb) + self.config.get_allowed_connections(ta, Any)
         if not clss:
             d = InfoDialog('Can not connect', f"A {type(a).__name__} can not be connected to a {type(b).__name__}")
