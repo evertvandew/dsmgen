@@ -15,10 +15,11 @@ def generator_tests():
         generator, module_name = gen.Generator.load_from_config(gen.Configuration(TEST_SPEC))
         sysml_spec = sys.modules[module_name]
         attrs = generator.get_diagram_attributes(sysml_spec.Block)
-        assert len(attrs) == 2
+        assert len(attrs) == 3
         names = [f.name for f in attrs]
         assert 'name' in names
         assert 'description' in names
+        assert 'parameters' in names
 
 
 if __name__ == '__main__':

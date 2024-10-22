@@ -13,8 +13,8 @@ from test_frame import prepare, test, run_tests, cleanup
 import generate_project     # Ensures the client is built up to date
 
 from build.sysml_data import GEN_VERSION
-START_SERVER = True
-START_THREADED_SERVER = False
+START_SERVER = False
+START_THREADED_SERVER = True
 
 def run_server():
     """ Start the server in a separate process. Return the URL to access it.
@@ -282,7 +282,8 @@ def test_server():
         )
         assert r.status_code == 201
         results = json.loads(r.content)
-        assert results['model_class'] == 'Block'
+        assert results['model_class'] == '_BlockRepresentation'
+        assert results['_entity']['__classname__'] == 'Block'
         for i, p in enumerate(results['children']):
             assert p['category'] == int(data_store.ReprCategory.port)
             assert p['block'] == 3 + i
@@ -345,18 +346,14 @@ def test_server():
         assert results['Id'] == 1
         assert results['diagram'] == 2
         assert results['parent'] == None
-        assert results['model_class'] == 'BlockInstance'
+        assert results['model_class'] == '_InstanceRepresentation'
         assert len(results['children']) == 2
-        assert results['_entity']['__classname__'] == 'BlockInstance'
-        assert results['_entity']['Id'] == 6
-        assert results['_entity']['parent'] == 2    # The Instance block is created under the diagram
-        assert results['_entity']['definition'] == 3
-        assert results['_entity']['parameters'] == {'parameters': {'factor': 0.0, 'limit': 0}}
-        assert results['_definition']['__classname__'] == 'SubProgramDefinition'
-        assert results['_definition']['Id'] == 3
-        assert results['_definition']['name'] == 'Block 1'
-        assert results['_definition']['description'] == 'Dit is een test'
-        assert results['_definition']['parameters'] == '{"limit":"int","factor":"float"}'
+        assert results['parameters'] == {'parameters': {'factor': 0.0, 'limit': 0}}
+        assert results['_entity']['__classname__'] == 'SubProgramDefinition'
+        assert results['_entity']['Id'] == 3
+        assert results['_entity']['name'] == 'Block 1'
+        assert results['_entity']['description'] == 'Dit is een test'
+        assert results['_entity']['parameters'] == '{"limit":"int","factor":"float"}'
 
         for i, p in enumerate(results['children']):
             assert p['category'] == int(data_store.ReprCategory.port)
@@ -364,12 +361,9 @@ def test_server():
             assert p['diagram'] == 2
             assert p['parent'] == 1
             assert p['_entity']['__classname__'] == 'FlowPort'
-        # Check the underlying Instance can be accessed
-        r = requests.get(base_url + '/data/BlockInstance/6')
-        assert r.status_code == 200
 
         # Now delete the Instance Representation and check that the underlying Instance is deleted as well
-        r = requests.delete(base_url+'/data/_BlockRepresentation/1')
+        r = requests.delete(base_url+'/data/_InstanceRepresentation/1')
         assert r.status_code == 204
         # Check the port representations are gone
         r = requests.get(base_url+'/data/_BlockRepresentation/2')
@@ -401,23 +395,19 @@ def test_server():
         assert results['Id'] == 1
         assert results['diagram'] == 2
         assert results['parent'] == None
-        assert results['model_class'] == 'BlockInstance'
+        assert results['model_class'] == '_InstanceRepresentation'
+        assert results['parameters'] == {'parameters': {}}
         assert len(results['children']) == 1
         p = results['children'][0]
         assert p['Id'] == 2
         assert p['__classname__'] == '_BlockRepresentation'
         assert p['_entity']['Id'] == 4
         assert p['_entity']['__classname__'] == 'FlowPort'
-        assert results['_entity']['__classname__'] == 'BlockInstance'
-        assert results['_entity']['Id'] == 5
-        assert results['_entity']['parent'] == 2    # The Instance block is created under the diagram
-        assert results['_entity']['definition'] == 3
-        assert results['_entity']['parameters'] == {'parameters': {}}
-        assert results['_definition']['__classname__'] == 'SubProgramDefinition'
-        assert results['_definition']['Id'] == 3
-        assert results['_definition']['name'] == 'Block 1'
-        assert results['_definition']['description'] == 'Dit is een test'
-        assert results['_definition']['parameters'] == ''
+
+        assert results['_entity']['__classname__'] == 'SubProgramDefinition'
+        assert results['_entity']['Id'] == 3
+        assert results['_entity']['name'] == 'Block 1'
+        assert results['_entity']['description'] == 'Dit is een test'
 
     @test
     def redo_add():
@@ -459,11 +449,11 @@ def test_server():
         assert r.status_code == 201
         results = json.loads(r.content)
         assert results['diagram'] == 2
-        assert results['block'] == 3
-        assert results['model_class'] == 'BlockInstance'
-        assert results['_entity']['parameters']['parameters']['type'] == 1
+        assert results['block'] == 1
+        assert results['model_class'] == '_InstanceRepresentation'
+        assert results['parameters']['parameters']['type'] == 1
 
 
 if __name__ == '__main__':
-    run_tests('*.test_create_delete_instance')
+    run_tests('*.store_parameter_specification')
     run_tests()

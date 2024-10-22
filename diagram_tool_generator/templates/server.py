@@ -132,6 +132,7 @@ def create_port_representations(definition_id, representation_id, diagram, sessi
             height=0,
             styling='',
             category=dm.ReprCategory.port,
+            model_class=type(ch).__name__
         ).to_db() for ch in port_entities]
     for p in port_reprs:
         session.add(p)
@@ -149,33 +150,44 @@ def create_block_representation(index, table, data, session, dm):
         if len(definition_records) != 1:
             return flask.make_response(f'Not found', 404)
         definition_record = definition_records[0]
-        definition = dm.AWrapper.load_from_db(definition_record)
+        entity = dm.AWrapper.load_from_db(definition_record)
         # Prepare the set of data to be stored in the Instance model object
         details = dict(parent=data['diagram'], definition=index)
         # Find the 'parameter_spec' fields and add them to the instance
         # This must be done runtime as the list of parameters is specified in the record being instantiated.
         # It is not set statically in the model specification.
-        params = PARAMETER_SPECIFICATIONS.get(definition.__class__.__name__, [])
-        all_params = {p: get_parameters_defaults(getattr(definition, p)) for p in params}
-        details['parameters'] = all_params
-
-        entity = table(**details)
-        entity.store(session=session)
+        params = PARAMETER_SPECIFICATIONS.get(entity.__class__.__name__, [])
+        all_params = {p: get_parameters_defaults(getattr(entity, p)) for p in params}
+        record = dm._InstanceRepresentation(
+            diagram=data['diagram'],
+            block=entity.Id,
+            parent=None,
+            x=data['x'],
+            y=data['y'],
+            z=data.get('z', 0),
+            width=data['width'],
+            height=data['height'],
+            styling='',
+            category=data.get('category', dm.ReprCategory.block),
+            model_class=table.__name__,
+            parameters=all_params
+        ).to_db()
     else:
         entity = table.retrieve(index, session=session)
 
-    record = dm._BlockRepresentation(
-        diagram=data['diagram'],
-        block=entity.Id,
-        parent=None,
-        x=data['x'],
-        y=data['y'],
-        z=data.get('z', 0),
-        width=data['width'],
-        height=data['height'],
-        styling='',
-        category = data.get('category', dm.ReprCategory.block)
-    ).to_db()
+        record = dm._BlockRepresentation(
+            diagram=data['diagram'],
+            block=entity.Id,
+            parent=None,
+            x=data['x'],
+            y=data['y'],
+            z=data.get('z', 0),
+            width=data['width'],
+            height=data['height'],
+            styling='',
+            category = data.get('category', dm.ReprCategory.block),
+            model_class = table.__name__
+        ).to_db()
     session.add(record)
     session.commit()
 
@@ -186,11 +198,11 @@ def create_block_representation(index, table, data, session, dm):
         # Represent the ports belonging to the block being represented.
         port_entities, port_reprs = create_port_representations(entity.Id, record.Id, data['diagram'], session, dm)
     session.commit()
-    record_dict = dm._BlockRepresentation.db_to_dict(record)
+    record_dict = dm.SpecialRepresentation.db_to_dict(record)
     record_dict['_entity'] = entity.asdict()
     if issubclass(table, dm.AInstance):
-        record_dict['_definition'] = definition.asdict()
-    record_dict['children'] = [dm._BlockRepresentation.db_to_dict(p) for p in port_reprs]
+        record_dict['_definition'] = entity.asdict()
+    record_dict['children'] = [dm.SpecialRepresentation.db_to_dict(p) for p in port_reprs]
     for e, p in zip(port_entities, record_dict['children']):
         p['_entity'] = e.asdict()
     return flask.make_response(json.dumps(record_dict, cls=dm.ExtendibleJsonEncoder), 201)
@@ -207,7 +219,8 @@ def create_relation_representation(index: int, table: type, data: Dict[str, Any]
         z=data['z'],
         styling='',
         rel_cls=table.__name__ + 'Representation',
-        category=data.get('category', dm.ReprCategory.relationship)
+        category=data.get('category', dm.ReprCategory.relationship),
+        model_class=table.__name__
     )
     record.post_init()
     session.add(record)
@@ -468,13 +481,7 @@ def diagram_contents(index):
         data = []
 
         for repr, entity in result:
-            match repr.category:
-                case ReprCategory.relationship:
-                    d = dm._RelationshipRepresentation.db_to_dict(repr)
-                case ReprCategory.message:
-                    d = dm._MessageRepresentation.db_to_dict(repr)
-                case _:
-                    d = dm._BlockRepresentation.db_to_dict(repr)
+            d = dm.SpecialRepresentation.db_to_dict(repr)
             d['_entity'] = dm.AWrapper.load_from_db(entity).asdict()
             data.append(d)
 

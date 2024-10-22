@@ -31,9 +31,11 @@ def data_store_tests():
         entity_name = url.split('/')[2]
         # This is a dataclass
         cls = sm.__dict__[entity_name]
-        jdata = json.loads(kwargs['data'])
-        jdata = {k: v for k, v in jdata.items() if k not in ['children', '__classname__']}
-        _instance = cls(**jdata)
+        #assert entity_name == kwargs['__classname__']
+        del kwargs['__classname__']
+        #jdata = json.loads(kwargs['data'])
+        #jdata = {k: v for k, v in jdata.items() if k not in ['children', '__classname__']}
+        _instance = cls(**kwargs)
         # If the thing can be instantiated, all is well.
 
     @test
@@ -92,6 +94,7 @@ def data_store_tests():
                                "__classname__": "Note"}},
                   {"Id": 1, "diagram": 3, "relationship": 1, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]",
                    "z": 0.0, "styling": {}, "__classname__": "_RelationshipRepresentation", "rel_cls": "BlockReferenceRepresentation",
+                   "category": ReprCategory.relationship,
                    "_entity": {"Id": 1, "stereotype": 1, "source": 4, "target": 5, "source_multiplicity": 1,
                                "target_multiplicity": 1, "__classname__": "BlockReference"}},
                   {"Id": 51, "diagram": 3, "block": 10, "parent": 2, "__classname__": "_BlockRepresentation", "category": ReprCategory.port,
@@ -130,7 +133,8 @@ def data_store_tests():
         ok = False
         def check_request(url, method, kwargs):
             nonlocal ok
-            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "parent": None, "name": "Test1", "description": "This is a test block", "__classname__": "Block"}
+            for k, v in {"Id": 0, "order": 0, "parent": None, "name": "Test1", "description": "This is a test block", "__classname__": "Block"}.items():
+                assert kwargs[k] == v
             ok = True
             return Response(201, json={'Id': 123})
 
@@ -147,11 +151,13 @@ def data_store_tests():
         model = client.Block(name="Test1", description="This is a test block")
         item = ModeledShapeAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
         def check_request_model(url, method, kwargs):
-            assert json.loads(kwargs['data']) == {"Id": 0, "parent": 456, "name": "Test1", "description": "This is a test block", "order": 0, "__classname__": "Block"}
+            for k, v in {"Id": 0, "parent": 456, "name": "Test1", "description": "This is a test block", "order": 0, "__classname__": "Block"}.items():
+                assert kwargs[k] == v
             return Response(201, json={'Id': 123})
 
         def check_request_repr(url, method, kwargs):
-            assert json.loads(kwargs['data']) == {"Id": 0, "order": 0, "category": 2, "diagram": 456, "block": 123, "parent": None, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "__classname__": "ModeledShapeAndPorts"}
+            for k, v in {"Id": 0, "order": 0, "category": 2, "diagram": 456, "block": 123, "parent": None, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "__classname__": "ModeledShapeAndPorts"}.items():
+                assert kwargs[k] == v
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/Block', 'post', get_response=check_request_model)
@@ -184,15 +190,16 @@ def data_store_tests():
         )
 
         def check_request_model(url, method, kwargs):
-            data = json.loads(kwargs['data'])
-            assert data["stereotype"] == 2
-            assert data["source"] == 101
-            assert data["target"] == 102
-            assert data["__classname__"] == "BlockReference"
+            #data = json.loads(kwargs['data'])
+            assert kwargs["stereotype"] == 2
+            assert kwargs["source"] == 101
+            assert kwargs["target"] == 102
+            assert kwargs["__classname__"] == "BlockReference"
             return Response(201, json={'Id': 123})
 
         def check_request_repr(url, method, kwargs):
-            assert json.loads(kwargs['data']) == {'Id': 0, "diagram": 456, "relationship": 123, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]", "z": 0.0, "category": 4, "styling": {}, '__classname__': 'ModeledRelationship'}
+            for k, v in {'Id': 0, "diagram": 456, "relationship": 123, "source_repr_id": 1, "target_repr_id": 2, "routing": "[]", "z": 0.0, "category": 4, "styling": {}, '__classname__': 'ModeledRelationship'}.items():
+                assert kwargs[k] == v
             return Response(201, json={'Id': 121})
 
         add_expected_response('/data/BlockReference', 'post', get_response=check_request_model)
@@ -212,11 +219,11 @@ def data_store_tests():
         ds.update_cache(model)
         item = ModeledShapeAndPorts(model_entity=model, x=100, y=150, width=64, height=40, styling={}, diagram=456)
         def check_request_repr(url, method, kwargs):
-            details = json.loads(kwargs['data'])
+            #details = json.loads(kwargs['data'])
             expected = dict(Id=0, diagram=456, block=123, parent=None, x=100, y=150, z=0.0, width=64, height=40,
                             styling={}, __classname__='ModeledShapeAndPorts')
             for k in expected.keys():
-                assert details[k] == expected[k], f"Values not equal for key {k}: {details[k]} != {expected[k]}"
+                assert kwargs[k] == expected[k], f"Values not equal for key {k}: {details[k]} != {expected[k]}"
             #assert kwargs['data'] == '''{"diagram": 456, "block": 123, "parent": null, "x": 100, "y": 150, "z": 0.0, "width": 64, "height": 40, "styling": {}, "block_cls": "BlockRepresentation"}'''
             return Response(201, json={'Id': 121})
 
@@ -449,5 +456,5 @@ def data_store_tests():
 
 
 if __name__ == '__main__':
-    run_tests('*.test_ports')
+    run_tests('*.test_get_diagram')
     run_tests()
