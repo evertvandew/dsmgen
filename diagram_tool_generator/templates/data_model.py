@@ -578,6 +578,7 @@ class _InstanceRepresentation(ARepresentation):
     order: int = 0
     orientation: int = 0
     parameters: str = ''
+    instance_role: str = ''
 
     def extract_record_values(self) -> Dict[str, Any]:
         return self._to_db(

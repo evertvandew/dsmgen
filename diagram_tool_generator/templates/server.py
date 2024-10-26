@@ -168,7 +168,8 @@ def create_block_representation(index, table, data, session, dm):
             height=data['height'],
             styling='',
             category=data.get('category', dm.ReprCategory.block),
-            parameters=all_params
+            parameters=all_params,
+            instance_role=table.__name__
         )
     else:
         entity = table.retrieve(index, session=session)

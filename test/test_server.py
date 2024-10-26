@@ -357,6 +357,7 @@ def test_server():
         assert results['diagram'] == 2
         assert results['parent'] == None
         assert results['__classname__'] == '_InstanceRepresentation'
+        assert results['instance_role'] == 'BlockInstance'
         assert len(results['children']) == 2
         assert results['parameters'] == {'parameters': {'factor': 0.0, 'limit': 0}}
         assert results['_entity']['__classname__'] == 'SubProgramDefinition'
@@ -407,6 +408,7 @@ def test_server():
         assert results['parent'] == None
         assert results['__classname__'] == '_InstanceRepresentation'
         assert results['parameters'] == {'parameters': {}}
+        assert results['instance_role'] == 'BlockInstance'
         assert len(results['children']) == 1
         p = results['children'][0]
         assert p['Id'] == 2
@@ -465,5 +467,5 @@ def test_server():
 
 
 if __name__ == '__main__':
-    run_tests('*.store_parameter_specification')
+    run_tests('*.test_create_delete_instance')
     run_tests()
