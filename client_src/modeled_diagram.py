@@ -52,7 +52,7 @@ class ModeledDiagram(Diagram):
                     #    r.model_entity.ports.append(source)
                     # Check it is represented in each representation
                     if not any(source.Id == p.model_entity.Id for p in r.ports):
-                        p = repr_cls(parent=r.Id, model_entity=source, diagram=self.diagram_id, model_class=source_cls_name)
+                        p = repr_cls(parent=r.Id, model_entity=source, diagram=self.diagram_id)
                         self.datastore.add_complex(p)
                         # Redraw the shape
                         r.updateShape(r.shape)
@@ -61,7 +61,7 @@ class ModeledDiagram(Diagram):
                 if source.parent == self.diagram_id:
                     # Now we need to create a PortLabel
                     repr_cls = source.get_representation_cls(ReprCategory.block)
-                    self.addBlock(repr_cls(model_entity=source, block=source.Id, diagram=self.diagram_id, model_class=source_cls_name))
+                    self.addBlock(repr_cls(model_entity=source, block=source.Id, diagram=self.diagram_id))
 
 
                 # TODO: This bit can probably be removed.
@@ -207,7 +207,6 @@ class ModeledDiagram(Diagram):
             x=loc.x, y=loc.y,
             width=int(default_style.get('width', 64)), height=int(default_style.get('height', 40)),
             diagram=self.diagram_id,
-            model_class = block_cls.__name__
         )
         category = self.get_representation_category(block_cls)
         # Determine the initial order
@@ -238,9 +237,10 @@ class ModeledDiagram(Diagram):
         self.datastore.delete(block)
         super().deleteBlock(block)
 
-    def connect(self, a, b):
+    def connect(self, a: ModeledShape, b: ModeledShape):
         """ Connect two blocks a and b. If necessary, the right connection type is selected by the User. """
-        ta, tb = [self.config.all_entities[r.model_class] for r in [a, b]]
+        ta, tb = [r.modelled_entity() for r in [a, b]]
+        ta, tb = [(self.config.all_entities[r] if isinstance(r, str) else r) for r in [ta, tb]]
         clss = self.config.get_allowed_connections(ta, tb) + self.config.get_allowed_connections(ta, Any)
         if not clss:
             d = InfoDialog('Can not connect', f"A {type(a).__name__} can not be connected to a {type(b).__name__}")

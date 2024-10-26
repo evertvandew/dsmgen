@@ -63,7 +63,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker, backref, relationship, 
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.sql import text
 from sqlalchemy.engine import Engine
-
+from sqlalchemy.engine.cursor import CursorResult
 from client_src.storable_element import ReprCategory
 
 GEN_VERSION = "0.5"
@@ -218,6 +218,46 @@ def update_db_v0_3(session):
 def update_db_v0_4(session):
     session.execute(text(f'ALTER TABLE _relationshiprepresentation RENAME COLUMN "anchor_positions" TO "anchor_offsets";'))
     return "0.5"
+def update_db_v0_5(session):
+    # Re-use the _blockrepresentation table as the basis for the _representation.
+    session.execute(
+        text(f'ALTER TABLE _blockrepresentation RENAME COLUMN "block" TO "entity";'))
+    session.execute(text('ALTER TABLE _blockrepresentation ADD COLUMN "link1" INTEGER'))
+    session.execute(text('ALTER TABLE _blockrepresentation ADD COLUMN "link2" INTEGER'))
+    session.execute(text('ALTER TABLE _blockrepresentation ADD COLUMN "link3" INTEGER'))
+    session.execute(text('ALTER TABLE _blockrepresentation ADD COLUMN "model_class" STRING'))
+    session.execute(text('ALTER TABLE _blockrepresentation ADD COLUMN "details" BLOB'))
+    session.execute(text('ALTER TABLE _blockrepresentation  RENAME TO "_entity"'))
+
+    #
+
+    # Create _entities for all representations.
+    result = session.execute(text('SELECT * FROM _relationship;'))
+    keys = result.keys()
+    new_entities = []
+    for data in result:
+        d = dict(zip(keys, data))
+        new_entities.append(dict(
+            type='Relationship',
+            subtype=d['subtype'],
+            details=json.dumps(dict(
+                order=0,
+                source=d['source_id'],
+                target=d['target_id'],
+                name=d['name'],
+                parent=d['parent'],
+                __classname__=d['__classname__']
+            ))
+        ))
+
+    for new_entitie in new_entities.items():
+        session.execute(text(''))
+
+    # Replace all instance objects with instance representations
+
+    # Remove the definition and association field
+    session.execute(text(f'ALTER TABLE _entity DELETE COLUMN "definition";'))
+    session.execute(text(f'ALTER TABLE _entity DELETE COLUMN "association";'))
 
 def init_db(e=None):
     global engine
@@ -273,6 +313,7 @@ class _Entity(Base):
 @dataclass
 class _Representation(Base):
     Id: int = Column(Integer, primary_key=True)
+    subtype: str = Column(String)       # Holds the role this representation has in the model.
     diagram: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
     entity: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
     parent: int = Column(Integer, ForeignKey("_representation.Id", ondelete='CASCADE'))
@@ -281,245 +322,10 @@ class _Representation(Base):
     link3: int = Column(Integer, ForeignKey("_representation.Id", ondelete='SET NULL'))
     order: int = Column(Integer)
     category: int = Column(Enum(ReprCategory))
-    model_class: str = Column(String)       # Holds the role this representation has in the model.
     details: bytes = Column("details", LargeBinary)
 
     def asdict(self):
         raise NotImplementedError()
-
-@dataclass
-class SpecialRepresentation:
-    Id: Optional[int] = None
-    diagram: Optional[int] = None
-    styling: str = ""
-    category: ReprCategory = ReprCategory.no_repr
-    order: int = 0,
-    model_class: str = Column(String)  # Holds the role this representation has in the model.
-
-    """ Add a function to a Data Class that extracts a dictionary from it from which the dataclass
-        can be reconstructed.
-    """
-    def asdict(self) -> Dict[str, Any]:
-        d = asdict(self)
-        d['__classname__'] = type(self).__name__
-        return d
-
-    @staticmethod
-    def db_to_dict(repr: _Representation):
-        cls = {c.__name__: c for c in SpecialRepresentation.__subclasses__()}[repr.model_class]
-        return cls.db_to_dict(repr)
-
-    @staticmethod
-    def _db_to_dict(repr: _Representation):
-        details = json.loads(repr.details)
-
-        return dict(
-            Id=repr.Id,
-            diagram=repr.diagram,
-            styling=details['styling'],
-            category=repr.category,
-            model_class=repr.model_class,
-            details=details
-        )
-
-    def _to_db(self, details, **kwargs) -> _Representation:
-        details['styling'] = self.styling
-        return _Representation(
-            Id = self.Id,
-            diagram = self.diagram,
-            category = self.category,
-            details = json.dumps(details).encode('utf8'),
-            model_class = type(self).__name__,
-            **kwargs
-        )
-
-
-@dataclass
-class _BlockRepresentation(SpecialRepresentation):
-    block: Optional[int] = None
-    parent: Optional[int] = None
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
-    category: ReprCategory = ReprCategory.block
-    lane_length: float = 0.0
-    width: float = 0.0
-    height: float = 0.0
-    order: int = 0
-    orientation: int = 0
-
-    @classmethod
-    def db_to_dict(cls, repr: _Representation) -> Dict:
-        base = SpecialRepresentation._db_to_dict(repr)
-        details = base['details']
-        del base['details']
-        base.update(
-            block=repr.entity,
-            parent=repr.parent,
-            x=details['x'],
-            y=details['y'],
-            z=details['z'],
-            lane_length=details['lane_length'],
-            width=details['width'],
-            height=details['height'],
-            order=repr.order,
-            __classname__=cls.__name__
-        )
-        return base
-
-    def to_db(self) -> _Representation:
-        details = dict(
-            x = self.x,
-            y = self.y,
-            z = self.z,
-            lane_length = self.lane_length,
-            width = self.width,
-            height = self.height,
-        )
-        return self._to_db(
-            entity = self.block,
-            parent = self.parent,
-            order = self.order,
-            details = details
-        )
-
-@dataclass
-class _InstanceRepresentation(SpecialRepresentation):
-    category: ReprCategory = ReprCategory.block_instance
-    block: Optional[int] = None
-    parent: Optional[int] = None
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
-    lane_length: float = 0.0
-    width: float = 0.0
-    height: float = 0.0
-    order: int = 0
-    orientation: int = 0
-    parameters: str = ''
-
-    @classmethod
-    def db_to_dict(cls, repr: _Representation) -> Dict:
-        base = SpecialRepresentation._db_to_dict(repr)
-        details = base['details']
-        del base['details']
-        base.update(
-            block=repr.entity,
-            parent=repr.parent,
-            x=details['x'],
-            y=details['y'],
-            z=details['z'],
-            lane_length=details['lane_length'],
-            width=details['width'],
-            height=details['height'],
-            order=repr.order,
-            parameters=details['parameters'],
-            __classname__=cls.__name__
-        )
-        return base
-
-    def to_db(self) -> _Representation:
-        details = dict(
-            x = self.x,
-            y = self.y,
-            z = self.z,
-            lane_length = self.lane_length,
-            width = self.width,
-            height = self.height,
-            parameters = self.parameters
-        )
-        return self._to_db(
-            details,
-            entity = self.block,
-            parent = self.parent,
-            order = self.order,
-        )
-
-
-@dataclass
-class _MessageRepresentation(SpecialRepresentation):
-    message: Optional[int] = None
-    parent: Optional[int] = None
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
-    category: ReprCategory = ReprCategory.message
-    order: int = 0
-    orientation: float = 0.0
-    direction: int = 0
-
-    @classmethod
-    def db_to_dict(cls, repr: _Representation) -> Dict:
-        base = SpecialRepresentation._db_to_dict(repr)
-        details = base['details']
-        base.update(
-            message=repr.entity,
-            parent=repr.parent,
-            x=details['x'],
-            y=details['y'],
-            z=details['z'],
-            order=repr.order,
-            orientation=details['orientation'],
-            direction=details['direction'],
-            __classname__=cls.__name__
-        )
-
-    def to_db(self) -> _Representation:
-        details = dict(
-            x = self.x,
-            y = self.y,
-            z = self.z,
-            orientation = self.orientation,
-            direction = self.direction,
-        )
-        return self._to_db(
-            details,
-            entity = self.message,
-            parent = self.parent,
-            order = self.order
-        )
-
-
-@dataclass
-class _RelationshipRepresentation(SpecialRepresentation):
-    relationship: Optional[int] = None
-    source_repr_id: Optional[int] = None
-    target_repr_id: Optional[int] = None
-    routing: str = ''    # JSON list of Co-ordinates of nodes
-    z: float = 0.0       # For ensuring the line goes over the right blocks.
-    category: ReprCategory = ReprCategory.relationship
-    anchor_offsets: str = ""
-    anchor_sizes: str = ""
-
-    @classmethod
-    def db_to_dict(cls, repr: _Representation) -> Dict:
-        base = SpecialRepresentation._db_to_dict(repr)
-        details = base['details']
-        base.update(
-            relationship=repr.entity,
-            source_repr_id=repr.link1,
-            target_repr_id=repr.link2,
-            routing=details['routing'],
-            anchor_offsets=details['anchor_offsets'],
-            anchor_sizes=details['anchor_sizes'],
-            __classname__=cls.__name__
-        )
-        return base
-
-    def to_db(self) -> _Representation:
-        details = dict(
-            routing = self.routing,
-            styling = self.styling,
-            anchor_offsets = self.anchor_offsets,
-            anchor_sizes = self.anchor_sizes
-        )
-        return self._to_db(
-            details,
-            entity = self.relationship,
-            link1=self.source_repr_id,
-            link2=self.target_repr_id,
-        )
-
 
 # ##############################################################################
 # # Helper for serializing classes.
@@ -716,7 +522,108 @@ class AMessage(ABlock):
     def get_entity_type(cls):
         return EntityType.Message
 
-    # Generated dataclasses
+@dataclass
+class ARepresentation(AWrapper):
+    Id: Optional[int] = None
+    diagram: Optional[int] = None
+    styling: str = ""
+    category: ReprCategory = ReprCategory.no_repr
+    order: int = 0,
+
+    @staticmethod
+    def get_db_table():
+        return _Representation
+
+    def _to_db(self, **kwargs) -> Dict[str, Any]:
+        return dict(
+            Id=self.Id,
+            diagram=self.diagram,
+            category=self.category,
+            subtype=type(self).__name__,
+            **kwargs
+        )
+
+@dataclass
+class _BlockRepresentation(ARepresentation):
+    block: Optional[int] = None
+    parent: Optional[int] = None
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+    category: ReprCategory = ReprCategory.block
+    lane_length: float = 0.0
+    width: float = 0.0
+    height: float = 0.0
+    order: int = 0
+    orientation: int = 0
+
+    def extract_record_values(self) -> Dict[str, Any]:
+        return self._to_db(
+            entity=self.block,
+            parent=self.parent,
+            order=self.order,
+        )
+
+@dataclass
+class _InstanceRepresentation(ARepresentation):
+    category: ReprCategory = ReprCategory.block_instance
+    block: Optional[int] = None
+    parent: Optional[int] = None
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+    lane_length: float = 0.0
+    width: float = 0.0
+    height: float = 0.0
+    order: int = 0
+    orientation: int = 0
+    parameters: str = ''
+
+    def extract_record_values(self) -> Dict[str, Any]:
+        return self._to_db(
+            entity=self.block,
+            parent=self.parent,
+            order=self.order,
+        )
+
+@dataclass
+class _MessageRepresentation(ARepresentation):
+    message: Optional[int] = None
+    parent: Optional[int] = None
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+    category: ReprCategory = ReprCategory.message
+    order: int = 0
+    orientation: float = 0.0
+    direction: int = 0
+
+    def extract_record_values(self) -> Dict[str, Any]:
+        return self._to_db(
+            entity=self.message,
+            parent=self.parent,
+            order=self.order
+        )
+
+@dataclass
+class _RelationshipRepresentation(ARepresentation):
+    relationship: Optional[int] = None
+    source_repr_id: Optional[int] = None
+    target_repr_id: Optional[int] = None
+    routing: str = ''  # JSON list of Co-ordinates of nodes
+    z: float = 0.0  # For ensuring the line goes over the right blocks.
+    category: ReprCategory = ReprCategory.relationship
+    anchor_offsets: str = ""
+    anchor_sizes: str = ""
+
+    def extract_record_values(self) -> Dict[str, Any]:
+        return self._to_db(
+            entity=self.relationship,
+            link1=self.source_repr_id,
+            link2=self.target_repr_id,
+        )
+
+# Generated dataclasses
 % for entity in generator.ordered_items:
 <%
     stereotype = 'ADiagram' if entity in generator.md.diagrams else \

@@ -456,5 +456,5 @@ def data_store_tests():
 
 
 if __name__ == '__main__':
-    run_tests('*.test_get_diagram')
+    run_tests('*.test_ports')
     run_tests()

@@ -131,11 +131,10 @@ def create_port_representations(definition_id, representation_id, diagram, sessi
             width=0,
             height=0,
             styling='',
-            category=dm.ReprCategory.port,
-            model_class=type(ch).__name__
-        ).to_db() for ch in port_entities]
+            category=dm.ReprCategory.port
+        ) for ch in port_entities]
     for p in port_reprs:
-        session.add(p)
+        p.store(session)
     return port_entities, port_reprs
 
 def create_block_representation(index, table, data, session, dm):
@@ -169,9 +168,8 @@ def create_block_representation(index, table, data, session, dm):
             height=data['height'],
             styling='',
             category=data.get('category', dm.ReprCategory.block),
-            model_class=table.__name__,
             parameters=all_params
-        ).to_db()
+        )
     else:
         entity = table.retrieve(index, session=session)
 
@@ -185,10 +183,9 @@ def create_block_representation(index, table, data, session, dm):
             width=data['width'],
             height=data['height'],
             styling='',
-            category = data.get('category', dm.ReprCategory.block),
-            model_class = table.__name__
-        ).to_db()
-    session.add(record)
+            category = data.get('category', dm.ReprCategory.block)
+        )
+    record.store(session)
     session.commit()
 
     if issubclass(table, dm.AInstance):
@@ -198,11 +195,11 @@ def create_block_representation(index, table, data, session, dm):
         # Represent the ports belonging to the block being represented.
         port_entities, port_reprs = create_port_representations(entity.Id, record.Id, data['diagram'], session, dm)
     session.commit()
-    record_dict = dm.SpecialRepresentation.db_to_dict(record)
+    record_dict = record.asdict()
     record_dict['_entity'] = entity.asdict()
     if issubclass(table, dm.AInstance):
         record_dict['_definition'] = entity.asdict()
-    record_dict['children'] = [dm.SpecialRepresentation.db_to_dict(p) for p in port_reprs]
+    record_dict['children'] = [p.asdict() for p in port_reprs]
     for e, p in zip(port_entities, record_dict['children']):
         p['_entity'] = e.asdict()
     return flask.make_response(json.dumps(record_dict, cls=dm.ExtendibleJsonEncoder), 201)
@@ -219,8 +216,7 @@ def create_relation_representation(index: int, table: type, data: Dict[str, Any]
         z=data['z'],
         styling='',
         rel_cls=table.__name__ + 'Representation',
-        category=data.get('category', dm.ReprCategory.relationship),
-        model_class=table.__name__
+        category=data.get('category', dm.ReprCategory.relationship)
     )
     record.post_init()
     session.add(record)
@@ -316,15 +312,6 @@ def get_entity_data(path, index):
             result = flask.make_response(data, 200)
             result.headers['Content-Type'] = 'application/json'
             return result
-    elif issubclass(table, dm.SpecialRepresentation):
-        with dm.session_context() as session:
-            record = session.query(dm._Representation).filter(dm._Representation.Id==index).first()
-            if not record:
-                return flask.make_response('Not found', 404)
-            data = json.dumps(table.db_to_dict(record), cls=dm.ExtendibleJsonEncoder)
-            result = flask.make_response(data, 200)
-            result.headers['Content-Type'] = 'application/json'
-            return result
     elif is_dataclass(table):
         try:
             record = table.retrieve(index)
@@ -378,12 +365,6 @@ def add_entity_data(path):
     elif data_id:
         print("An ID was already set")
         return flask.make_response('Illegal request', 400)
-    if issubclass(table, dm.SpecialRepresentation):
-        with dm.session_context() as session:
-            record = table(**data).to_db()
-            session.add(record)
-            session.commit()
-            return flask.make_response(json.dumps(table.db_to_dict(record)), 201)
     if issubclass(table, dm.Base):
         with dm.session_context() as session:
             record = table(**data)
@@ -433,9 +414,7 @@ def create_representation(path, index):
 def delete_entity_data(path, index):
     if not (table := dm.__dict__.get(path, '')):
         return flask.make_response('Not found', 404)
-    if issubclass(table, dm.Base) or issubclass(table, dm.SpecialRepresentation):
-        if issubclass(table, dm.SpecialRepresentation):
-            table = dm._Representation
+    if issubclass(table, dm.Base):
         with dm.session_context() as session:
             records = session.query(table).filter(table.Id == index).all()
             if records:
@@ -481,7 +460,7 @@ def diagram_contents(index):
         data = []
 
         for repr, entity in result:
-            d = dm.SpecialRepresentation.db_to_dict(repr)
+            d = dm.AWrapper.load_from_db(repr).asdict()
             d['_entity'] = dm.AWrapper.load_from_db(entity).asdict()
             data.append(d)
 

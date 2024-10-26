@@ -52,7 +52,7 @@ import json
 from context_menu import context_menu_name
 from explorer import Element, make_explorer
 from dataclasses import dataclass, field, is_dataclass, asdict, fields
-from typing import Self, List, Dict, Any, Callable, Type, Optional, Union, Tuple
+from typing import Self, List, Dict, Any, Callable, Type, Optional, Union, Tuple, override
 from collections.abc import Iterable
 import types
 from enum import IntEnum
@@ -178,6 +178,16 @@ ${inspect.getsource(entity.getStyle)}
                 return {k: resolve(v) for k, v in cls.allowed_drops_blocks.items()}
             else:
                 return {k: resolve(v) for k, v in cls.allowed_create_blocks.items()}
+
+        @override
+        def get_representation_category(self, block_cls) -> ReprCategory:
+            return {
+                (True, True): ReprCategory.laned_instance,
+                (True, False): ReprCategory.laned_block,
+                (False, True): ReprCategory.block_instance,
+                (False, False): ReprCategory.block
+            }[(block_cls in self.vertical_lane or block_cls in self.horizontal_lane, block_cls.is_instance_of())]
+
     % elif generator.md.is_diagram(entity):
     class Diagram(ModeledDiagram):
         allowed_drops_blocks = {${", ".join(generator.get_allowed_drops(entity))}}
@@ -237,20 +247,23 @@ ${inspect.getsource(entity.getStyle)}
         elif category == ms.ReprCategory.port:
             return ms.Port
     %elif generator.get_allowed_ports().get(entity.__name__, []) or generator.md.is_instance_of(entity):
-        if category == ms.ReprCategory.block:
-            return ms.ModeledShapeAndPorts
-        elif category == ms.ReprCategory.block_instance:
-            return ms.ModeledBlockInstance
-        elif category == ms.ReprCategory.laned_block:
-            return laned_diagram.LanedShape
+        return {
+            ms.ReprCategory.block: ms.ModeledShapeAndPorts,
+            ms.ReprCategory.block_instance: ms.ModeledBlockInstance,
+            ms.ReprCategory.laned_block: laned_diagram.LanedShape,
+            ms.ReprCategory.laned_instance: laned_diagram.LanedInstance
+        }[category]
     %elif generator.md.is_message(entity):
         if category == ms.ReprCategory.message:
             return ms.Message
     %else:
-        if category == ms.ReprCategory.block:
-            return ms.ModeledShape
-        elif category == ms.ReprCategory.laned_block:
-            return laned_diagram.LanedShape
+        return {
+            ms.ReprCategory.block: ms.ModeledShape,
+            ms.ReprCategory.block_instance: ms.ModeledBlockInstance,
+            ms.ReprCategory.laned_block: laned_diagram.LanedShape,
+            ms.ReprCategory.laned_instance: laned_diagram.LanedInstance
+        }[category]
+
     %endif
 
     %endif

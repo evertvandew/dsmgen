@@ -43,6 +43,7 @@ class ReprCategory(IntEnum):
     laned_block = auto()
     laned_connection = auto()
     block_instance = auto()
+    laned_instance = auto()
 
 
 def from_dict(cls, **details) -> Self:

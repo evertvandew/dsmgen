@@ -36,7 +36,7 @@ def run_server():
         def run_threaded():
             sysml_run.run(port, 'client_src')
         th = threading.Thread(target = run_threaded)
-        th.setDaemon(True)
+        th.daemon = True
         th.start()
 
     # Wait until the server is up
@@ -66,9 +66,7 @@ def test_server():
     def load_db(records):
         with sm.session_context() as session:
             for r in records:
-                if isinstance(r, sm.SpecialRepresentation):
-                    session.add(r.to_db())
-                elif is_dataclass(r):
+                if is_dataclass(r):
                     r.store(session, accept_id=True)
                 else:
                     session.add(r)
@@ -242,14 +240,16 @@ def test_server():
                 diagram=2,
                 relationship=8,
                 source_repr_id=1,
-                target_repr_id=5
+                target_repr_id=5,
+                order=0
             ),  # From PortLabel to BlockInstance port
             sm._RelationshipRepresentation(
                 Id=7,
                 diagram=2,
                 relationship=9,
                 source_repr_id=4,
-                target_repr_id=3
+                target_repr_id=3,
+                order=0
             )  # From Note to Block
         ])
 
@@ -282,13 +282,23 @@ def test_server():
         )
         assert r.status_code == 201
         results = json.loads(r.content)
-        assert results['model_class'] == '_BlockRepresentation'
+        repr_id = results['Id']
+        assert results['__classname__'] == '_BlockRepresentation'
         assert results['_entity']['__classname__'] == 'Block'
         for i, p in enumerate(results['children']):
             assert p['category'] == int(data_store.ReprCategory.port)
             assert p['block'] == 3 + i
             assert p['diagram'] == 1
             assert p['parent'] == 1
+
+        # Try to update the representation
+        r = requests.post(
+            base_url+f'/data/_BlockRepresentation/{repr_id}',
+            data=json.dumps({'diagram': 1, 'x': 100, 'y': 200, 'z': 0, 'width': 64, 'height': 40, 'category': 2}),
+            headers={'Content-Type': 'application/json'}
+        )
+        assert r.status_code == 202
+        pass
 
     @test
     def test_relationship_delete():
@@ -346,7 +356,7 @@ def test_server():
         assert results['Id'] == 1
         assert results['diagram'] == 2
         assert results['parent'] == None
-        assert results['model_class'] == '_InstanceRepresentation'
+        assert results['__classname__'] == '_InstanceRepresentation'
         assert len(results['children']) == 2
         assert results['parameters'] == {'parameters': {'factor': 0.0, 'limit': 0}}
         assert results['_entity']['__classname__'] == 'SubProgramDefinition'
@@ -395,7 +405,7 @@ def test_server():
         assert results['Id'] == 1
         assert results['diagram'] == 2
         assert results['parent'] == None
-        assert results['model_class'] == '_InstanceRepresentation'
+        assert results['__classname__'] == '_InstanceRepresentation'
         assert results['parameters'] == {'parameters': {}}
         assert len(results['children']) == 1
         p = results['children'][0]
@@ -450,7 +460,7 @@ def test_server():
         results = json.loads(r.content)
         assert results['diagram'] == 2
         assert results['block'] == 1
-        assert results['model_class'] == '_InstanceRepresentation'
+        assert results['__classname__'] == '_InstanceRepresentation'
         assert results['parameters']['parameters']['type'] == 1
 
 

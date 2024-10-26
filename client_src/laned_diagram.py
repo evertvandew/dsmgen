@@ -9,13 +9,13 @@ How does a laned diagram differ from a normal block diagram?
 These differences are handled by giving the LanedDiagram different event handler state classes than the normal Diagram.
 
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import override, List
+from typing import override, List, Dict, Type, Any
 
 from browser import svg, window, bind
 from data_store import UndoableDataStore
-from modeled_shape import ModeledShape, ModeledRelationship
+from modeled_shape import ModeledShape, ModeledRelationship, ModelEntity
 from diagrams import ResizeStates, DiagramConfiguration, ResizeFSM
 from modeled_diagram import ModeledDiagram
 from point import Point
@@ -48,6 +48,9 @@ class LaneOrientation(StrEnum):
 class LanedShape(ModeledShape):
     lane_length: float = 1000.0
 
+    def is_laned(self) -> bool:
+        return True
+
     def getShape(self):
         shape = super().getShape()
         # The shape is a 'g' group, so we can freely add other elements to it.
@@ -72,6 +75,23 @@ class LanedShape(ModeledShape):
             l.attrs['y1'] = int(y)
             l.attrs['y2'] = int(y + self.lane_length)
 
+@dataclass
+class LanedInstance(LanedShape):
+    instance_role: Type[ModelEntity] = None
+    parameters: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def is_instance_of(cls):
+        return True
+
+    @classmethod
+    def repr_category(cls) -> ReprCategory:
+        return ReprCategory.laned_instance
+
+    def modelled_entity(self) -> Type[ModelEntity]:
+        return self.instance_role
+
+
 class LanedDragFSB(ResizeFSM):
     pass
     # def onMouseUp(self, diagram, ev) -> None:
@@ -90,16 +110,10 @@ class LanedDiagram(ModeledDiagram):
         super().__init__(config, widgets, datastore, diagram_id)
         self.lanes = []
 
-    @override
-    def get_representation_category(self, block_cls) -> ReprCategory:
-        if block_cls in self.vertical_lane or block_cls in self.horizontal_lane:
-            return ReprCategory.laned_block
-        return ReprCategory.block
-
     def addBlock(self, block):
         # Create the block as usual
         result = super().addBlock(block)
-        if block.category == ReprCategory.laned_block:
+        if block.is_laned():
             self.lanes.append(block)
         return result
 
@@ -107,7 +121,7 @@ class LanedDiagram(ModeledDiagram):
         """ In diagrams that have clipping, this function updates the location of a newly created block to comply with
             the diagram's rules.
         """
-        if details['category'] == ReprCategory.laned_block:
+        if details['category'] in [ReprCategory.laned_block, ReprCategory.laned_instance]:
             if block_cls in self.vertical_lane:
                 details['y'] = 60
                 details['x'] = 75 + sum(b.width for b in self.lanes) + self.lane_margin * len(self.lanes) + details['width'] // 2
@@ -118,7 +132,12 @@ class LanedDiagram(ModeledDiagram):
                 details['lane_length'] = 1000
 
     def get_connection_repr(self, a, b):
-        if a.category == ReprCategory.laned_block and b.category == ReprCategory.laned_block:
+        if a.is_laned() and b.is_laned():
+            return ReprCategory.laned_connection
+        return ReprCategory.relationship
+
+    def get_connection_repr(self, a: ModeledShape, b: ModeledShape):
+        if all(r.is_laned() for r in [a, b]):
             return ReprCategory.laned_connection
         return ReprCategory.relationship
 
@@ -138,7 +157,7 @@ class LanedDiagram(ModeledDiagram):
         # Just re-order all blocks and locate them in their proper positions.
         # When in doubt, use brute force.
         keyfunc = (lambda b: b.x) if self.vertical_lane else (lambda b: b.y)
-        order: List[LanedShape] = sorted((b for b in self.children if b.category==ReprCategory.laned_block), key=keyfunc)
+        order: List[LanedShape] = sorted((b for b in self.children if b.is_laned()), key=keyfunc)
         position = self.lane_offset
         for i, b in enumerate(order):
             b.order = i+1

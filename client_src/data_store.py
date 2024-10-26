@@ -221,7 +221,7 @@ class DataStore(EventDispatcher):
             if model != org_model:
                 self.update(model)
             repr = record.asdict()
-            changed = any(getattr(org_repr, k) != v for k, v in repr.items() if hasattr(org_repr, k) and k not in ['ports', 'model_entity'])
+            changed = any(getattr(org_repr, k) != v for k, v in repr.items() if hasattr(org_repr, k) and k not in ['ports', 'model_entity', '__classname__'])
             if collection == Collection.relation_repr:
                 changed = changed or org_repr.waypoints != record.get_waypoints()
             if changed:
@@ -328,6 +328,7 @@ class DataStore(EventDispatcher):
                     ReprCategory.block,
                     ReprCategory.laned_block,
                     ReprCategory.block_instance,
+                    ReprCategory.laned_instance,
                     ReprCategory.port,
                     ReprCategory.relationship,
                     ReprCategory.laned_connection,
@@ -412,7 +413,7 @@ class DataStore(EventDispatcher):
                 '_RelationshipRepresentation': ReprCategory.relationship,
                 '_MessageRepresentation': ReprCategory.message,
                 '_BlockInstanceRepresentation': ReprCategory.block_instance,
-                '_BlockRepresentation': ReprCategory.block
+                '_BlockRepresentation': ReprCategory.block,
             }[data['__classname__']]
         representation_cls = model_instance.get_representation_cls(repr_category)
         repr = representation_cls.from_dict(self, model_entity=model_instance, **data)

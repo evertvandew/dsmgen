@@ -17,7 +17,7 @@ You should have received a copy of the GNU General Public License
 along with Foobar; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
-from typing import Any, Self, List, Dict, Optional, cast, override, Callable, Tuple
+from typing import Any, Self, List, Dict, Optional, cast, override, Callable, Tuple, Type
 from dataclasses import dataclass, field
 from enum import StrEnum
 import json
@@ -45,11 +45,14 @@ class ModelRepresentation(StorableElement, PropertyEditable):
     Id: int = 0
     model_entity: ModelEntity = None
     diagram: int = 0                    # Diagram in which this representation is displayed.
-    model_class: str = ''
+    __classname__: str = ''
 
     @classmethod
     def repr_category(cls) -> ReprCategory:
         raise NotImplementedError()
+
+    def modelled_entity(self) -> Type[ModelEntity]:
+        return type(self.model_entity)
 
     def getShape(self):
         raise NotImplementedError()
@@ -128,6 +131,9 @@ class ModeledShape(Shape, ModelRepresentation):
     def block(self):
         storable_entity = cast(StorableElement, self.model_entity)
         return storable_entity.Id
+
+    def is_laned(self) -> bool:
+        return False
 
     def asdict(self, ignore: List[str]=None) -> Dict[str, Any]:
         ignore = (ignore or []) + ['model_entity', 'ports']
@@ -374,6 +380,7 @@ class ModeledShapeAndPorts(ModeledShape):
 
 @dataclass
 class ModeledBlockInstance(ModeledShapeAndPorts):
+    instance_role: Type[ModelEntity] = None
     parameters: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -383,6 +390,9 @@ class ModeledBlockInstance(ModeledShapeAndPorts):
     @classmethod
     def repr_category(cls) -> ReprCategory:
         return ReprCategory.block_instance
+
+    def modelled_entity(self) -> Type[ModelEntity]:
+        return self.instance_role
 
     def get_db_table(cls):
         return "_BlockInstanceRepresentation"

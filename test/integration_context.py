@@ -141,8 +141,10 @@ class ExplorerApi(HtmlApi):
                 'children': children,
                 'category': category,
                 '__classname__': request_cls.get_representation_cls(category).__name__,
-                'model_class': request_cls.__name__
             }
+            if category in [ReprCategory.block_instance, ReprCategory.laned_instance]:
+                content['parameters'] = {'parameters': {}}
+                content['instance_role'] = request_cls.__name__
 
             return Response(201, json=content)
 

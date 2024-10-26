@@ -212,8 +212,8 @@ def simulated_diagram_tests():
         entity = client.Block(Id=1, name='block')
         p1 = client.FlowPort(Id=2, parent=1, name='Input')
         p2 = client.FlowPort(Id=3, parent=1, name='Output')
-        input = client.PortLabel(model_entity=p1, x=100, y=300, height=64, width=100, Id=10, model_class='FlowPort')
-        output = client.PortLabel(model_entity=p2, x=400, y=300, height=64, width=100, Id=11, model_class='FlowPort')
+        input = client.PortLabel(model_entity=p1, x=100, y=300, height=64, width=100, Id=10)
+        output = client.PortLabel(model_entity=p2, x=400, y=300, height=64, width=100, Id=11)
 
         diagram.addBlock(input)
         diagram.addBlock(output)
@@ -748,7 +748,6 @@ def integration_tests():
         context.diagrams.add_port(2, client.FlowPort, name='out')
         assert len(context.diagrams.ports(2)) == 2
         # Connect the three blocks
-        assert all(r.model_class for r in context.data_store.live_instances[Collection.block_repr].values())
         context.diagrams.connect(1, (2, 0), client.FlowPortConnection)
         context.diagrams.connect((2, 1), 3, client.FlowPortConnection)
         # Check the data in the data store
@@ -942,7 +941,6 @@ def integration_tests():
             {"Id": 1, "diagram": 5, "block": 6, "parent": None, "x": 347.0, "y": 188.0, "z": 0.0, "width": 64.0,
              "height": 40.0, "order": 0, "orientation": 4, "styling": "", "category": 2,
              "__classname__": "_BlockRepresentation",
-             'model_class': 'Block',
              "_entity": {
                  "order": 0, "Id": 6, "name": "A", "parent": 5, "__classname__": "Block"
              }
@@ -951,7 +949,6 @@ def integration_tests():
                 "Id": 2, "diagram": 5, "block": 7, "parent": None, "x": 647.0, "y": 188.0, "z": 0.0, "width": 64.0,
                 "height": 40.0, "order": 0, "styling": "", "category": 2,
                 "__classname__": "_BlockRepresentation",
-                'model_class': 'Block',
                 "_entity": {
                     "order": 0, "Id": 7, "name": "A", "parent": 5, "__classname__": "Block"
                 }
@@ -1435,6 +1432,7 @@ def integration_tests():
         assert isinstance(context.diagrams.blocks()[1].model_entity, client.Class)
         for shape in context.diagrams.blocks():
             assert isinstance(shape, client.LanedShape)
+        check_expected_response()
 
         # Draw a message between the two blocks
         context.diagrams.connect(1, 2, client.SequencedMessage)
@@ -1578,6 +1576,6 @@ def integration_tests():
 
 if __name__ == '__main__':
     # import cProfile
-    run_tests('*.add_relationship')
+    run_tests('*.laned_diagram')
     run_tests()
     # cProfile.run('run_tests()', sort='tottime')

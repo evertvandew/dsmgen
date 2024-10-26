@@ -592,8 +592,7 @@ class Diagram(OwnerInterface):
         self.place_block(block_cls, details)
 
         repr_cls = block_cls.get_representation_cls(category)
-        instance = repr_cls(diagram=self.diagram_id, model_class=block_cls.__name__,
-                       **details)
+        instance = repr_cls(diagram=self.diagram_id, **details)
         instance.model_entity = block_cls(parent=self.diagram_id)
         self.addBlock(instance)
         return instance
@@ -843,7 +842,7 @@ class BlockCreateWidget(Diagram.Widget):
             entity = block_cls()
             repr_cls = entity.get_representation_cls(ReprCategory.block)
             representation = repr_cls(x=self.margin, y=i*(self.height+self.margin)+self.margin,
-                         height=self.height, width=1.6*self.height, model_entity=entity, model_class=block_cls.__name__)
+                         height=self.height, width=1.6*self.height, model_entity=entity)
             representation.logical_class = block_cls
             shape = representation.getShape()
             shape.attrs['id'] = f'create_{name}_btn'
