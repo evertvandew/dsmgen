@@ -66,7 +66,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.engine.cursor import CursorResult
 from client_src.storable_element import ReprCategory
 
-GEN_VERSION = "0.5"
+GEN_VERSION = "0.6"
 
 parts = urlparse("${config.dbase_url}")
 if parts.scheme == 'sqlite':
@@ -194,6 +194,13 @@ class Version(Base):
     versionnr: str = Column(String)
 
 
+def dump_table(name: str, session) -> List[Dict[str, Any]]:
+    """ Dump the contents of a database table to a list of dictionaries. """
+    result = session.execute(text(f'SELECT * FROM {name};'))
+    keys = result.keys()
+    return [dict(zip(keys, r)) for r in result]
+
+
 def update_db_v0_1(session) -> str:
     """ Update from v0.1 (to 0.2.) """
     # Add the "category" field to all representations.
@@ -219,45 +226,96 @@ def update_db_v0_4(session):
     session.execute(text(f'ALTER TABLE _relationshiprepresentation RENAME COLUMN "anchor_positions" TO "anchor_offsets";'))
     return "0.5"
 def update_db_v0_5(session):
-    # Re-use the _blockrepresentation table as the basis for the _representation.
-    session.execute(
-        text(f'ALTER TABLE _blockrepresentation RENAME COLUMN "block" TO "entity";'))
-    session.execute(text('ALTER TABLE _blockrepresentation ADD COLUMN "link1" INTEGER'))
-    session.execute(text('ALTER TABLE _blockrepresentation ADD COLUMN "link2" INTEGER'))
-    session.execute(text('ALTER TABLE _blockrepresentation ADD COLUMN "link3" INTEGER'))
-    session.execute(text('ALTER TABLE _blockrepresentation ADD COLUMN "model_class" STRING'))
-    session.execute(text('ALTER TABLE _blockrepresentation ADD COLUMN "details" BLOB'))
-    session.execute(text('ALTER TABLE _blockrepresentation  RENAME TO "_entity"'))
+    # Load all the data in all tables.
+    entities = dump_table('_entity', session)
+    relationships = dump_table('_relationship', session)
+    block_representations = dump_table('_blockrepresentation', session)
+    message_representations = dump_table('_messagerepresentation', session)
+    relationship_representations = dump_table('_relationshiprepresentation', session)
+    entity_count = max(r['Id'] for r in entities)
+    representation_count = max(r['Id'] for r in block_representations)
 
-    #
+    # Copy the blockrepresentations straight to the representation table
+    repr_clss = {
+        ReprCategory.no_repr: '',
+        ReprCategory.block: '_BlockRepresentation',
+        ReprCategory.port: '_BlockRepresentation',
+        ReprCategory.relationship: '_RelationshipRepresentation',
+        ReprCategory.message: '_MessageRepresentation',
+        ReprCategory.laned_block: '_BlockRepresentation',
+        ReprCategory.laned_connection: '_RelationshipRepresentation',
+        ReprCategory.block_instance: '_InstanceRepresentation',
+        ReprCategory.laned_instance: '_InstanceRepresentation'
+    }
+    assert len(repr_clss) == len(ReprCategory)
+    for r in block_representations:
+        r['__classname__'] = repr_clss[r['category']]
+        session.execute(text(f"INSERT INTO _representation (Id, subtype, diagram, entity, parent, [order], category, details) VALUES({r['Id']}, '_BlockRepresentation', {r['diagram']}, {r['block']}, {r['parent'] or "NULL"}, {r['order']}, {r['category']}, '{json.dumps(r)}');"))
 
-    # Create _entities for all representations.
-    result = session.execute(text('SELECT * FROM _relationship;'))
-    keys = result.keys()
-    new_entities = []
-    for data in result:
-        d = dict(zip(keys, data))
-        new_entities.append(dict(
-            type='Relationship',
-            subtype=d['subtype'],
-            details=json.dumps(dict(
-                order=0,
-                source=d['source_id'],
-                target=d['target_id'],
-                name=d['name'],
-                parent=d['parent'],
-                __classname__=d['__classname__']
-            ))
-        ))
+    # store the relationships as entities
+    relation_translation = {}
+    for relationship in relationships:
+        entity_count += 1
+        st = relationship['subtype']
+        relation_translation[relationship['Id']] = entity_count
+        details = json.loads(relationship['details'])
+        del relationship['details']
+        relationship.update(details)
+        for k in ['subtype', 'source_id', 'target_id', 'associate_id']:
+            del relationship[k]
+        relationship['Id'] = entity_count
+        details = json.dumps(relationship)
+        entities.append(dict(Id=entity_count, type=EntityType.Relationship, subtype=st, parent=None, order=0, details=details))
+        session.execute(text(f"INSERT INTO _entity (Id, type, subtype, parent, [order], details) VALUES({entity_count}, '{EntityType.Relationship.name}', '{st}', NULL, 0, '{details}');"))
 
-    for new_entitie in new_entities.items():
-        session.execute(text(''))
+    # Store the relation representations.
+    relrep_translation = {}
+    for relrep in relationship_representations:
+        representation_count += 1
+        relrep_translation[relrep['Id']] = representation_count
+        relrep['__classname__'] = repr_clss[ReprCategory.relationship]
+        relrep['order'] = 0
+        relrep['category'] = ReprCategory.relationship
+        d, e, l1, l2, details = *[relrep[k] for k in ['diagram', 'relationship', 'source_repr_id', 'target_repr_id']], json.dumps(relrep)
+        e = relation_translation[e]
+        block_representations.append(dict(Id=representation_count, diagram=d, entity=e, link1=l1, link2=l2, order=0,
+                                          category=int(ReprCategory.relationship), subtype='_RelationshipRepresentation', details=details))
+        session.execute(text(f"INSERT INTO _representation (Id, subtype, diagram, entity, link1, link2, [order], category, details) VALUES({representation_count}, '_RelationshipRepresentation', {d}, {e}, {l1}, {l2}, {0}, {int(ReprCategory.relationship)}, '{details}');"))
+
+    # Store the message representations
+    for relrep in message_representations:
+        representation_count += 1
+        relrep['__classname__'] = repr_clss[relrep['category']]
+        d, e, l1, o, c, details = *[relrep[k] for k in ['diagram', 'message', 'parent', 'order', 'category']], json.dumps(relrep)
+        l1 = relation_translation[l1]
+        block_representations.append(dict(Id=representation_count, diagram=d, entity=e, link1=l1, order=o,
+                                          category=int(ReprCategory.relationship), details=details))
+        session.execute(text(f"INSERT INTO _representation (Id, subtype, diagram, entity, link1, [order], category, details) VALUES({representation_count}, '_MessageRepresentation', {d}, {e}, {l1}, {o}, {c}, '{details}');"))
 
     # Replace all instance objects with instance representations
+    # Find the instances
+    instances = [e for e in entities if e.get('definition', None)]
+    instance_ids = set(e['Id'] for e in instances)
+    # Find the representations of these instances
+    instance_reps = [r for r in block_representations if r.get('definition')]
+    # Copy the data from each instance into the representation, and link the representation to the definition.
+    # After copying the data, the instance entity can be deleted.
+    for r in instance_reps:
+        e = entities[r['block']]
+        r['instance_role'] = e['__classname__']
+        r['parameters'] = e['parameters']
+        d = json.dumps(r)
+        session.execute(text(f'UPDATE _representation SET entity={r["definition"]}, definition=NULL, details={d} WHERE Id={r['Id']};'))
+        session.execute(text(f'DELETE FROM _entities WHERE Id={r['definition']};'))
 
-    # Remove the definition and association field
-    session.execute(text(f'ALTER TABLE _entity DELETE COLUMN "definition";'))
-    session.execute(text(f'ALTER TABLE _entity DELETE COLUMN "association";'))
+    # Remove the unused tables.
+    session.execute(text('DROP TABLE _messagerepresentation;'))
+    session.execute(text('DROP TABLE _relationshiprepresentation;'))
+    session.execute(text('DROP TABLE _blockrepresentation;'))
+    session.execute(text('DROP TABLE _relationship;'))
+
+    return "0.6"
+
 
 def init_db(e=None):
     global engine
@@ -312,6 +370,12 @@ class _Entity(Base):
 
 @dataclass
 class _Representation(Base):
+    """ The representation has three "links" to entities, A simple Block representation doesn't need these,
+        but a simple connection representation needs two.
+        I use three here because at the moment the relationship I can think of
+        with the most associations has three: the connection between two classes using an associative class.
+        At the moment that connection can not be expressed in the model specification, but in future it might.
+    """
     Id: int = Column(Integer, primary_key=True)
     subtype: str = Column(String)       # Holds the role this representation has in the model.
     diagram: int = Column(Integer, ForeignKey("_entity.Id", ondelete='CASCADE'))
@@ -321,7 +385,7 @@ class _Representation(Base):
     link2: int = Column(Integer, ForeignKey("_representation.Id", ondelete='SET NULL'))
     link3: int = Column(Integer, ForeignKey("_representation.Id", ondelete='SET NULL'))
     order: int = Column(Integer)
-    category: int = Column(Enum(ReprCategory))
+    category: int = Column(Integer)
     details: bytes = Column("details", LargeBinary)
 
     def asdict(self):

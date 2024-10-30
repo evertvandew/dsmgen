@@ -12,8 +12,6 @@
 * Relationships are deleted without confirmation.
 
 # Refactoring
-* Ensure `storable_element.py` and `data_model.py` share the same `ReprCategory` class.
-* No longer have "Instance" in the core model, instead add optional parameters to block representations.
 * Use `get_type_hints` instead of raw `__annotations__`.
 * Split internal fields into separate structures so there can be no clashes with user-named fields.
 * Refactor the typing system in the specification files, so that it is class-based for all types with
@@ -107,6 +105,8 @@
 
 
 # Solved issues:
+* Ensure `storable_element.py` and `data_model.py` share the same `ReprCategory` class.
+* No longer have "Instance" in the core model, instead add optional parameters to block representations.
 * When adding or removing ports to a definition, its representations in Implementations aren't updated.
 * Double-click on a subprogram in a diagram doesn't open the associated diagram.
 * When editing the name of a block the explorer shows the text &mdash instead of a dash.

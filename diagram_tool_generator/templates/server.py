@@ -454,9 +454,10 @@ def get_hierarchy():
 
 @app.route('/data/diagram_contents/<int:index>', methods=['GET'])
 def diagram_contents(index):
-    with dm.session_context() as session:
+    with (dm.session_context() as session):
         # Get the representations shown in the diagram.
-        result = session.query(dm._Representation, dm._Entity).filter(dm._Representation.diagram == index)                             .join(dm._Entity, onclause=dm._Entity.Id == dm._Representation.entity).all()
+        result = session.query(dm._Representation, dm._Entity).filter(dm._Representation.diagram == index) \
+                .join(dm._Entity, onclause=dm._Entity.Id == dm._Representation.entity).all()
 
         data = []
 

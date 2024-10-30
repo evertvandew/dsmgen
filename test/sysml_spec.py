@@ -160,7 +160,33 @@ class UseCase:
     priority: (selection("NotApplicable Must Should Could Would"), detail)
     category: (str, detail)
 
-@md.BlockDiagram(UseCase, Note, Constraint, styling='icon:image')
+
+@md.Relationship(styling = "endmarker:triangleopen;pattern:dashed;routing_method:center2center")
+class Extends:
+    source: XRef('extended', UseCase, hidden)
+    target: XRef('extending', UseCase, hidden)
+    name: str
+
+@md.Relationship(styling="routing_method:center2center")
+class Includes:
+    source: XRef('including', UseCase, hidden)
+    target: XRef('addition', UseCase, hidden)
+    name: str
+
+@md.Relationship(styling='endmarker:hat;pattern:dashed;routing_method:center2center')
+class InheritUseCase:
+    source: XRef('child', UseCase, hidden)
+    target: XRef('parent', UseCase, hidden)
+    name: str
+
+@md.Relationship(styling='endmarker:hat;routing_method:center2center')
+class Association:
+    source: XRef('actor', Actor, Class, hidden)
+    target: XRef('usecase', UseCase, hidden)
+    name: str
+
+
+@md.BlockDiagram(Actor, UseCase, Note, Constraint, styling='icon:image')
 class UseCaseDiagram:
     parent: XRef('children', Block, FunctionalModel, hidden)
     name: str
