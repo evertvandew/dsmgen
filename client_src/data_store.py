@@ -413,6 +413,7 @@ class DataStore(EventDispatcher):
                 '_RelationshipRepresentation': ReprCategory.relationship,
                 '_MessageRepresentation': ReprCategory.message,
                 '_BlockInstanceRepresentation': ReprCategory.block_instance,
+                '_InstanceRepresentation': ReprCategory.block_instance,
                 '_BlockRepresentation': ReprCategory.block,
             }[data['__classname__']]
         representation_cls = model_instance.get_representation_cls(repr_category)

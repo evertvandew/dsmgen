@@ -131,6 +131,7 @@ def create_port_representations(definition_id, representation_id, diagram, sessi
             width=0,
             height=0,
             styling='',
+            orientation=ch.orientation,
             category=dm.ReprCategory.port
         ) for ch in port_entities]
     for p in port_reprs:

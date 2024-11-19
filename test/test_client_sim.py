@@ -132,7 +132,7 @@ port2port = [
 
 diagram_w_instance = [
     {"Id": 1, "diagram": 3, "block": 7, "parent": None, "x": 358.0, "y": 235.0, "z": 0.0, "width": 64.0, "height": 40.0,
-     "styling": {}, "block_cls": "BlockInstanceRepresentation", "__classname__": "_BlockInstanceRepresentation",
+     "styling": {}, "block_cls": "BlockInstanceRepresentation", "__classname__": "_InstanceRepresentation",
      "parameters": {"parameters": {"factor": 41, "gain": 3.1415}}, "category": int(data_store.ReprCategory.block_instance),
      "_entity": {"order": 0, "Id": 4, "parent": 1, "name": "test block", "implementation": "",
                      "parameters": {"factor": "int", "gain": "float"}, "__classname__": "SubProgramDefinition"}},
@@ -423,7 +423,7 @@ def simulated_diagram_tests():
 
         add_expected_response('/data/BlockInstance/123/create_representation', 'post', Response(201, json={
             'Id': 400,
-            '__classname__': '_BlockInstanceRepresentation',
+            '__classname__': '_InstanceRepresentation',
             'category': 8,
             'block': 125,
             'parent': None,
@@ -475,7 +475,7 @@ def simulated_diagram_tests():
         d.select('#edit_factor')[0].value = '123.456'
         d.select('#edit_limit')[0].value = '87654'
         btn = d.select_one('#details .btn-primary')
-        add_expected_response('/data/_BlockInstanceRepresentation/400', 'post', Response(200, json={}))
+        add_expected_response('/data/_InstanceRepresentation/400', 'post', Response(200, json={}))
         btn.dispatchEvent(events.Click())
 
         assert repr.parameters == {'factor': 123.456, 'limit': 87654}

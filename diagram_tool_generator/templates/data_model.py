@@ -651,6 +651,9 @@ class _InstanceRepresentation(ARepresentation):
             order=self.order,
         )
 
+# Create an alias, old databases may use this name.
+_BlockInstanceRepresentation = _InstanceRepresentation
+
 @dataclass
 class _MessageRepresentation(ARepresentation):
     message: Optional[int] = None

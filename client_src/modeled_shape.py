@@ -395,7 +395,7 @@ class ModeledBlockInstance(ModeledShapeAndPorts):
         return self.instance_role
 
     def get_db_table(cls):
-        return "_BlockInstanceRepresentation"
+        return "_InstanceRepresentation"
 
     def get_allowed_ports(self) -> List[Self]:
         """ A block instance inherits its ports from its parent, and can not edit them directly. """
