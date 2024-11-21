@@ -21,7 +21,7 @@ from typing import Any, Self, List, Dict, Optional, cast, override, Callable, Tu
 from dataclasses import dataclass, field
 from enum import StrEnum
 import json
-from browser import svg, document, console
+from browser import svg, document, console, bind
 from diagrams import Shape, Relationship, CP, Point, Orientations
 import shapes
 from svg_shapes import MsgShape, HAlign, VAlign
@@ -232,6 +232,25 @@ class Port(CP, ModelRepresentation):
         shape.attrs['data-rid'] = self.Id
         storable_entity = cast(StorableElement, self.model_entity)
         shape.attrs['data-mid'] = storable_entity.Id
+        self.name_widget = None
+
+        @bind(shape, 'mouseover')
+        def show_name(ev):
+            print('over port')
+            if not shape.parent:
+                return
+            p = self.pos
+            self.name_widget = svg.text(self.model_entity.get_text(0), x=p.x, y=p.y-20,
+                font_size=14, font_family='arial')
+            shape.parent <= self.name_widget
+
+        @bind(shape, 'mouseleave')
+        def hide_name(ev):
+            print('leaving port')
+            if self.name_widget:
+                self.name_widget.remove()
+            self.name_widget = None
+
         return shape
     def updateShape(self, shape=None):
         shape = shape or self.shape

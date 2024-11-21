@@ -64,6 +64,7 @@
 
 
 # Done:
+* Added a rudimentary tooltip showing the name to the ports.
 * Allow extra details (texts) to be shown around a relationship.
   A mechanism already exists to obtain several texts from a block.
 * Place texts with an offset, and allow that offset to be edited. Perhaps also the bounding box of the text.
