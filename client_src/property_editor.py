@@ -40,7 +40,8 @@ def toggle_caret(ev):
     ev.preventDefault()
     c = ev.target
     holder = c.parent.parent
-    children = holder.select(f'.{line_cls}')
+    #children = holder.select(f'.{line_cls}')
+    children = [n for n in holder.childNodes if line_cls in n.classList]
     if 'fa-caret-right' in list(c.classList):
         c.classList.remove('fa-caret-right')
         c.classList.add('fa-caret-down')
