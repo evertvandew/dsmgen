@@ -522,8 +522,8 @@ class DiagramConfiguration:
     connections_from: Dict[type, Dict[type, List[type]]]
     all_entities: Dict[str, type]
 
-    def get_allowed_connections(self, blocka_cls, blockb_cls) -> List[type]:
-        return self.connections_from.get(blocka_cls, {}).get(blockb_cls, [])
+    def get_allowed_connections(self, block_from_cls, block_to_cls) -> List[type]:
+        return self.connections_from.get(block_from_cls, {}).get(block_to_cls, [])
 
 
 

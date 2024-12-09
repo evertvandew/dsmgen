@@ -1,3 +1,5 @@
+from posthog.utils import clean
+
 from test_frame import prepare, test, run_tests, cleanup
 import requests
 import json
@@ -6,6 +8,7 @@ from typing import Dict, Optional, Any
 
 import build.public.block_programming_client as client
 import build.block_programming_data as server_data
+import sqlite3
 
 from browser import ajax
 
@@ -28,7 +31,7 @@ class IntegrationContext(ic.IntegrationContext):
         parent_id = None
         result = None
         for p in parts:
-            result = [o for o in self.explorer_data if o['name'] == p and o['parent'] == parent_id]
+            result = [o for o in self.explorer_data if o.get('name') == p and o['parent'] == parent_id]
             if len(result) == 0:
                 raise RuntimeError(f"Could not find name {p} as child of {parent_id}")
             if len(result) > 1:
@@ -44,10 +47,28 @@ class IntegrationContext(ic.IntegrationContext):
         pass
 
 
+test_diagram_name = 'integration_test_program'
+def delete_test_diagram():
+    dbfile = 'build/data/diagrams.sqlite3'
+    db = sqlite3.connect(dbfile)
+    cur = db.cursor()
+    diagrams = cur.execute(f'SELECT Id FROM _entity WHERE parent == 2 AND json_extract(details, "$.name")="{test_diagram_name}";')
+    for data in diagrams:
+        cur.execute(f'DELETE FROM _representation WHERE diagram == {data[0]};')
+        cur.execute(f'DELETE FROM _entity WHERE Id == {data[0]};')
+    db.commit()
+
 @prepare
 def prepare_integration_checks():
 
     context = IntegrationContext('localhost:5101')
+
+    delete_test_diagram()
+
+    @cleanup
+    def clean_db():
+        delete_test_diagram()
+
 
     @test
     def check_MCU_placement():
@@ -55,15 +76,11 @@ def prepare_integration_checks():
         context.explorer.create_block(
             2,
             server_data.ProgramDefinition,
-            name='integration_test_program'
+            name=test_diagram_name
         )
         context.load_explorer_data()
         did = context.id_from_path('Programs/integration_test_program')
         print("Created diagram with ID", did)
-
-        @cleanup
-        def delete_test_diagram():
-            context.explorer.delete_block(did)
 
         # Double-clicking a diagram opens it.
         context.explorer.dblclick_element(did)
@@ -73,6 +90,10 @@ def prepare_integration_checks():
                                          server_data.BlockDefinition)
         assert len(context.diagrams.blocks()) == 1
         assert len(context.diagrams.blocks()[0].children) == 64
+
+    @test
+    def connect_ioconfig_ports():
+        """ Test whether io configuration ports can be connected. """
 
 
 if __name__ == '__main__':

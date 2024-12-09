@@ -69,7 +69,10 @@ def run_tests(*filters):
 
         # Cleanup is in reversed order, hopefully keeping dependencies alive while needed.
         for c in reversed(cleanups):
-            c()
+            try:
+                c()
+            except:
+                logging.exception("Exception during execution of cleanup")
 
     logging.error(f"Failures: {len(failures)} / {len(executed_tests)}")
     if failures:

@@ -237,19 +237,19 @@ class ModeledDiagram(Diagram):
         self.datastore.delete(block)
         super().deleteBlock(block)
 
-    def connect(self, a: ModeledShape, b: ModeledShape):
+    def connect(self, _from: ModeledShape, to: ModeledShape):
         """ Connect two blocks a and b. If necessary, the right connection type is selected by the User. """
-        ta, tb = [r.modelled_entity() for r in [a, b]]
-        ta, tb = [(self.config.all_entities[r] if isinstance(r, str) else r) for r in [ta, tb]]
-        clss = self.config.get_allowed_connections(ta, tb) + self.config.get_allowed_connections(ta, Any)
+        t_from, t_to = [r.modelled_entity() for r in [_from, to]]
+        t_from, t_to = [(self.config.all_entities[r] if isinstance(r, str) else r) for r in [t_from, t_to]]
+        clss = self.config.get_allowed_connections(t_from, t_to) + self.config.get_allowed_connections(t_from, Any)
         if not clss:
-            d = InfoDialog('Can not connect', f"A {type(a).__name__} can not be connected to a {type(b).__name__}")
+            d = InfoDialog('Can not connect', f"A {t_from.__name__} can not be connected to a {t_to.__name__}")
             return
         if len(clss) > 1:
             # Let the user select Connection type
-            self.selectConnectionClass(clss, lambda cls: self.connect_specific(a, b, cls))
+            self.selectConnectionClass(clss, lambda cls: self.connect_specific(_from, to, cls))
         else:
-            self.connect_specific(a, b, clss[0])
+            self.connect_specific(_from, to, clss[0])
 
     def mouseDownChild(self, widget: ModeledShape, ev, update_func=None):
         super().mouseDownChild(widget, ev)

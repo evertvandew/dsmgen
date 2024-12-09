@@ -38,6 +38,12 @@ class Orientation(IntEnum):
     LEFT = 8
     ANY = 9
 
+class SimpleType(IntEnum):
+    Int = auto()
+    Float = auto()
+    String = auto()
+    Bool = auto()
+
 @dataclass
 class Parameter:
     param_type: type
@@ -62,6 +68,11 @@ class BlockDefinition:
     inputs: Dict[str, Port] = field(default_factory=dict)
     outputs: Dict[str, Port] = field(default_factory=dict)
     parameters: Dict[str, Parameter] = field(default_factory=dict)
+
+
+class vec_3d: pass
+class Quaternion: pass
+
 
 stdlib = {
     'Basic IO': {
@@ -147,32 +158,105 @@ stdlib = {
             parameters={'baudrate': Parameter(int, 500000)}
         ),
     },
+    'constant': BlockDefinition(
+        outputs={'out': Port()},
+        parameters={'type': Parameter(SimpleType), 'value': Parameter(str)}
+    ),
     'conversions': {
-        'mux': BlockDefinition(),
-        'demux': BlockDefinition(),
-        'struct_construct': BlockDefinition(),
-        'struct_deconstruct': BlockDefinition(),
-        'dict_insert': BlockDefinition(),
-        'dict_extract': BlockDefinition(),
-        'type_cast': BlockDefinition(),
+        'mux': BlockDefinition(
+            #inputs = lambda b: {f'in_{i+1}' for i in range(b.parameters['nr_inputs'])},
+            inputs = {'a': Port(), 'b': Port()},
+            outputs = {'out': Port()},
+            parameters = {'nr_inputs': Parameter(int,2)}
+        ),
+        'demux': BlockDefinition(
+            #outputs=lambda b: {f'out_{i + 1}' for i in range(b.parameters['nr_outputs'])},
+            outputs = {'a': Port(), 'b': Port()},
+            inputs={'in': Port()},
+            parameters={'nr_outputs': Parameter(int, 2)}
+        ),
     },
     'math': {
-        'sum': BlockDefinition(),
-        'mult': BlockDefinition(),
-        'gain': BlockDefinition(),
-        'expression': BlockDefinition(),
-        'integrate': BlockDefinition(),
-        'differentiate': BlockDefinition(),
-        'low_pass': BlockDefinition(),
-        'high_pass': BlockDefinition(),
-        'transfer_function': BlockDefinition(),
-        'PID_controller': BlockDefinition(),
-        'average': BlockDefinition(),
+        'sum': BlockDefinition(
+            #inputs=lambda b: {f'in_{i + 1}' for i in range(b.parameters['nr_inputs'])},
+            inputs={'a': Port(), 'b': Port()},
+            outputs={'out': Port()},
+            parameters={'nr_inputs': Parameter(int, 2)}
+        ),
+        'mult': BlockDefinition(
+            inputs={'a': Port(), 'b': Port()},
+            outputs={'out': Port()},
+        ),
+        'gain': BlockDefinition(
+            inputs={'in': Port()},
+            outputs={'out': Port()},
+            parameters={'gain': Parameter(float, 1.0)}
+        ),
+        'expression': BlockDefinition(
+            #inputs=lambda b: {f'in_{i + 1}' for i in range(b.parameters['nr_inputs'])},
+            inputs={'a': Port(), 'b': Port()},
+            outputs={'out': Port()},
+            parameters={'nr_inputs': Parameter(int, 2), 'expression': Parameter(str)}
+        ),
+        'integrate': BlockDefinition(
+            inputs={'in': Port()},
+            outputs={'out': Port()},
+            parameters={'gain': Parameter(float, 1.0)}
+        ),
+        'differentiate': BlockDefinition(
+            inputs={'in': Port()},
+            outputs={'out': Port()},
+            parameters={'gain': Parameter(float, 1.0)}
+        ),
+        'low_pass': BlockDefinition(
+            inputs={'in': Port()},
+            outputs={'out': Port()},
+            parameters={'cutoff': Parameter(float, 1.0)}
+        ),
+        'high_pass': BlockDefinition(
+            inputs={'in': Port()},
+            outputs={'out': Port()},
+            parameters={'cutoff': Parameter(float, 1.0)}
+        ),
+        'transfer_function': BlockDefinition(
+            inputs={'in': Port()},
+            outputs={'out': Port()},
+            parameters={'transfer_function': Parameter(str)}
+        ),
+        'PID_controller': BlockDefinition(
+            inputs={'in': Port()},
+            outputs={'out': Port()},
+            parameters={'P': Parameter(float, 1.0), 'I': Parameter(float, 0.0), 'D': Parameter(float, 0.0)}
+        ),
+        'average': BlockDefinition(
+            inputs={'in': Port()},
+            outputs={'out': Port()}
+        ),
         'quaternions': {
-            'rotate': BlockDefinition(),
-            'add_rotations': BlockDefinition(),
-            'normalize': BlockDefinition(),
+            'rotate': BlockDefinition(
+                inputs={'in': Port(vec_3d), 'r': Port(Quaternion)},
+                outputs={'out': Port(vec_3d)}
+            ),
+            'add_rotations': BlockDefinition(
+                inputs={'in': Port(Quaternion), 'r': Port(Quaternion)},
+                outputs={'out': Port(Quaternion)}
+            ),
+            'normalize': BlockDefinition(
+                inputs={'in': Port(Quaternion)},
+                outputs={'out': Port(Quaternion)}
+            ),
         }
+    },
+    'logic': {
+        'counter': BlockDefinition(
+            inputs={'in': Port(), 'reset': Port()},
+            outputs={'count': Port(), 'overflow': Port(port_type=PortType.Async)},
+            parameters={'initial': Parameter(int, 0), 'maximum': Parameter(int, None)}
+        ),
+        'toggle': BlockDefinition(
+            inputs={'in': Port()},
+            outputs={'out': Port()}
+        )
     }
 }
 
@@ -222,12 +306,21 @@ def read_pinconfigs(p: pathlib.Path, wanted_mcus: List[str]):
     micro_controllers = {path.basename(f).split('.')[0]: read_pinconfig(f) for f in files}
     return micro_controllers
 
+def arduino():
+    pins = {f'D{i+1}': Port(PortType.IOConfig, orientation=Orientation.RIGHT) for i in range(14)}
+    pins.update({f'A{i}': Port(PortType.IOConfig, orientation=Orientation.RIGHT) for i in range(6)})
+    pins['timer_tick'] = Port(PortType.Async, orientation=Orientation.RIGHT)
+    return {'arduino_uno': BlockDefinition(outputs=pins)}
+
 
 mcus = read_pinconfigs(
     '/opt/st/stm32cubeide_1.16.1/plugins/com.st.stm32cube.common.mx_6.12.1.202409122256/db/mcu',
     ['STM32F446R*', 'STM32H743ZIT*']
 )
-#stdlib['Micro Controllers'] = mcus
+mcus.update(arduino())
+
+
+stdlib['Micro Controllers'] = mcus
 
 
 def create_instances(lib: Dict, parent: dm.LibraryFolder) -> Generator[dm.LibraryFolder | dm.BlockDefinition, None, None]:

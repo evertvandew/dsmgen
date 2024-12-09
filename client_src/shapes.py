@@ -659,6 +659,7 @@ class Relationship(Stylable):
     waypoints: List[Point] = field(default_factory=list)
     id: HIDDEN(int) = field(default_factory=getId)
     z: float = 0.0
+    order: int = 0
     styling: dict = field(default_factory=dict)
     default_style = dict(linecolor='#000000', linewidth='2', endmarker='arrow', startmarker='', routing_method='square')
 

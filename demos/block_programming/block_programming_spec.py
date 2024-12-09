@@ -130,12 +130,12 @@ class AsyncOutput:
 
 @md.Relationship(styling='endmarker:arrow')
 class SynchronousChannel:
-    source: XRef('source', Output)
+    source: XRef('source', Output, AsyncOutput)
     target: XRef('target', Input)
 
 @md.Relationship(styling='endmarker:arrowopen')
 class AsyncChannel:
-    source: XRef('source', AsyncOutput)
+    source: XRef('source', Output, AsyncOutput)
     target: XRef('target', AsyncInput)
 
 @md.Relationship(styling='endmarker:arrow')
