@@ -35,16 +35,16 @@ widget block_shape {
                 match p {
                 CornerPositions.TL => circle(x:x, y:y, r:5,
                     onDragStart: |pos|start_size=Pos{x:width, y:height},
-                    onDrag: |pos, delta|{x=pos.x; y=pos.y; width=start_size.x-delta.x; height=start_size.y-delta.y;}),
+                    onDrag: |pos, delta| {x=pos.x; y=pos.y; width=start_size.x-delta.x; height=start_size.y-delta.y;}),
                 CornerPositions.TR => circle{x:x+width, y:y, r:5,
-                    onDragStart: |pos|start_size=Pos{width, height},
+                    onDragStart: |pos|start_size=Pos{x:width, y:height},
                     onDrag: |pos, delta|{y=pos.y; width=start_size.x+delta.x; height=start_size.y-delta.y;}},
                 CornerPositions.BR => circle{x:x+width, y:y+height, r:5,
-                    onDragStart: |pos|start_size=Pos{width, height},
+                    onDragStart: |pos|start_size=Pos{x:width, y:height},
                     onDrag: |pos, delta|{width=start_size.x+delta.x; height=start_size.y+delta.y;}},
                 CornerPositions.BL => circle{x:x, y:y+height, r:5,
-                    onDragStart: |pos|start_size=Pos{width, height},
-                    onDrag: |pos, delta|{x=pos.x; width=start_size.x-delta.x; height=start_size.y+delta.y;}},
+                    onDragStart: |pos|start_size=Pos{x:width, y:height},
+                    onDrag: |pos, delta|{x=pos.x; width=start_size.x-delta.x; height=start_size.y+delta.y;}}
                 }
             })
         },
@@ -56,7 +56,7 @@ widget block_shape {
 
 
 struct BlockModel {
-    property shape_model: BlockShapeModel
+    property shape_model: BlockShapeModel,
     property text: str
 }
 
@@ -68,5 +68,5 @@ widget block {
     property height: float,
     property model: BlockModel,
 
-    block_shape{x:x, y:y, width:width, height:height, model:model.shape_model}
+    item block_shape{x:x, y:y, width:width, height:height, model:model.shape_model}
 }

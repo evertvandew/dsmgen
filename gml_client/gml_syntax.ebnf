@@ -36,53 +36,55 @@ state_declaration = 'state' variable_name '{' ','.{
     | fsm_declaration
 } '}' ;
 
-transition = "transit" "from" variable_name "to" variable_name "when" expression ;
+transition = "transit" "from" variable_name "to" variable_name "when" single_expression ;
 
-expression =
-    | binop
-    | assignment
-    | block_expression
-    | closure_definition
-    | parenthesized_expression
+lhs =
+    | fn_invocation
+    | array_index
+    | field_expression
+    | variable_name ;
+
+single_expression =
     | match_expression
     | if_expression
-    | unop
-    | fn_invocation
-    | tuple_index
-    | array_index
     | struct_construction
-    | field_expression
-    | variable_name
+    | binop
+    | parenthesized_expression
+    | unop
+    | closure_definition
+    | lhs
     | literal_value ;
 
-block_expression = '{' ';'.{ expression } '}' ;
+expression =
+    | assignment
+    | block_expression
+    | single_expression ;
 
-match_expression = 'match' expression '{' ','.{ match_clause '=>' expression } '}' ;
+block_expression = '{' ';'.{ expression | () } '}' ;
 
-if_expression = 'if' expression '{' expression '}' [ 'else' '{' expression '}' ] ;
+match_expression = 'match' lhs '{' ','.{ match_clause '=>' expression } '}' ;
 
-match_clause = default_match_branch | enum_reference | expression ;
+if_expression = 'if' single_expression block_expression [ 'else' block_expression ] ;
 
-fn_invocation = expression '(' ','.{ [ variable_name ':' ] expression } ')' ;
+match_clause = default_match_branch | enum_reference | single_expression ;
 
-field_expression = expression '.' variable_name ;
+fn_invocation = lhs '(' ','.{ [ variable_name ':' ] single_expression } ')' ;
 
-tuple_index = expression '.' /[0-9]*/ ;
+field_expression = lhs '.' ( variable_name | /[0-9]+/ ) ;
 
-array_index = expression '[' expression ']' ;
+array_index = lhs '[' single_expression ']' ;
 
 closure_definition = '|' ','.{variable_name} '|' expression ;
 
-binop = expression operator ~expression ;
+binop = single_expression operator single_expression ;
 
-struct_construction = variable_name '{' ','.{ variable_name ':' expression } '}' ;
+struct_construction = variable_name '{' ','.{ variable_name ':' single_expression } '}' ;
 
-assignment = lhs assignment_operator expression ;
-lhs = field_expression | tuple_index | array_index | variable_name ;
+assignment = lhs assignment_operator single_expression ;
 
-unop = unary_operator expression ;
+unop = unary_operator single_expression ;
 
-parenthesized_expression = '(' expression ')' ;
+parenthesized_expression = '(' single_expression ')' ;
 
 enum_reference = '.'{ type_name } [ '(' ','.{ variable_name } ')' | '{' ','.{ variable_name } '}' ] ;
 
@@ -111,8 +113,8 @@ string_literal = /".*?"/ | /'.*?'/ ;
 float_literal = /[0-9]*[.][0-9]*/ ;
 int_literal = /[0-9]+/ ;
 bool_literal = "true" | "false" ;
-tuple_literal = '(' ','.{ expression } ')' ;
-array_literal = '[' ','.{ expression } ']' ;
+tuple_literal = '(' ','.{ single_expression } ')' ;
+array_literal = '[' ','.{ single_expression } ']' ;
 
 
 variable_name = name ;
