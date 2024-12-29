@@ -1,5 +1,5 @@
 import QtQuick 2.15
-import QtQuick.Shapes 1.0;
+import QtQuick.Shapes 1.12
 
 Item {
     id: block
@@ -13,18 +13,32 @@ Item {
         color: "yellow"
         anchors.fill: parent
 
-        MouseArea {
-            anchors.fill: parent
-            propagateComposedEvents: false
-            onClicked: {
-                block.state = "HIGHLIGHTED";
-                block.clicked(index)
-            }
-        }
+        // MouseArea {
+        //     anchors.fill: parent
+        //     propagateComposedEvents: false
+        //     drag.target: parent
+        //     drag.threshold: 0
+        //     onClicked: {
+        //         block.state = "HIGHLIGHTED";
+        //         block.clicked(index)
+        //     }
+        // }
         
         ListModel{
             id: handles
         }
+        
+            
+    MouseArea {
+        anchors.fill: parent
+        propagateComposedEvents: false
+        drag.target: parent
+        drag.threshold: 0
+        onClicked: {
+            block.state = "HIGHLIGHTED";
+            block.clicked(index)
+        }
+    }
         
         Repeater{
             id: resize_handles
@@ -78,6 +92,7 @@ Item {
         handles.append({x:width-10, y:height-10}),
         handles.append({x:0, y:height-10})
     }
+
     
     states: [
         State {
@@ -94,6 +109,5 @@ Item {
             PropertyChanges { target: rectangle; border.color: "lightblue" }
         }
     ]
-    
 }
  

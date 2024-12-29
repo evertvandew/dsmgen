@@ -1,0 +1,127 @@
+# Use me using the "tatsu" Python library
+@@grammar::GML
+@@whitespace::/[\t\n\r ]+/
+# @@eol_comments::/\/\/(^\n]*?$/
+# @@comments::/\/\*((?:.|\n)*?)\*\//
+
+start = statement_list $ ;
+#start = { statement ( eol | $ ) } ;
+
+statement_list = { statement };
+statement = | import | enum_definition | struct_definition | widget_definition ;
+
+import = 'use' '::'.{ variable_name | ( '{' import '}' ) } ;
+
+struct_definition = 'struct' type_name '{' ','.{ property_declaration } '}' ;
+
+property_declaration = 'property' variable_name ':' type_reference [ '=' default_value ] ;
+
+enum_definition = 'enum' type_name '{' ','.{ enum_item } '}' ;
+
+enum_item = type_name [ tuple_type | struct_type ] ;
+
+widget_definition = 'widget' type_name '{' ','.{
+      property_declaration
+    | item_declaration
+    | fsm_declaration
+} '}' ;
+
+item_declaration = 'item' [ variable_name ':' ] expression ;
+
+fsm_declaration = 'fsm' variable_name '{' ','.{ state_declaration | transition } '}' ;
+
+state_declaration = 'state' variable_name '{' ','.{
+      property_declaration
+    | item_declaration
+    | fsm_declaration
+} '}' ;
+
+transition = "transit" "from" variable_name "to" variable_name "when" expression ;
+
+expression =
+    | binop
+    | assignment
+    | block_expression
+    | closure_definition
+    | parenthesized_expression
+    | match_expression
+    | if_expression
+    | unop
+    | fn_invocation
+    | tuple_index
+    | array_index
+    | struct_construction
+    | field_expression
+    | variable_name
+    | literal_value ;
+
+block_expression = '{' ';'.{ expression } '}' ;
+
+match_expression = 'match' expression '{' ','.{ match_clause '=>' expression } '}' ;
+
+if_expression = 'if' expression '{' expression '}' [ 'else' '{' expression '}' ] ;
+
+match_clause = default_match_branch | enum_reference | expression ;
+
+fn_invocation = expression '(' ','.{ [ variable_name ':' ] expression } ')' ;
+
+field_expression = expression '.' variable_name ;
+
+tuple_index = expression '.' /[0-9]*/ ;
+
+array_index = expression '[' expression ']' ;
+
+closure_definition = '|' ','.{variable_name} '|' expression ;
+
+binop = expression operator ~expression ;
+
+struct_construction = variable_name '{' ','.{ variable_name ':' expression } '}' ;
+
+assignment = lhs assignment_operator expression ;
+lhs = field_expression | tuple_index | array_index | variable_name ;
+
+unop = unary_operator expression ;
+
+parenthesized_expression = '(' expression ')' ;
+
+enum_reference = '.'{ type_name } [ '(' ','.{ variable_name } ')' | '{' ','.{ variable_name } '}' ] ;
+
+type_reference =
+    | function_type
+    | type_name
+    | no_type
+    | tuple_type
+    | struct_type ;
+
+function_type = "fn(" ','.{ type_reference } ")" [ "->" type_reference ] ;
+tuple_type = '(' ','.{ type_reference } ')' ;
+struct_type = '{' ','.{ variable_name ':' type_reference } '}' ;
+
+default_value = literal_value ;
+
+literal_value =
+    | float_literal
+    | int_literal
+    | bool_literal
+    | tuple_literal
+    | array_literal
+    | string_literal ;
+
+string_literal = /".*?"/ | /'.*?'/ ;
+float_literal = /[0-9]*[.][0-9]*/ ;
+int_literal = /[0-9]+/ ;
+bool_literal = "true" | "false" ;
+tuple_literal = '(' ','.{ expression } ')' ;
+array_literal = '[' ','.{ expression } ']' ;
+
+
+variable_name = name ;
+type_name = name ;
+
+name = /[a-zA-Z_][a-zA-Z0-9_]*/ ;
+
+no_type = '()' ;
+unary_operator = !'->' '+' | '-' | '!' ;
+operator = !('->' | '=>') '+' | '-' | '*' | '/' | '%' | '>>' | '<<' | '>' | '<' | '>=' | '<=' | '==' | '!=' | '&&' | '||' | '..=' | '..' ;
+assignment_operator = !'=>' '=' ;
+default_match_branch = '_' ;
