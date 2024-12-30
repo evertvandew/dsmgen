@@ -5,26 +5,31 @@
 # @@comments::/\/\*((?:.|\n)*?)\*\//
 
 start = statement_list $ ;
-#start = { statement ( eol | $ ) } ;
 
 statement_list = { statement };
-statement = | import | enum_definition | struct_definition | widget_definition ;
+statement = | import | enum_definition | struct_definition | widget_definition | main_window ;
 
 import = 'use' '::'.{ variable_name | ( '{' import '}' ) } ;
 
-struct_definition = 'struct' type_name '{' ','.{ property_declaration } '}' ;
+struct_definition = 'struct' type_name '{' ','.{ property_declaration | event_declaration } '}' ;
 
 property_declaration = 'property' variable_name ':' type_reference [ '=' default_value ] ;
+event_declaration = 'event' variable_name ':' type_reference ;
 
 enum_definition = 'enum' type_name '{' ','.{ enum_item } '}' ;
 
 enum_item = type_name [ tuple_type | struct_type ] ;
 
-widget_definition = 'widget' type_name '{' ','.{
-      property_declaration
+widget_definition = 'widget' type_name widget_details ;
+
+widget_details = '{' ','.{
+    | property_declaration
+    | event_declaration
     | item_declaration
     | fsm_declaration
 } '}' ;
+
+main_window = 'main' widget_details ;
 
 item_declaration = 'item' [ variable_name ':' ] expression ;
 
