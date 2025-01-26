@@ -4,10 +4,18 @@
 # @@eol_comments::/\/\/(^\n]*?$/
 # @@comments::/\/\*((?:.|\n)*?)\*\//
 
+
+
+###############################################################################
+## Notes
+##
+## This language is fixed-type, non-dynamic.
+## Assignments can not declare new variables
+
 start = statement_list $ ;
 
 statement_list = { statement };
-statement = | import | enum_definition | struct_definition | widget_definition | main_window ;
+statement = import | enum_definition | struct_definition | widget_definition | main_window ;
 
 import = 'use' '::'.{ variable_name | ( '{' import '}' ) } ;
 
@@ -16,30 +24,36 @@ struct_definition = 'struct' type_name '{' ','.{ property_declaration | event_de
 property_declaration = 'property' variable_name ':' type_reference [ '=' default_value ] ;
 event_declaration = 'event' variable_name ':' type_reference ;
 
-enum_definition = 'enum' type_name '{' ','.{ enum_item } '}' ;
+enum_definition = 'enum' type_name '{' ';'.{ enum_item } '}' ;
 
 enum_item = type_name [ tuple_type | struct_type ] ;
 
 widget_definition = 'widget' type_name widget_details ;
 
-widget_details = '{' ','.{
+widget_details = '{' ';'.{
     | property_declaration
     | event_declaration
     | item_declaration
     | fsm_declaration
+    | variable_declaration
+    | ()
 } '}' ;
 
 main_window = 'main' widget_details ;
 
 item_declaration = 'item' [ variable_name ':' ] expression ;
 
-fsm_declaration = 'fsm' variable_name '{' ','.{ state_declaration | transition } '}' ;
+fsm_declaration = 'fsm' variable_name '{' ';'.{ state_declaration | transition | () } '}' ;
 
-state_declaration = 'state' variable_name '{' ','.{
+variable_declaration = 'let' variable_name [ ':' type_reference ] '=' single_expression ;
+
+state_declaration = 'state' variable_name '{' ';'.{
       property_declaration
     | item_declaration
+    | event_declaration
     | fsm_declaration
-} '}' ;
+    | ()
+}  '}' ;
 
 transition = "transit" "from" variable_name "to" variable_name "when" single_expression ;
 
@@ -52,7 +66,6 @@ lhs =
 single_expression =
     | match_expression
     | if_expression
-    | struct_construction
     | binop
     | parenthesized_expression
     | unop
@@ -82,8 +95,6 @@ array_index = lhs '[' single_expression ']' ;
 closure_definition = '|' ','.{variable_name} '|' expression ;
 
 binop = single_expression operator single_expression ;
-
-struct_construction = variable_name '{' ','.{ variable_name ':' single_expression } '}' ;
 
 assignment = lhs assignment_operator single_expression ;
 
