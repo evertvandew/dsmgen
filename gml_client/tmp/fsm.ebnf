@@ -1,0 +1,32 @@
+@@grammar::FSM
+@@whitespace::/[\t\n\r ]+/
+
+start = { statement } $ ;
+
+statement = fsm_definition ;
+
+fsm_definition::FsmDefinition = 'fsm' variable_name '{' { fsm_details } '}' ;
+
+fsm_details = argument_definition | event_definition | variable_definition | state_definition ;
+
+argument_definition::Argument = 'argument' variable_name ';' ;
+event_definition::Event = 'event' variable_name ';' ;
+variable_definition::Variable = 'variable' variable_name ';' ;
+
+state_definition::State = 'state' variable_name '{' { state_detail } '}' ;
+state_detail = fsm_definition | transition ;
+
+transition::Transition = 'transition' event '->' variable_name [ ':' code_snippet ] ';' ;
+
+event::Event = dotted_variable_name [ '(' ','.{ variable_name } ')' ]  [ 'if' condition ] ;
+condition::str = '(' { no_bracket | condition } ')' ;
+no_bracket::str = /[^()]/ ;
+
+code_snippet::str = { braced_snippet | no_brace_semicolon } ;
+code_snippet_semicolons::str = { braced_snippet | no_brace } ;
+braced_snippet::str = '{' code_snippet_semicolons '}' ;
+no_brace_semicolon::str = /[^{};]+/ ;
+no_brace::str = /[^{}]+/ ;
+
+variable_name::str = /[a-zA-Z_][a-zA-Z0-9_]*/ ;
+dotted_variable_name::str = /[a-zA-Z_][a-zA-Z0-9_.]*/ ;

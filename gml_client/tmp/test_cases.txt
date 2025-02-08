@@ -1,0 +1,36 @@
+
+# Testcase 1: A simple fsm with only the default transition
+@testcase 1
+@command python
+import fsm_generator
+fsm_generator.generate_JS(template=open('test_template.html'))
+@endcommand
+@file test_template.html
+@endfile
+
+@file stdin
+fsm canvas {
+    variable the_canvas;
+    state Initial {
+        transition _ -> _ : {
+            this.the_canvas = Svg();
+        };
+    }
+}
+@endfile
+
+@expect stdout
+class canvas {
+    constructor() {
+        this.state_Initial = {
+            on_entry: function() {
+                this.the_canvas = Svg();
+            }
+        }
+        this.current_state = this.Initial_state.onentry();
+    }
+}
+
+let fsm = new canvas();
+@endexpect
+@endtest

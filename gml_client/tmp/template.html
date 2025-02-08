@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+<script>
+
+
+function tag_creator_factorized(tag, args_description, kwargs_description, tag_factory) {
+    // Split the strings describing the arguments.
+    let arg_names = args_description.split(" ");
+    let kwarg_names = kwargs_description.split(" ");
+    function add_tag(args, kwargs) {
+        // Check the arguments
+        if (args.length != arg_names.length) {
+            alert("Not the correct number of fixed parameters creating <"+tag+">. Got " + args + ' expected '+ arg_names);
+        }
+        for (let i=0; i<Object.keys(kwargs).length; i++) {
+            let n = Object.keys(kwargs)[i];
+            if (!kwarg_names.includes(n)) {
+                alert("Unknown argument "+n+" when creating <"+tag+">.");
+            }
+        }
+        // Create the new element
+        let new_element = tag_factory(tag);
+        // Set the attributes provided as fixed-length arguments
+        for (let i=0; i<arg_names.length; i++) {
+            let n = arg_names[i];
+            if (n == "children") {
+                new_element.appendChild(args[i]);
+            } else if (n == "text") {
+                new_element.innerText = args[i];
+            } else {
+                //new_element.setAttribute(n.replace("_", "-"), args[i]);
+                new_element[n.replace("_", "-")] = args[i];
+            }
+        }
+        // Set the attributed provided as optional arguments
+        for (const [key, value] of Object.entries(kwargs)) {
+            if (events.includes(key)) {
+                new_element.addEventListener(key, value);
+            } else {
+                new_element.setAttribute(key.replace("_", "-"), value);
+            }
+        }
+        return new_element;
+    }
+    return add_tag;
+}
+
+function html_tag_creator(tag, args_description, kwargs_description) {
+    return tag_creator_factorized(tag, args_description, kwargs_description, (t) => {return document.createElement(t);});
+}
+
+var svn_ns = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+function svg_tag_creator(tag, args_description, kwargs_description) {
+    return tag_creator_factorized(tag, args_description, kwargs_description, (t) => {
+        let new_tag = document.createElementNS(svn_ns, t);
+        if (tag == 'svg') {
+            new_tag.setAttributeNS("http://www.w3.org/2000/xmlns/", "xmlns:xlink", "http://www.w3.org/1999/xlink");
+        }
+        return new_tag;
+    });
+}
+
+var html_attributes = 'id class style hidden';
+var div_attributes = 'height width max_width';
+var mouse_events = 'click dblclick mousemove mouseover mouseenter mouseleave mouseup mousedown';
+var events = mouse_events.split(' ');
+
+var Input = html_tag_creator('input', '', html_attributes + ' type name value readonly disabled');
+var Button = html_tag_creator('button', 'text', html_attributes+' '+mouse_events);
+var Div = html_tag_creator('div', 'children', html_attributes+' '+mouse_events);
+var Svg = svg_tag_creator('svg', 'children', html_attributes+' '+mouse_events);
+
+
+var block_attributes = 'fill stroke stroke_width opacity '+mouse_events;
+var line_attributes = 'marker_start marker_end marker_mid stroke stroke_width '+mouse_events;
+var text_attributes = 'font_size font_family font_weight font_style text_anchor';
+
+var Rect = svg_tag_creator('rect', 'x y width height', 'rx ry ' + block_attributes);
+var Circle = svg_tag_creator('circle', 'r cx cy', block_attributes);
+var Ellipse = svg_tag_creator('ellipse', 'rx ry cx cy', block_attributes);
+var Line = svg_tag_creator('ellipse', 'x1 x2 y1 y2', line_attributes);
+var Path = svg_tag_creator('path', 'd', line_attributes + ' ' + block_attributes);
+var Text = svg_tag_creator('text', 'inner_html x y', 'dx dy rotate textLength lengthAdjust ' + text_attributes + ' ' + block_attributes + ' ' + line_attributes);
+
+
+
+
+
+    function render_main () {
+        let new_elements = [
+            Button(['Klik mij'], {click: (_) => {alert('HELP!')}})
+        ];
+        return new_elements;
+    }
+
+
+    window.onload = () => {
+        let new_elements = render_main();
+        for (let i=0; i<new_elements.length; i++) {
+            document.body.appendChild(new_elements[i])
+        }
+    };
+
+</script>
+<body>
+
+</body>
+</html>
