@@ -20,17 +20,18 @@ fsm canvas {
 @endfile
 
 @expect stdout
-class canvas {
+class Canvas {
     constructor() {
         this.state_Initial = {
             on_entry: function() {
                 this.the_canvas = Svg();
+
             }
         }
-        this.current_state = this.Initial_state.onentry();
+        this.current_state = this.Initial_state.on_entry();
     }
 }
 
-let fsm = new canvas();
+let fsm1 = new Canvas();
 @endexpect
 @endtest

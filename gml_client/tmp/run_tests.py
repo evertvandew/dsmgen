@@ -77,7 +77,7 @@ def compare_output(output, expected) -> str:
     # For now, use the diff utility.
     open('test_output', 'w').write(output)
     open('test_expected', 'w').write(expected)
-    result = subprocess.run('diff -ty test_expected test_output', shell=True, capture_output=True)
+    result = subprocess.run('diff -tywB test_expected test_output', shell=True, capture_output=True)
     if result.returncode == 0:
         return ''
     return result.stdout

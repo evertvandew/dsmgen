@@ -22,9 +22,9 @@ event::Event = dotted_variable_name [ '(' ','.{ variable_name } ')' ]  [ 'if' co
 condition::str = '(' { no_bracket | condition } ')' ;
 no_bracket::str = /[^()]/ ;
 
-code_snippet::str = { braced_snippet | no_brace_semicolon } ;
-code_snippet_semicolons::str = { braced_snippet | no_brace } ;
-braced_snippet::str = '{' code_snippet_semicolons '}' ;
+code_snippet::Code = { braced_snippet | no_brace_semicolon } ;
+code_snippet_semicolons = { braced_snippet | no_brace } ;
+braced_snippet = '{' code_snippet_semicolons '}' ;
 no_brace_semicolon::str = /[^{};]+/ ;
 no_brace::str = /[^{}]+/ ;
 
