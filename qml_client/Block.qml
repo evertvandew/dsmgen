@@ -5,7 +5,8 @@ Item {
     id: block
     signal clicked(index: int)
 
-    width: 40; height: 25
+    width: 40; height: 25;
+    property var drag_start: Qt.point(0,0);
 
     Rectangle {
         id: rectangle
@@ -37,6 +38,21 @@ Item {
         onClicked: {
             block.state = "HIGHLIGHTED";
             block.clicked(index)
+        }
+        onPressed: {
+            console.log("Mouse down");
+            block.state = "DRAGING";
+            block.drag_start = Qt.point(mouse.x, mouse.y);
+        }
+        onMouseXChanged: {
+            if (block.state == "DRAGING") {
+                block.x += mouse.x - block.drag_start.x;
+            }
+        }
+        onMouseYChanged: {
+            if (block.state == "DRAGING") {
+                block.y += mouse.y - block.drag_start.y;
+            }
         }
     }
         
@@ -107,6 +123,10 @@ Item {
         State {
             name: "DECORATED"
             PropertyChanges { target: rectangle; border.color: "lightblue" }
+        },
+        State {
+            name: "DRAGING"
+            StateChangeScript { script: handles.clear() }
         }
     ]
 }
