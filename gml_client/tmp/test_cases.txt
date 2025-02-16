@@ -1,4 +1,54 @@
 
+# Testcase 2: A state machine with complex event handlers
+@testcase 1
+@command python
+import fsm_generator
+fsm_generator.generate_JS(template=open('test_template.html'))
+@endcommand
+@file test_template.html
+@endfile
+
+@file stdin
+fsm canvas {
+    variable the_canvas;
+    variable block_create;
+    state Initial {
+        transition _ -> _ : {
+            this.the_canvas = Svg();
+        };
+        transition this.the_canvas.onclick() -> _ : {
+            console.log("Canvas was clicked");
+        };
+    }
+}
+@endfile
+
+@expect stdout
+class Canvas {
+    constructor() {
+        this.state_Initial = {
+            on_entry: function() {
+                this.the_canvas = Svg();
+
+            }
+        }
+        this.current_state = this.Initial_state.on_entry();
+    }
+}
+
+let fsm1 = new Canvas();
+@endexpect
+@endtest
+
+
+
+
+
+
+
+
+
+
 # Testcase 1: A simple fsm with only the default transition
 @testcase 1
 @command python

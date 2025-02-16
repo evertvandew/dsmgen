@@ -2,59 +2,116 @@ import QtQuick 2.15
 import QtQuick.Shapes 1.12
 
 Item {
+    
+    enum ShapeType {
+        Rect,
+        Square,
+        Circle,
+        Ellipse,
+        Note,
+        Component,
+        Diamond,
+        Folder,
+        Closed_circle,
+        Transparent_circle,
+        Ringed_closed_circle,
+        Bar,
+        Hexagon,
+        Octagon,
+        Box,
+        Drum,
+        Stickman,
+        Oblique_rect,
+        Tunnel,
+        Document,
+        Tape,
+        Triangle_down,
+        Triangle_up,
+        Hourglass,
+        Label,
+        Cloud
+    }
+    
+    function getShapePath(shape_type : int, width: int, height: int) : string {
+        switch(shape_type) {
+            case 1:
+                return "M 0 0 h %0 v %1 h -%0 z".arg(width).arg(height);
+            case 2:
+                return "M 0 0 h %0 v %0 h -%0 z".arg((width+height)/2);
+            case 3:
+                // arg0: radius. arg1: diameter
+                return "M 0,%0 a %0,%0 0 0 0 %1,0 a %0,%0 0 0 0 -%1,0".arg((width+height)/4).arg((width+height)/2);
+            case 4:
+                return "M 0,%1 a %0,%1 0 0 0 %2,0 a %0,%1 0 0 0 -%2,0".arg(width/2).arg(height/2).arg(width);
+            case 5:
+                return "M %0,%2 l -%2,-%2 v %2 Z M %0,%2 V %1 H 0 V 0 h %3 z"
+                .arg(width).arg(height).arg(0.1*width).arg(0.9*width);
+        }
+    }
+    
+    
     id: block
     signal clicked(index: int)
 
     width: 40; height: 25;
     property var drag_start: Qt.point(0,0);
+    property int shape_type: 5;
+    
 
     Rectangle {
         id: rectangle
-        border.color: "black"
-        color: "yellow"
         anchors.fill: parent
-
-        // MouseArea {
-        //     anchors.fill: parent
-        //     propagateComposedEvents: false
-        //     drag.target: parent
-        //     drag.threshold: 0
-        //     onClicked: {
-        //         block.state = "HIGHLIGHTED";
-        //         block.clicked(index)
-        //     }
-        // }
         
         ListModel{
             id: handles
         }
         
-            
-    MouseArea {
-        anchors.fill: parent
-        propagateComposedEvents: false
-        drag.target: parent
-        drag.threshold: 0
-        onClicked: {
-            block.state = "HIGHLIGHTED";
-            block.clicked(index)
-        }
-        onPressed: {
-            console.log("Mouse down");
-            block.state = "DRAGING";
-            block.drag_start = Qt.point(mouse.x, mouse.y);
-        }
-        onMouseXChanged: {
-            if (block.state == "DRAGING") {
-                block.x += mouse.x - block.drag_start.x;
+        // BlockShape {
+        //     block: block
+        // }
+                
+        Shape {
+            id: shape
+        
+            ShapePath {
+                fillColor: "yellow"
+                strokeColor: "black"
+                startX: 0; startY: 0
+        
+                PathSvg {
+                    //path: "M 0 0 h "+block.width+" v "+(block.height)+" h -"+block.width+" z"
+                    path: getShapePath(block.shape_type, block.width, block.height)
+                }
             }
         }
-        onMouseYChanged: {
-            if (block.state == "DRAGING") {
-                block.y += mouse.y - block.drag_start.y;
+
+        
+        MouseArea {
+            anchors.fill: parent
+            propagateComposedEvents: false
+            drag.target: parent
+            drag.threshold: 0
+            onClicked: {
+                block.state = "HIGHLIGHTED";
+                block.clicked(index)
+            }
+            onPressed: (mouse) => {
+                console.log("Mouse down");
+                block.state = "DRAGING";
+                block.drag_start = Qt.point(mouse.x, mouse.y);
+            }
+            onMouseXChanged: (mouse) => {
+                if (block.state == "DRAGING") {
+                    block.x += mouse.x - block.drag_start.x;
+                }
+            }
+            onMouseYChanged: (mouse) => {
+                if (block.state == "DRAGING") {
+                    block.y += mouse.y - block.drag_start.y;
+                }
             }
         }
-    }
+
         
         Repeater{
             id: resize_handles
