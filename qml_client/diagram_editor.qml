@@ -19,6 +19,9 @@ ApplicationWindow {
     signal blockClicked(index: int)
     signal connectionClicked(index: int)
     
+    property int block_a
+    property int block_b
+    
     
     Rectangle {
         id: page
@@ -39,7 +42,12 @@ ApplicationWindow {
         MouseArea{
             anchors.fill: parent
             onClicked: (mouse) => {
-                blocks.append({"x": mouse.x, "y": mouse.y, "shape_type": 5});
+                blocks.append({
+                    "x": mouse.x,
+                    "y": mouse.y,
+                    "width": 100,
+                    "height": 40,
+                    "shape_type": 5});
             }
         }
 
@@ -49,11 +57,11 @@ ApplicationWindow {
             Block{
                 x: model.x
                 y: model.y
+                width: model.width
+                height: model.height
                 shape_type: model.shape_type
                 
                 onClicked: (index, mouse) => {
-                    console.log("Clicked: "+index + mouse)
-                    console.log("Current state:"+stateMachine.state)
                     main_window.blockClicked(index)
                 }
             }
@@ -62,7 +70,10 @@ ApplicationWindow {
         Repeater{
             id: connections_view
             model: connections
-
+            Connection {
+                a_details: blocks_view.itemAt(model.block_a)
+                b_details: blocks_view.itemAt(model.block_b)
+            }
         }
     }
     
@@ -97,7 +108,7 @@ ApplicationWindow {
             
             onEntered: {
                 console.log("block editing mode")
-                editing_mode_btn.text= "Edit drawing"
+                editing_mode_btn.text= "Connect blocks"
             }
 
             onExited: {
@@ -110,10 +121,30 @@ ApplicationWindow {
                 targetState: block_mode
                 signal: editing_mode_btn.clicked
             }
+            SignalTransition {
+                targetState: block_a_selected
+                signal: blockClicked
+                onTriggered: (index) => {
+                    console.log("A block " + index + " was clicked")
+                    block_a = index
+                }
+            }
             onEntered: {
-                editing_mode_btn.text= "Connect blocks"
-                onBlockClicked: {
-                    console.log("block " + index + " was clicked")
+                editing_mode_btn.text= "Edit drawing"
+            }
+        }
+        
+        State {
+            id: block_a_selected
+            SignalTransition {
+                targetState: connection_mode
+                signal: blockClicked
+                onTriggered: (index) => {
+                    console.log("B block " + index + " was clicked")
+                    block_b = index
+                    connections.append({"block_a": block_a, "block_b": block_b})
+                    console.log('Created a connection:'+block_a+' '+block_b)
+                    console.log('The blocks:'+blocks_view.itemAt(block_a)+' '+blocks_view.itemAt(block_b))
                 }
             }
         }
