@@ -147,6 +147,10 @@ ApplicationWindow {
                     console.log('The blocks:'+blocks_view.itemAt(block_a)+' '+blocks_view.itemAt(block_b))
                 }
             }
+            SignalTransition {
+                targetState: block_mode
+                signal: editing_mode_btn.clicked
+            }
         }
     }
     

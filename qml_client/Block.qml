@@ -158,15 +158,6 @@ Item {
         }
     }
     
-    function decorate() {
-        handles.clear()
-        handles.append({x:0, y:0})
-        handles.append({x:width-10, y:0}),
-        handles.append({x:width-10, y:height-10}),
-        handles.append({x:0, y:height-10})
-    }
-
-    
     states: [
         State {
             name: ""
@@ -186,5 +177,46 @@ Item {
             StateChangeScript { script: handles.clear() }
         }
     ]
+    
+    function decorate() {
+        handles.clear()
+        handles.append({x:0, y:0})
+        handles.append({x:width-10, y:0}),
+        handles.append({x:width-10, y:height-10}),
+        handles.append({x:0, y:height-10})
+    }
+    
+    function getSize() {
+        return Qt.point(width, height)
+    }
+    function getCenter() {
+        return Qt.point(x+width/2, y+height/2)
+    }
+    function copysign(a, b) {
+        let aa = Math.abs(a)
+        if (b < 0) {
+            return -aa
+        } else if (b > 0) {
+            return aa
+        }
+        return 0
+    }
+    function intersect(b: Qt.point) {
+        let halfsize = Qt.point(width/2, height/2)
+        let a = getCenter()
+        let delta = Qt.point(b.x - a.x, b.y-a.y)
+        if (Math.abs(delta.x) > 1) {
+            let rc = delta.y / delta.x
+            let i_left = Qt.point(copysign(halfsize.x, delta.x), copysign(rc*halfsize.x, delta.y))
+            if (Math.abs(i_left.y) < halfsize.y) {
+                let result = Qt.point(i_left.x + a.x, i_left.y + a.y)
+                return result
+            }
+        }
+        let rc = delta.x / delta.y
+        let i_top = Qt.point(copysign(rc*halfsize.y, delta.x), copysign(halfsize.y, delta.y))
+        let result = Qt.point(i_top.x + a.x, i_top.y + a.y)
+        return result
+    }
 }
  
