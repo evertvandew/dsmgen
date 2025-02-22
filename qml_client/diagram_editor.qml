@@ -112,6 +112,9 @@ ApplicationWindow {
             }
 
             onExited: {
+                for (var i = 0; i<blocks_view.count; i++) {
+                    blocks_view.itemAt(i).state = "";
+                }
             }
         }
         
@@ -130,14 +133,14 @@ ApplicationWindow {
                 }
             }
             onEntered: {
-                editing_mode_btn.text= "Edit drawing"
+                editing_mode_btn.text= "1. Edit drawing"
             }
         }
         
         State {
             id: block_a_selected
             SignalTransition {
-                targetState: connection_mode
+                targetState: block_mode
                 signal: blockClicked
                 onTriggered: (index) => {
                     console.log("B block " + index + " was clicked")
@@ -150,6 +153,9 @@ ApplicationWindow {
             SignalTransition {
                 targetState: block_mode
                 signal: editing_mode_btn.clicked
+            }
+            onEntered: {
+                editing_mode_btn.text= "2. Edit drawing"
             }
         }
     }

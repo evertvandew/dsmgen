@@ -92,11 +92,9 @@ Item {
             drag.target: parent
             drag.threshold: 0
             onClicked: {
-                block.state = "HIGHLIGHTED";
                 block.clicked(index)
             }
             onPressed: (mouse) => {
-                console.log("Mouse down");
                 block.state = "DRAGING";
                 block.drag_start = Qt.point(mouse.x, mouse.y);
             }
@@ -166,11 +164,11 @@ Item {
         State {
             name: "HIGHLIGHTED"
             PropertyChanges { target: rectangle; border.color: "blue"; border.width: 3 }
-            StateChangeScript { script: decorate() }
         },
         State {
             name: "DECORATED"
             PropertyChanges { target: rectangle; border.color: "lightblue" }
+            StateChangeScript { script: decorate() }
         },
         State {
             name: "DRAGING"
