@@ -30,10 +30,12 @@ ApplicationWindow {
         
         ListModel{
             id: blocks
-//           ListElement{ x: 100; y: 100}
+            ListElement{ x: 100; y: 100; width: 100; height: 40; shape_type: 1}
+            ListElement{ x: 500; y: 500; width: 100; height: 40; shape_type: 1}
         }
         ListModel{
             id: connections
+            ListElement{ block_a: 0; block_b: 1; waypoints: [{x: 300, y:0}] }
         }
         ListModel{
             id: messages

@@ -4,41 +4,47 @@ import QtQuick.Shapes 1.12
 Item {
     property var a_details
     property var b_details
+    
+    property var waypoints
 
     property var start_point: a_details.intersect(b_details.getCenter())
     property var end_point: b_details.intersect(a_details.getCenter())
     
     signal clicked(index: int)
 
-    Shape {
-        ShapePath {
-            strokeColor: "black"
-            strokeWidth: 1
-            
-            startX: start_point.x
-            startY: start_point.y
-            
-            PathLine {
-                x: end_point.x
-                y: end_point.y
+    Repeater {
+        model: 1 + waypoints.count
+        
+        Shape {
+            ShapePath {
+                strokeColor: "black"
+                strokeWidth: 1
+                
+                startX: start_point.x
+                startY: start_point.y
+                
+                PathLine {
+                    x: end_point.x
+                    y: end_point.y
+                }
             }
-        }
-        Item {
-            id: item
-            x: Math.min(start_point.x, end_point.x) - 5
-            y: Math.min(start_point.y, end_point.y) - 5
-            width: Math.abs(end_point.x - start_point.x) + 10
-            height: Math.abs(end_point.y - start_point.y) + 10
-            
-            MouseArea {
-                anchors.fill: parent
-                onClicked: (mouse) => {
-                    let mouse_pos = Qt.point(mouse.x+item.x-start_point.x, mouse.y+item.y-start_point.y)
-                    let distance = Math.abs(distanceToLine(start_point, end_point, mouse_pos))
-                    if (distance < 5) {
-                        console.log("line click")
-                    } else {
-                        console.log("Missed the line: "+distance)
+            Item {
+                id: item
+                x: Math.min(start_point.x, end_point.x) - 5
+                y: Math.min(start_point.y, end_point.y) - 5
+                width: Math.abs(end_point.x - start_point.x) + 10
+                height: Math.abs(end_point.y - start_point.y) + 10
+                
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: (mouse) => {
+                        let mouse_pos = Qt.point(mouse.x+item.x-start_point.x, mouse.y+item.y-start_point.y)
+                        let distance = Math.abs(distanceToLine(start_point, end_point, mouse_pos))
+                        if (distance < 5) {
+                            console.log("line click")
+                        } else {
+                            console.log("Missed the line: "+distance)
+                        }
                     }
                 }
             }
