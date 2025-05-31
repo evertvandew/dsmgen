@@ -1,7 +1,8 @@
 
-mod arduino_lib;
+mod standard_lib;
 mod block_program;
 mod hal_mock;
+mod block_base;
 
 use block_program::TheProgram;
 use hal_mock::{mock_dio};
