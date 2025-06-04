@@ -64,9 +64,15 @@ from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.sql import text
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.cursor import CursorResult
-from client_src.storable_element import ReprCategory
+
 
 GEN_VERSION = "0.6"
+
+
+# ReprCategory is copied during the generation of this file.
+# The original is in client_src.storable_element
+${config.ReprCategory}
+
 
 parts = urlparse("${config.dbase_url}")
 if parts.scheme == 'sqlite':

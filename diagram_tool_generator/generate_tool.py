@@ -32,6 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 """
 
 import os, os.path
+import inspect
 import importlib
 from dataclasses import fields
 from typing import Self, Any, List, Dict
@@ -43,6 +44,7 @@ from mako.template import Template
 import model_definition
 import model_definition as mdef
 from config import Configuration
+from client_src.storable_element import ReprCategory
 
 
 def load_specification(module_name: str, specification):
@@ -374,6 +376,7 @@ def generate_tool(config: Configuration):
 
     config.server_dir = ensure_dir_exists(config.server_dir)
     config.client_dir = ensure_dir_exists(config.client_dir)
+    config.ReprCategory = inspect.getsource(ReprCategory)
 
     def hdir(basedir, p):
         """ Return a directory relative to the homedir """
