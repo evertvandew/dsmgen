@@ -1,0 +1,392 @@
+block_lu:
+    1: &id001
+        Id: 1
+        diagram: 407
+        parameters:
+            parameters: {}
+        parent: null
+        type_id: 385
+        type_name: arduino_uno
+        type_parameters: ''
+    28: &id002
+        Id: 28
+        diagram: 407
+        parameters:
+            parameters: {}
+        parent: null
+        type_id: 115
+        type_name: toggle
+        type_parameters: ''
+    31: &id003
+        Id: 31
+        diagram: 407
+        parameters:
+            parameters:
+                type: 1
+        parent: null
+        type_id: 9
+        type_name: DO
+        type_parameters: type:PinType
+    46: &id004
+        Id: 46
+        diagram: 407
+        parameters:
+            maximum: 100
+        parent: null
+        type_id: 110
+        type_name: counter
+        type_parameters:
+            maximum: int
+blocks:
+- *id001
+- *id002
+- *id003
+- *id004
+connection_lu:
+    39: &id005
+        Id: 39
+        source: 10
+        target: 34
+        type_name: ConfigChannel
+    40: &id006
+        Id: 40
+        source: 30
+        target: 32
+        type_name: SynchronousChannel
+    51: &id007
+        Id: 51
+        source: 50
+        target: 29
+        type_name: SynchronousChannel
+    52: &id008
+        Id: 52
+        source: 22
+        target: 47
+        type_name: SynchronousChannel
+connections:
+- *id005
+- *id006
+- *id007
+- *id008
+port_lu:
+    2: &id009
+        Id: 2
+        name: D1
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 386
+        type_name: ConfigOutput
+    3: &id010
+        Id: 3
+        name: D2
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 387
+        type_name: ConfigOutput
+    4: &id011
+        Id: 4
+        name: D3
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 388
+        type_name: ConfigOutput
+    5: &id012
+        Id: 5
+        name: D4
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 389
+        type_name: ConfigOutput
+    6: &id013
+        Id: 6
+        name: D5
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 390
+        type_name: ConfigOutput
+    7: &id014
+        Id: 7
+        name: D6
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 391
+        type_name: ConfigOutput
+    8: &id015
+        Id: 8
+        name: D7
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 392
+        type_name: ConfigOutput
+    9: &id016
+        Id: 9
+        name: D8
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 393
+        type_name: ConfigOutput
+    10: &id017
+        Id: 10
+        name: D9
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 394
+        type_name: ConfigOutput
+    11: &id018
+        Id: 11
+        name: D10
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 395
+        type_name: ConfigOutput
+    12: &id019
+        Id: 12
+        name: D11
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 396
+        type_name: ConfigOutput
+    13: &id020
+        Id: 13
+        name: D12
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 397
+        type_name: ConfigOutput
+    14: &id021
+        Id: 14
+        name: D13
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 398
+        type_name: ConfigOutput
+    15: &id022
+        Id: 15
+        name: D14
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 399
+        type_name: ConfigOutput
+    16: &id023
+        Id: 16
+        name: A0
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 400
+        type_name: ConfigOutput
+    17: &id024
+        Id: 17
+        name: A1
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 401
+        type_name: ConfigOutput
+    18: &id025
+        Id: 18
+        name: A2
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 402
+        type_name: ConfigOutput
+    19: &id026
+        Id: 19
+        name: A3
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 403
+        type_name: ConfigOutput
+    20: &id027
+        Id: 20
+        name: A4
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 404
+        type_name: ConfigOutput
+    21: &id028
+        Id: 21
+        name: A5
+        order: 0
+        parameters:
+            parameters: ''
+            peripheral_class: <class 'int'>
+        parent_block: 1
+        parent_type_id: 405
+        type_name: ConfigOutput
+    22: &id029
+        Id: 22
+        name: timer_tick
+        order: 0
+        parameters:
+            data_type: int
+        parent_block: 1
+        parent_type_id: 406
+        type_name: AsyncOutput
+    29: &id030
+        Id: 29
+        name: in
+        order: 0
+        parameters:
+            data_type: int
+        parent_block: 28
+        parent_type_id: 116
+        type_name: Input
+    30: &id031
+        Id: 30
+        name: out
+        order: 0
+        parameters:
+            data_type: int
+        parent_block: 28
+        parent_type_id: 117
+        type_name: Output
+    32: &id032
+        Id: 32
+        name: input
+        order: 0
+        parameters:
+            data_type: bool
+        parent_block: 31
+        parent_type_id: 10
+        type_name: Input
+    33: &id033
+        Id: 33
+        name: enable
+        order: 0
+        parameters:
+            data_type: bool
+        parent_block: 31
+        parent_type_id: 11
+        type_name: AsyncInput
+    34: &id034
+        Id: 34
+        name: pin
+        order: 0
+        parameters:
+            peripheral_class: 2
+        parent_block: 31
+        parent_type_id: 12
+        type_name: ConfigInput
+    47: &id035
+        Id: 47
+        name: in
+        order: 0
+        parameters:
+            data_type: int
+        parent_block: 46
+        parent_type_id: 111
+        type_name: Input
+    48: &id036
+        Id: 48
+        name: reset
+        order: 0
+        parameters:
+            data_type: int
+        parent_block: 46
+        parent_type_id: 112
+        type_name: Input
+    49: &id037
+        Id: 49
+        name: count
+        order: 0
+        parameters:
+            data_type: int
+        parent_block: 46
+        parent_type_id: 113
+        type_name: Output
+    50: &id038
+        Id: 50
+        name: overflow
+        order: 0
+        parameters:
+            data_type: int
+        parent_block: 46
+        parent_type_id: 114
+        type_name: AsyncOutput
+ports:
+- *id009
+- *id010
+- *id011
+- *id012
+- *id013
+- *id014
+- *id015
+- *id016
+- *id017
+- *id018
+- *id019
+- *id020
+- *id021
+- *id022
+- *id023
+- *id024
+- *id025
+- *id026
+- *id027
+- *id028
+- *id029
+- *id030
+- *id031
+- *id032
+- *id033
+- *id034
+- *id035
+- *id036
+- *id037
+- *id038

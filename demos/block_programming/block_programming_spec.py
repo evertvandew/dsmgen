@@ -11,6 +11,8 @@ md.ModelVersion('0.1')
 
 @md.register_enum
 class PeripheralClass(IntEnum):
+    InputPin = auto()
+    OutputPin = auto()
     IOPin = auto()
     Timer = auto()
     Uart = auto()
