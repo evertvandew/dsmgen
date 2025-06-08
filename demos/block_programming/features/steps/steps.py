@@ -40,10 +40,19 @@ def step_impl(context, index, block_id):
 
 @then('the number of blocks to be instantiated equals {count:d}')
 def step_impl(context, count):
-    eq_(len(context.program_generator.blocks), count)
+    eq_(len(context.program_generator.inner_blocks), count)
 
 @then('the generated instantiation for block {block:d} equals "{code}"')
 def step_impl(context, block, code):
-    block = context.program_generator.blocks[block]
+    block = context.program_generator.inner_blocks[block]
     eq_(context.program_generator.block_constructor(block), code)
+
+@then('the constructor for connection {conn:d} equals "{code}"')
+def step_impl(context, conn, code):
+    eq_(context.program_generator.connection_constructor(conn), code)
+
+
+@then('the number of connections to be instantiated equals {count:d}')
+def step_impl(context, count):
+    eq_(len(context.program_generator.connections), count)
 

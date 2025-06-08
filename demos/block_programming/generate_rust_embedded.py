@@ -218,21 +218,38 @@ class ProgramGenerator:
     def __init__(self, block_id, program_data):
         self.block_id = block_id
         self.program_data = program_data
+        self.my_blocks = [b for b in self.program_data['blocks'] if b['parent'] == self.block_id]
+        block_ids = set(b['Id'] for b in self.my_blocks)
+        self.my_ports = [p for p in self.program_data['ports'] if p['parent_block'] in block_ids]
+        port_ids = set(p['Id'] for p in self.my_ports)
+        self.my_connections = [c for c in self.program_data['connections'] if c['source'] in port_ids and c['type_name'] != 'ConfigChannel']
+        # Order the ports
+        input_counts = {i:0 for i in block_ids}
+        output_counts = {i:0 for i in block_ids}
+        for p in self.my_ports:
+            # Don't order the configuration ports: those are for compile time, not runtime connections.
+            if 'config' in p['type_name'].lower():
+                continue
+            if 'output' in p['type_name'].lower():
+                p['order'] = output_counts[p['parent_block']]
+                output_counts[p['parent_block']] += 1
+            else:
+                p['order'] = input_counts[p['parent_block']]
+                input_counts[p['parent_block']] += 1
 
     @property
     def inner_blocks(self):
-        return [b for b in self.program_data['blocks'] if b['parent'] == self.block_id]
+        return self.my_blocks
     @property
     def inner_ports(self):
-        block_ids = set(b['Id'] for b in self.inner_blocks)
-        return [p for p in self.program_data['ports'] if p['parent_block'] in block_ids]
+        return self.my_ports
     @property
     def parameters(self):
         config_ports = [p for p in self.inner_ports if p['type_name'] == 'ConfigInput']
         return [(p['name'], p['parent_block'], lookup_resource_type(p), p['Id']) for p in config_ports]
     @property
-    def blocks(self):
-        return self.program_data['blocks']
+    def connections(self):
+        return self.my_connections
 
     def block_constructor(self, block):
         values = []
@@ -258,11 +275,26 @@ class ProgramGenerator:
         values = ', '.join(values)
         return f'lib::{block['type_name']}::new({values})'
 
+    def connection_constructor(self, connection_id:int) -> str:
+        order = {b['Id']:i for i, b in enumerate(self.inner_blocks)}
+        connection = self.connections[connection_id]
+        port_lu = self.program_data['port_lu']
+        block_lu = self.program_data['block_lu']
+        if connection['type_name'] == dm.ConfigChannel.__name__:
+            return ''
+        source_port = port_lu[connection['source']]
+        target_port = port_lu[connection['target']]
+        source_block = order[source_port['parent_block']]
+        target_block = order[target_port['parent_block']]
+        return (f'Connection(({source_block}, {source_port['order']}),'
+                f'({target_block}, {target_port['order']}))')
+
 
 class ArduinoCodeGenerator:
     def __init__(self, name: str, program_data):
         self.name = name
         self.program_data = program_data
+
     def get_program_generator(self, block_id):
         return ProgramGenerator(block_id, self.program_data)
     def get_preamble(self):
