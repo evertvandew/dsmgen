@@ -249,8 +249,8 @@ stdlib = {
     },
     'logic': {
         'counter': BlockDefinition(
-            inputs={'in': Port(), 'reset': Port()},
-            outputs={'count': Port(), 'overflow': Port(port_type=PortType.Async)},
+            inputs={'in': Port()},
+            outputs={'out': Port()},
             parameters={'initial': Parameter(int, 0), 'maximum': Parameter(int, None)}
         ),
         'toggle': BlockDefinition(

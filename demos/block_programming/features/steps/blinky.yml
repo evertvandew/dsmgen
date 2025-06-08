@@ -53,15 +53,15 @@ connection_lu:
         source: 30
         target: 32
         type_name: SynchronousChannel
-    51: &id007
-        Id: 51
-        source: 50
-        target: 29
-        type_name: SynchronousChannel
-    52: &id008
-        Id: 52
+    50: &id007
+        Id: 50
         source: 22
         target: 47
+        type_name: SynchronousChannel
+    51: &id008
+        Id: 51
+        source: 49
+        target: 29
         type_name: SynchronousChannel
 connections:
 - *id005
@@ -332,16 +332,7 @@ port_lu:
         parent_block: 46
         parent_type_id: 111
         type_name: Input
-    48: &id036
-        Id: 48
-        name: reset
-        order: 0
-        parameters:
-            data_type: int
-        parent_block: 46
-        parent_type_id: 112
-        type_name: Input
-    49: &id037
+    49: &id036
         Id: 49
         name: count
         order: 0
@@ -350,15 +341,6 @@ port_lu:
         parent_block: 46
         parent_type_id: 113
         type_name: Output
-    50: &id038
-        Id: 50
-        name: overflow
-        order: 0
-        parameters:
-            data_type: int
-        parent_block: 46
-        parent_type_id: 114
-        type_name: AsyncOutput
 ports:
 - *id009
 - *id010
@@ -388,5 +370,3 @@ ports:
 - *id034
 - *id035
 - *id036
-- *id037
-- *id038

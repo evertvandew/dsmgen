@@ -236,6 +236,7 @@ class ProgramGenerator:
             else:
                 p['order'] = input_counts[p['parent_block']]
                 input_counts[p['parent_block']] += 1
+        pass
 
     @property
     def inner_blocks(self):

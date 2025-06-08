@@ -32,7 +32,6 @@ Feature: Generate Rust code for Arduino
                 |   2   | "lib::DO::new::<P0>(p0, 1)"   |
                 |   3   | "lib::counter::new(100)"      |
 
-    @active
     Scenario Outline: Connection construction
         Given the Blinky network
         When generating the main program
@@ -42,8 +41,8 @@ Feature: Generate Rust code for Arduino
         Examples:
             | conn | code                          |
             |  0   | "Connection((1, 0),(2, 0))"   |
-            |  1   | "Connection((3, 0),(1, 0))"   |
-            |  2   | "Connection((0, 0),(3, 0))"   |
+            |  1   | "Connection((0, 0),(3, 0))"   |
+            |  2   | "Connection((3, 0),(1, 0))"   |
 
     Scenario: determining program parameters
         Given the Blinky network

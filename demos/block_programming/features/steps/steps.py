@@ -35,7 +35,7 @@ def step_impl(context, index, type):
 
 @then('the recipient of parameter {index:d} is block {block_id:d}')
 def step_impl(context, index, block_id):
-    block_order = [b['Id'] for b in context.program_generator.blocks]
+    block_order = [b['Id'] for b in context.program_generator.inner_blocks]
     eq_(context.program_generator.parameters[index][1], block_order[block_id])
 
 @then('the number of blocks to be instantiated equals {count:d}')
