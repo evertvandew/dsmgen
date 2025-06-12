@@ -169,7 +169,7 @@ def create_project(name: str, mcu_settings: CpuSupport):
     # Create the project using cargo
     project_name = name.replace('_', '-')
     mcu_settings.create_project(project_name, mcu_settings)
-    subprocess.run(f'cp rust_target/block_library.rs {name}/src')
+    subprocess.run(f'cp rust_target/src/*.rs {name}/src', shell=True)
 
 
 def write_program(cpu_support:CpuSupport, data: dict):
@@ -213,12 +213,29 @@ def lookup_resource_type(port: Dict):
     }[port['parameters']['peripheral_class']]
 
 
+def deindent(prefix: str, text: str) -> str:
+    offset = len(prefix)
+    lines = []
+    for s in text.splitlines():
+        if s.startswith(prefix):
+            lines.append(s[offset:])
+        else:
+            lines.append(s)
+    return '\n'.join(lines)
+
+def indent(prefix: str, text: str) -> str:
+    lines = []
+    for s in text.splitlines():
+        lines.append(prefix+s)
+    return '\n'.join(lines)
+
 
 class ProgramGenerator:
-    def __init__(self, block_id, program_data):
+    def __init__(self, block_id, program_data, mcu_block=None):
         self.block_id = block_id
         self.program_data = program_data
         self.my_blocks = [b for b in self.program_data['blocks'] if b['parent'] == self.block_id]
+        self.mcu_block = self.my_blocks.index(program_data['block_lu'][mcu_block])
         block_ids = set(b['Id'] for b in self.my_blocks)
         self.my_ports = [p for p in self.program_data['ports'] if p['parent_block'] in block_ids]
         port_ids = set(p['Id'] for p in self.my_ports)
@@ -246,13 +263,18 @@ class ProgramGenerator:
         return self.my_ports
     @property
     def parameters(self):
+        """ Return a tuple (name, recipient, type, port_id) """
         config_ports = [p for p in self.inner_ports if p['type_name'] == 'ConfigInput']
-        return [(p['name'], p['parent_block'], lookup_resource_type(p), p['Id']) for p in config_ports]
+        connection_lu = {c['target']: c['source'] for c in self.program_data['connections']}
+        return [(p['name'], p['parent_block'], lookup_resource_type(p), p['Id'], connection_lu.get(p['Id'], None))
+                for p in config_ports]
+
     @property
     def connections(self):
         return self.my_connections
 
-    def block_constructor(self, block):
+    def block_constructor(self, block_id):
+        block = self.inner_blocks[block_id]
         values = []
         if block['type_parameters']:
             parameters = block['parameters']
@@ -290,127 +312,158 @@ class ProgramGenerator:
         return (f'Connection(({source_block}, {source_port['order']}),'
                 f'({target_block}, {target_port['order']}))')
 
+    def get_program_name(self):
+        return self.program_data['block_lu'][self.block_id] if self.block_id else "TheProgram"
+
+    def get_param_decl(self):
+        if parameters := self.parameters:
+            return '<' + ', '.join(f'P{i}: {p[2]}' for i, p in enumerate(parameters)) + '>'
+        return ''
+
+    def get_param_ref(self):
+        if parameters := self.parameters:
+            return '<' + ', '.join(f'P{i}' for i, p in enumerate(parameters)) + '>'
+        return ''
+
+    def get_constructor_args(self):
+        if parameters := self.parameters:
+            return ', '.join(f'p{i}: P{i}' for i, p in enumerate(parameters))
+        return ''
+
+    def get_block_decl(self, b_id):
+        b = self.inner_blocks[b_id]
+        parameter_lu = {p[1]: p for p in self.parameters}
+        result = f'lib::{b['type_name']}'
+        if b['Id'] in parameter_lu:
+            pargs = '<' + ','.join(f'P{i}' for i, p in enumerate(self.parameters) if p[1] == b['Id']) + '>'
+            result += pargs
+        return result
+
+    def get_blocks_decl(self):
+        block_params = {}
+        for i, p in enumerate(self.parameters):
+            if p[1] not in block_params:
+                block_params[p[1]] = [f'P{i}']
+            else:
+                block_params[p[1]].append(f'P{i}')
+        block_params = {i: '<'+', '.join(v)+'>' for i, v in block_params.items()}
+        return ',\n                '.join(f'block{i}: lib::{b['type_name']}{block_params.get(b['Id'], '')}' for i, b in enumerate(self.inner_blocks))
+
+    def get_program_instance_args(self):
+        """ Determine the arguments to pass to a program when instantiating it. """
+        args = []
+        for parameter in self.parameters:
+            resource = self.program_data['port_lu'][parameter[4]]
+            match parameter[2]:
+                case 'OutputPin':
+                    args.append(f'pins.{resource['name'].lower()}.into_output()')
+                case 'InputPin':
+                    args.append(f'pins.{resource['name'].lower()}.into_input()')
+                case _:
+                    assert False, f"Resources of type {parameter[2]} are not yet supported"
+        return ', '.join(args)
+
+    def get_program_declaration(self):
+        return deindent('            ', f"""
+            struct {self.get_program_name()}{self.get_param_decl()} {{
+                {self.get_blocks_decl()},
+                connections: [Connection; {len(self.connections)}]
+            }}
+            """)
+    def get_my_implementation(self):
+        block_constructs = ',\n                        '.join(f'block{i}: {self.block_constructor(i)}' for i, _ in enumerate(self.inner_blocks))
+        connect_constructs = ',\n'.join(self.connection_constructor(i) for i, _ in enumerate(self.connections))
+        return deindent('            ', f"""
+            impl{self.get_param_decl()} {self.get_program_name()}{self.get_param_ref()} {{
+                fn new({self.get_constructor_args()}) -> Self {{
+                    Self{{
+                        {block_constructs},
+                        connections: [
+{indent('                            ', connect_constructs)}
+                        ]
+                    }}
+                }}
+            }}""")
+
+    def get_program_implementation(self):
+
+        block_list = ',\n                        '.join(f"{i:<3}=> &mut self.block{i}" for i, _ in enumerate(self.inner_blocks))
+        return deindent('            ',f"""
+            impl{self.get_param_decl()} Program for {self.get_program_name()}{self.get_param_ref()} {{
+                fn get_block(&mut self, index: u8) -> &mut dyn IoProcess {{
+                    match index {{
+                        {block_list},
+                        _  => core::panic!("Unknown block ID")
+                    }}
+                }}
+                fn get_connections(&self) -> &[Connection] {{
+                    &self.connections
+                }}
+                fn get_arduino_block_id(&self) -> u8 {{{self.mcu_block}}}
+            }}
+        """)
+
+    def get_implementations(self):
+        result = [self.get_my_implementation(), self.get_program_implementation()]
+        if self.block_id:
+            result.append(self.get_ioprocess_implementation())
+        return '\n'.join(result)
+
+    def get_program(self):
+        return f"""
+            {self.get_program_declaration()}
+            {self.get_implementations()}
+            """
+
 
 class ArduinoCodeGenerator:
-    def __init__(self, name: str, program_data):
+    def __init__(self, name: str, program_data, mcu_block: int):
         self.name = name
         self.program_data = program_data
+        self.mcu_block = mcu_block
 
     def get_program_generator(self, block_id):
-        return ProgramGenerator(block_id, self.program_data)
-    def get_preamble(self):
-        return """#![no_std]
-#![no_main]
+        return ProgramGenerator(block_id, self.program_data, self.mcu_block)
 
-mod block_library;
-mod block_base;
-mod vecdeque;
+    def full_program(self):
+        program_generator = self.get_program_generator(None)
+        return deindent('            ', f"""
+            #![no_std]
+            #![no_main]
+            
+            mod block_library;
+            mod block_base;
+            mod vecdeque;
+            
+            use embedded_hal::digital::{{OutputPin}};
+            use block_library as lib;
+            use crate::block_base::{{clock_tick, Connection, Program, IoProcess}};
+            
+            use panic_halt as _;
+            
+            {indent('            ', program_generator.get_program())}
+            
+            #[arduino_hal::entry]
+            fn main() -> ! {{
+                let dp = arduino_hal::Peripherals::take().unwrap();
+                let pins = arduino_hal::pins!(dp);
 
-use embedded_hal::digital::{OutputPin};
-use block_library as lib;
-use crate::block_base::{clock_tick, Connection, Program, IoProcess};
+                let mut the_program = TheProgram::new({program_generator.get_program_instance_args()});
 
-use panic_halt as _;"""
+                loop {{
+                    clock_tick(&mut the_program);
+                    arduino_hal::delay_ms(1);
+                }}
+            }}
+            """)
 
     @property
     def program_name(self):
         return self.name.replace('_', '-')
 
 
-def code_generator(name: str, program_data):
-    return ArduinoCodeGenerator(name, program_data)
-
-
-
-def define_tests():
-    from test_frame import test, prepare
-
-    @prepare
-    def init():
-        from difflib import unified_diff
-
-        def export_program(prog_name):
-            test_data = get_program_data(prog_name)
-            yaml.dump(test_data.export(), open(prog_name+'.yml', 'w'), sort_keys=True, indent=4)
-
-        export_program('blinky')
-
-        test_data = yaml.full_load(open('blinky.yml'))
-
-        @test
-        def write_program_test():
-            open('test_generate.rs', 'w').write(write_program(test_data))
-            delta = ''.join(unified_diff(write_program(test_data), '''#![no_std]
-    #![no_main]
-    
-    use panic_halt as _;
-    use cortex_m_rt::entry;
-    use block_programming::embedded_lib as lib;
-    
-    
-    #[entry]
-    fn main() {
-        let mut the_program = Program{
-            blocks: vec![
-                lib::arduino_uno(),
-                lib::counter(0, 1000),
-                lib::toggle(),
-                lib::DO(get_resource("D9"), 1)
-            ],
-            connections: vec![
-                Connection((1, 0),(2, 0)),
-                Connection((0, 0),(1, 0)),
-                Connection((2, 0),(3, 0))
-            ]
-        };
-        
-        loop {
-            lib::clock_tick(&mut the_program);
-        }
-    }
-    ''', 'result', 'expected'))
-            assert not delta, f"Difference: {delta}"
-
-        @test
-        def write_block_declaration_test():
-            assert write_block_declaration(test_data['blocks'][0], test_data) == 'lib::arduino_uno()'
-
-        @test
-        def write_resource_assignment_test():
-            # resource assignments do not lead to (run-time) connections.
-            port_lu = test_data['port_lu']
-            block_lu = test_data['block_lu']
-            assert write_connection(test_data['connections'][2], port_lu, block_lu) is None
-            # Check the system detects which blocks have ConfigPorts and starts them up properly.
-            write_block_construction(test_data['blocks'][3], test_data)
-            assert write_block_construction(test_data['blocks'][3], test_data) == 'lib::DO::new::<P1>(arg_1, 1)'
-
-        @test
-        def write_connection_test():
-            port_lu = test_data['port_lu']
-            block_lu = test_data['block_lu']
-            assert write_connection(test_data['connections'][0], port_lu, block_lu) == 'Connection((1, 0),(2, 0))'
-
-        @test
-        def load_program_test():
-            result = get_program_data('blinky')
-            assert len(result.blocks) == 4
-            assert len(result.connections) == 4
-            assert len(result.ports) == 30
-
-        @test
-        def load_unknown_program():
-            result = get_program_data('I do not exist')
-            assert result is None
-
-        @test
-        def get_theprogram_template_parameters():
-            result = get_program_data('blinky')
-            txt = write_theprogram_parameter_arguments(result)
-            assert txt == "<P1: OutputPin>"
-            txt = write_theprogram_parameter_names(result)
-            assert txt == "<P1>"
-
+def code_generator(name: str, program_data, mcu_block):
+    return ArduinoCodeGenerator(name, program_data, mcu_block)
 
 
 if __name__ == '__main__':
@@ -439,7 +492,8 @@ if __name__ == '__main__':
             proj_name = program_name.replace('_', '-')
             create_project(proj_name, mcu_settings)
 
-            print(write_program(mcu_settings, data), file=open(f'{proj_name}/src/main.rs', 'w'))
+            generator = ArduinoCodeGenerator(proj_name, data, 1)
+            open(f'{proj_name}/src/main.rs', 'w').write(generator.full_program())
     else:
         define_tests()
         from test_frame import run_tests

@@ -1,24 +1,5 @@
 Feature: Generate Rust code for Arduino
 
-    Scenario: Generating the blinky network
-        Given the Blinky network
-        Then the program name is "blinky"
-        And the generated preamble equals
-            """
-            #![no_std]
-            #![no_main]
-
-            mod block_library;
-            mod block_base;
-            mod vecdeque;
-
-            use embedded_hal::digital::{OutputPin};
-            use block_library as lib;
-            use crate::block_base::{clock_tick, Connection, Program, IoProcess};
-
-            use panic_halt as _;
-            """
-
     Scenario Outline: block construction
         Given the Blinky network
         When generating the main program
@@ -44,9 +25,26 @@ Feature: Generate Rust code for Arduino
             |  1   | "Connection((0, 0),(3, 0))"   |
             |  2   | "Connection((3, 0),(1, 0))"   |
 
-    Scenario: determining program parameters
+    @active
+    Scenario Outline:
+        Given the Blinky network
+        When generating the main program
+        Then the declaration for block <block> equals <code>
+        Examples:
+            | block | code               |
+            |   0   | "lib::arduino_uno" |
+            |   1   | "lib::toggle"      |
+            |   2   | "lib::DO<P0>"      |
+            |   3   | "lib::counter"     |
+
+    @active
+    Scenario: determining program details
         Given the Blinky network
         When generating the main program
         Then there is 1 parameters
         And the type of parameter 0 is OutputPin
+        And the program parameter string is "<P0: OutputPin>"
         And the recipient of parameter 0 is block 2
+        And the program name is TheProgram
+        And the program instantiation parameters equals "pins.d13.into_output()"
+

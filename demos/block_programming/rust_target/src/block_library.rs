@@ -82,19 +82,19 @@ impl IoProcess for toggle {
 
 ///////////////////////////////////////////////////////////////////////////////
 // DO (Digital Output)
-pub struct DO<Pin> {
+pub struct DO<OP: OutputPin> {
     pub channels: ProcessIO<1, 0>,
-    pub pin: Pin,
+    pub pin: OP,
 }
-impl <Pin: OutputPin> DO<Pin> {
-    pub fn new(pin: Pin, _pintype: u8) -> Self {
+impl <OP: OutputPin> DO<OP> {
+    pub fn new<P>(pin: OP, _pintype: u8) -> Self {
         Self {
             channels: ProcessIO::<1, 0>::new(),
-            pin,
+            pin: pin,
         }
     }
 }
-impl<Pin: OutputPin> IoProcess for DO<Pin> {
+impl<OP: OutputPin> IoProcess for DO<OP> {
     fn get_io(&mut self) -> &mut dyn ProcessIOGetter {&mut self.channels}
     fn evaluate(&mut self) {
         if let PortValue::Integer(value) = self.channels.inputs[0].value {

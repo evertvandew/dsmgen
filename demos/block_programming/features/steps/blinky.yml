@@ -45,7 +45,7 @@ blocks:
 connection_lu:
     39: &id005
         Id: 39
-        source: 10
+        source: 14
         target: 34
         type_name: ConfigChannel
     40: &id006
